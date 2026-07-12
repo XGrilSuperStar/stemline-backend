@@ -62,6 +62,10 @@ OUTPUT_DIR = BASE_DIR / "output"
 UPLOADS_DIR.mkdir(exist_ok=True)
 OUTPUT_DIR.mkdir(exist_ok=True)
 
+# Simple in-memory job tracking. A real production version would use
+# a database or Redis instead, so jobs survive a server restart.
+jobs = {}
+
 # ---------------------------------------------------------------------------
 # Database setup (Postgres on Railway). DATABASE_URL is provided automatically
 # by Railway once a Postgres database is attached to this project.
