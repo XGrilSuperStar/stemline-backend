@@ -1,6 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import uvicorn
 import os
 import shutil
@@ -9,7 +10,7 @@ import zipfile
 from datetime import datetime, timedelta
 import jwt
 import bcrypt
-from sqlalchemy import create_engine, Column, Integer, String, DateTime
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 import logging
@@ -43,8 +44,18 @@ class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True)
     email = Column(String, unique=True, index=True)
+    username = Column(String, nullable=True)
     password_hash = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class SignupRequest(BaseModel):
+    email: str
+    username: str
+    password: str
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
 
 class Stem(Base):
     __tablename__ = "stems"
@@ -55,6 +66,14 @@ class Stem(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 Base.metadata.create_all(bind=engine)
+
+# One-time migration: add username column to users table if it doesn't exist yet
+try:
+    with engine.connect() as conn:
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS username VARCHAR"))
+        conn.commit()
+except Exception as e:
+    logger.warning(f"Username column migration skipped or already applied: {e}")
 
 # JWT config
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "default-secret-key")
@@ -87,7 +106,10 @@ def root():
     return {"status": "Stemline API is running"}
 
 @app.post("/api/v1/signup")
-def signup(email: str, password: str, db: Session = Depends(get_db)):
+def signup(body: SignupRequest, db: Session = Depends(get_db)):
+    email = body.email
+    username = body.username
+    password = body.password
     logger.info(f"Signup attempt for email: {email}")
     try:
         email = email.lower()
@@ -96,7 +118,7 @@ def signup(email: str, password: str, db: Session = Depends(get_db)):
             raise HTTPException(status_code=400, detail="Email already registered")
         
         password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-        new_user = User(email=email, password_hash=password_hash)
+        new_user = User(email=email, username=username, password_hash=password_hash)
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
@@ -107,13 +129,17 @@ def signup(email: str, password: str, db: Session = Depends(get_db)):
             algorithm=JWT_ALGORITHM
         )
         logger.info(f"User {new_user.id} signed up successfully")
-        return {"user_id": new_user.id, "token": token}
+        return {"user_id": new_user.id, "email": new_user.email, "username": new_user.username, "token": token}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Signup error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/v1/login")
-def login(email: str, password: str, db: Session = Depends(get_db)):
+def login(body: LoginRequest, db: Session = Depends(get_db)):
+    email = body.email
+    password = body.password
     logger.info(f"Login attempt for email: {email}")
     try:
         email = email.lower()
@@ -127,7 +153,9 @@ def login(email: str, password: str, db: Session = Depends(get_db)):
             algorithm=JWT_ALGORITHM
         )
         logger.info(f"User {user.id} logged in successfully")
-        return {"user_id": user.id, "token": token}
+        return {"user_id": user.id, "email": user.email, "username": user.username, "token": token}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Login error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
