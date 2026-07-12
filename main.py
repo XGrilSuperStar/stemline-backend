@@ -75,6 +75,16 @@ try:
 except Exception as e:
     logger.warning(f"Username column migration skipped or already applied: {e}")
 
+# One-time migration: fix users.id so it auto-generates values (was missing a sequence/default)
+try:
+    with engine.connect() as conn:
+        conn.execute(text("CREATE SEQUENCE IF NOT EXISTS users_id_seq OWNED BY users.id"))
+        conn.execute(text("SELECT setval('users_id_seq', COALESCE((SELECT MAX(id) FROM users), 0) + 1, false)"))
+        conn.execute(text("ALTER TABLE users ALTER COLUMN id SET DEFAULT nextval('users_id_seq')"))
+        conn.commit()
+except Exception as e:
+    logger.warning(f"users.id sequence migration skipped or already applied: {e}")
+
 # JWT config
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "default-secret-key")
 JWT_ALGORITHM = "HS256"
