@@ -1392,7 +1392,13 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.detail || 'Something went wrong. Try again.');
+        let message = 'Something went wrong. Try again.';
+        if (Array.isArray(data.detail)) {
+          message = data.detail.map(e => e.msg || JSON.stringify(e)).join(', ');
+        } else if (typeof data.detail === 'string') {
+          message = data.detail;
+        }
+        throw new Error(message);
       }
       setSession(data.token, data.email);
       refreshAccountButton();
