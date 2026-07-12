@@ -787,8 +787,12 @@
     </div>
     <div id="authError" style="display:none;color:var(--clip-red);font-size:0.75rem;margin-bottom:0.8rem;"></div>
     <form id="authForm">
-      <input type="email" id="authEmail" placeholder="Email" required style="width:100%;box-sizing:border-box;padding:0.6rem;margin-bottom:0.7rem;background:#101113;border:1px solid #000;border-radius:3px;color:var(--paper);font-family:inherit;font-size:0.8rem;">
-      <input type="password" id="authPassword" placeholder="Password" required minlength="8" style="width:100%;box-sizing:border-box;padding:0.6rem;margin-bottom:1rem;background:#101113;border:1px solid #000;border-radius:3px;color:var(--paper);font-family:inherit;font-size:0.8rem;">
+      <input type="email" id="authEmail" placeholder="Email" required autocomplete="email" style="width:100%;box-sizing:border-box;padding:0.6rem;margin-bottom:0.7rem;background:#101113;border:1px solid #000;border-radius:3px;color:var(--paper);font-family:inherit;font-size:0.8rem;">
+      <input type="text" id="authUsername" placeholder="Username" autocomplete="off" style="width:100%;box-sizing:border-box;padding:0.6rem;margin-bottom:0.7rem;background:#101113;border:1px solid #000;border-radius:3px;color:var(--paper);font-family:inherit;font-size:0.8rem;display:none;">
+      <div style="position:relative;margin-bottom:1rem;">
+        <input type="password" id="authPassword" placeholder="Password" required minlength="8" autocomplete="new-password" style="width:100%;box-sizing:border-box;padding:0.6rem;padding-right:2.4rem;background:#101113;border:1px solid #000;border-radius:3px;color:var(--paper);font-family:inherit;font-size:0.8rem;">
+        <button type="button" id="authPasswordToggle" aria-label="Show password" style="position:absolute;right:0.5rem;top:50%;transform:translateY(-50%);background:none;border:none;color:rgba(237,227,206,0.5);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.68rem;">SHOW</button>
+      </div>
       <button type="submit" id="authSubmitBtn" class="btn-primary" style="width:100%;border:none;cursor:pointer;font-family:inherit;">Log in</button>
     </form>
     <div style="text-align:center;margin-top:1rem;font-size:0.75rem;color:rgba(237,227,206,0.55);">
@@ -1307,7 +1311,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const authModalTitle = document.getElementById('authModalTitle');
   const authForm = document.getElementById('authForm');
   const authEmail = document.getElementById('authEmail');
+  const authUsername = document.getElementById('authUsername');
   const authPassword = document.getElementById('authPassword');
+  const authPasswordToggle = document.getElementById('authPasswordToggle');
   const authSubmitBtn = document.getElementById('authSubmitBtn');
   const authError = document.getElementById('authError');
   const authToggleText = document.getElementById('authToggleText');
@@ -1359,11 +1365,15 @@ document.addEventListener('DOMContentLoaded', () => {
       authSubmitBtn.textContent = 'Sign up';
       authToggleText.textContent = 'Already have an account?';
       authToggleLink.textContent = 'Log in';
+      authUsername.style.display = 'block';
+      authUsername.required = true;
     } else {
       authModalTitle.textContent = 'Log in';
       authSubmitBtn.textContent = 'Log in';
       authToggleText.textContent = "Don't have an account?";
       authToggleLink.textContent = 'Sign up';
+      authUsername.style.display = 'none';
+      authUsername.required = false;
     }
     authModal.style.display = 'flex';
   }
@@ -1378,6 +1388,12 @@ document.addEventListener('DOMContentLoaded', () => {
     openAuthModal(authMode === 'login' ? 'signup' : 'login');
   });
 
+  authPasswordToggle.addEventListener('click', () => {
+    const showing = authPassword.type === 'text';
+    authPassword.type = showing ? 'password' : 'text';
+    authPasswordToggle.textContent = showing ? 'SHOW' : 'HIDE';
+  });
+
   authForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     authError.style.display = 'none';
@@ -1385,10 +1401,13 @@ document.addEventListener('DOMContentLoaded', () => {
     authSubmitBtn.textContent = authMode === 'signup' ? 'Signing up…' : 'Logging in…';
     try {
       const endpoint = authMode === 'signup' ? '/api/v1/signup' : '/api/v1/login';
+      const payload = authMode === 'signup'
+        ? { email: authEmail.value, username: authUsername.value, password: authPassword.value }
+        : { email: authEmail.value, password: authPassword.value };
       const res = await fetch(API_BASE + endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: authEmail.value, password: authPassword.value })
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (!res.ok) {
