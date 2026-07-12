@@ -1,109 +1,80 @@
-"""
-Stemline Backend — Upload a song, get back split stems
-=========================================================
-
-This is a real, working backend. It accepts an audio file upload,
-runs it through Demucs (the AI stem separator), and lets the person
-download a zip of the 4 separated tracks.
-
-HOW TO RUN LOCALLY (one-time setup):
-    pip install fastapi uvicorn python-multipart demucs torchcodec
-
-THEN:
-    python main.py
-
-Then open http://localhost:8000/docs to test uploads directly, or
-point the Stemline landing page's upload form at this server.
-
-DEPLOYMENT NOTE:
-This is built the same way as DataShred101's backend (FastAPI +
-Railway). To go live, this deploys to Railway the same way — push
-to a GitHub repo connected to a Railway service.
-
-Processing is CPU-heavy: expect roughly 1x the song's length in
-processing time on a normal server (a 3-minute song takes about
-3 minutes). For a real paid product, an upgraded Railway plan or a
-GPU-backed service would speed this up a lot.
-"""
-
-import os
-import subprocess
-import sys
-import uuid
-import shutil
-import zipfile
-import datetime
-from pathlib import Path
-
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Header
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, EmailStr
-
-import bcrypt
+import uvicorn
+import os
+import shutil
+import subprocess
+import zipfile
+from datetime import datetime, timedelta
 import jwt
-from sqlalchemy import create_engine, Column, String, DateTime, ForeignKey
-from sqlalchemy.orm import declarative_base, sessionmaker, Session
+import bcrypt
+from sqlalchemy import create_engine, Column, Integer, String, DateTime
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
+import logging
 
-app = FastAPI(title="Stemline API")
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
-# Allow the landing page (running on any origin during testing) to call this API.
-# In production, lock this down to just your real domain.
+app = FastAPI()
+
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-BASE_DIR = Path(__file__).parent
-UPLOADS_DIR = BASE_DIR / "uploads"
-OUTPUT_DIR = BASE_DIR / "output"
-UPLOADS_DIR.mkdir(exist_ok=True)
-OUTPUT_DIR.mkdir(exist_ok=True)
-
-# Simple in-memory job tracking. A real production version would use
-# a database or Redis instead, so jobs survive a server restart.
-jobs = {}
-
-# ---------------------------------------------------------------------------
-# Database setup (Postgres on Railway). DATABASE_URL is provided automatically
-# by Railway once a Postgres database is attached to this project.
-# ---------------------------------------------------------------------------
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:pass@localhost/stemline_db")
-if DATABASE_URL.startswith("postgres://"):
-    # Railway sometimes gives the old-style prefix; SQLAlchemy needs postgresql://
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+# Database setup
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL environment variable not set")
 
 engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(bind=engine)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change-this-in-railway")
-JWT_ALGORITHM = "HS256"
-
-
+# Models
 class User(Base):
     __tablename__ = "users"
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    email = Column(String, unique=True, nullable=False, index=True)
-    password_hash = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-
+    id = Column(Integer, primary_key=True)
+    email = Column(String, unique=True, index=True)
+    password_hash = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 class Stem(Base):
-    """A saved split job, tied to the user who created it."""
     __tablename__ = "stems"
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
-    track_name = Column(String, nullable=False)
-    zip_path = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer)
+    track_name = Column(String)
+    zip_path = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 Base.metadata.create_all(bind=engine)
 
+# JWT config
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "default-secret-key")
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRATION_HOURS = 720
 
+# Dependency: get current user from token
+def get_current_user(token: str = None):
+    if not token:
+        raise HTTPException(status_code=401, detail="Missing token")
+    try:
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        user_id = payload.get("user_id")
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return user_id
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+# Helper: get DB session
 def get_db():
     db = SessionLocal()
     try:
@@ -111,197 +82,156 @@ def get_db():
     finally:
         db.close()
 
-
-def get_current_user(authorization: str = Header(None), db: Session = Depends(get_db)) -> User:
-    """Reads the 'Authorization: Bearer <token>' header and returns the logged-in user."""
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Not logged in.")
-    token = authorization.split(" ", 1)[1]
-    try:
-        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
-    except jwt.PyJWTError:
-        raise HTTPException(status_code=401, detail="Session expired, please log in again.")
-    user = db.query(User).filter(User.id == payload.get("user_id")).first()
-    if not user:
-        raise HTTPException(status_code=401, detail="Account not found.")
-    return user
-
-
-# ---------------------------------------------------------------------------
-# Signup / Login
-# ---------------------------------------------------------------------------
-class SignupRequest(BaseModel):
-    email: EmailStr
-    password: str
-
-
-class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str
-
-
-def make_token(user_id: str) -> str:
-    payload = {
-        "user_id": user_id,
-        "exp": datetime.datetime.utcnow() + datetime.timedelta(days=30),
-    }
-    return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
-
-
-@app.post("/api/v1/signup")
-def signup(req: SignupRequest, db: Session = Depends(get_db)):
-    email = req.email.lower()
-    if db.query(User).filter(User.email == email).first():
-        raise HTTPException(status_code=400, detail="An account with that email already exists.")
-    password_hash = bcrypt.hashpw(req.password.encode(), bcrypt.gensalt()).decode()
-    user = User(email=email, password_hash=password_hash)
-    db.add(user)
-    db.commit()
-    return {"token": make_token(user.id), "email": user.email}
-
-
-@app.post("/api/v1/login")
-def login(req: LoginRequest, db: Session = Depends(get_db)):
-    email = req.email.lower()
-    user = db.query(User).filter(User.email == email).first()
-    if not user or not bcrypt.checkpw(req.password.encode(), user.password_hash.encode()):
-        raise HTTPException(status_code=401, detail="Incorrect email or password.")
-    return {"token": make_token(user.id), "email": user.email}
-
-
 @app.get("/")
 def root():
     return {"status": "Stemline API is running"}
 
+@app.post("/api/v1/signup")
+def signup(email: str, password: str, db: Session = Depends(get_db)):
+    logger.info(f"Signup attempt for email: {email}")
+    try:
+        email = email.lower()
+        existing = db.query(User).filter(User.email == email).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already registered")
+        
+        password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+        new_user = User(email=email, password_hash=password_hash)
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        
+        token = jwt.encode(
+            {"user_id": new_user.id, "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS)},
+            JWT_SECRET_KEY,
+            algorithm=JWT_ALGORITHM
+        )
+        logger.info(f"User {new_user.id} signed up successfully")
+        return {"user_id": new_user.id, "token": token}
+    except Exception as e:
+        logger.error(f"Signup error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/login")
+def login(email: str, password: str, db: Session = Depends(get_db)):
+    logger.info(f"Login attempt for email: {email}")
+    try:
+        email = email.lower()
+        user = db.query(User).filter(User.email == email).first()
+        if not user or not bcrypt.checkpw(password.encode(), user.password_hash.encode()):
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+        
+        token = jwt.encode(
+            {"user_id": user.id, "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS)},
+            JWT_SECRET_KEY,
+            algorithm=JWT_ALGORITHM
+        )
+        logger.info(f"User {user.id} logged in successfully")
+        return {"user_id": user.id, "token": token}
+    except Exception as e:
+        logger.error(f"Login error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/v1/split")
-async def split_song(
-    file: UploadFile = File(...),
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """
-    Accepts an uploaded audio file, saves it, and kicks off stem separation.
-    Requires a logged-in user (Authorization: Bearer <token> header).
-    Returns a job_id the frontend can use to check status and download results.
-    """
-    allowed_extensions = {".mp3", ".wav", ".m4a", ".flac"}
-    file_ext = Path(file.filename).suffix.lower()
-
-    if file_ext not in allowed_extensions:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported file type '{file_ext}'. Use MP3, WAV, M4A, or FLAC."
-        )
-
-    job_id = str(uuid.uuid4())
-    saved_path = UPLOADS_DIR / f"{job_id}{file_ext}"
-
-    with open(saved_path, "wb") as f:
-        shutil.copyfileobj(file.file, f)
-
-    jobs[job_id] = {"status": "processing", "filename": file.filename}
-
+def split_stem(file: UploadFile = File(...), token: str = None, db: Session = Depends(get_db)):
+    logger.info(f"Split request received: {file.filename}")
+    user_id = get_current_user(token)
+    
     try:
-        # Run Demucs using the 6-stem model — this gives back all 6 stems
-        # separately: vocals, drums, bass, guitar, piano, other.
+        # Save uploaded file
+        upload_dir = "/tmp/stemline_uploads"
+        os.makedirs(upload_dir, exist_ok=True)
+        file_path = os.path.join(upload_dir, file.filename)
+        
+        logger.info(f"Saving uploaded file to: {file_path}")
+        with open(file_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+        
+        logger.info(f"File saved, starting Demucs processing...")
+        
+        # Run Demucs
+        output_dir = os.path.join(upload_dir, "output")
+        os.makedirs(output_dir, exist_ok=True)
+        
+        logger.info(f"Running: demucs -n htdemucs_6s -o {output_dir} {file_path}")
         result = subprocess.run(
-            [sys.executable, "-m", "demucs", "-n", "htdemucs_6s", "-o", str(OUTPUT_DIR), str(saved_path)],
+            ["demucs", "-n", "htdemucs_6s", "-o", output_dir, file_path],
             capture_output=True,
             text=True,
-            timeout=900  # 15 minute safety limit
+            timeout=300
         )
-
+        
+        logger.info(f"Demucs stdout: {result.stdout}")
+        logger.info(f"Demucs stderr: {result.stderr}")
+        logger.info(f"Demucs return code: {result.returncode}")
+        
         if result.returncode != 0:
-            jobs[job_id]["status"] = "error"
-            jobs[job_id]["error"] = result.stderr[-500:]
-            raise HTTPException(status_code=500, detail="Stem separation failed.")
-
-        song_name = saved_path.stem
-        stems_folder = OUTPUT_DIR / "htdemucs_6s" / song_name
-
-        if not stems_folder.exists():
-            jobs[job_id]["status"] = "error"
-            raise HTTPException(status_code=500, detail="Output not found after processing.")
-
-        # Zip all 6 stem files together for a single download
-        zip_path = OUTPUT_DIR / f"{job_id}_stems.zip"
+            logger.error(f"Demucs failed with return code {result.returncode}")
+            raise Exception(f"Demucs processing failed: {result.stderr}")
+        
+        # Find output stems
+        stem_dir = None
+        for root, dirs, files in os.walk(output_dir):
+            if any(f.endswith(".wav") for f in files):
+                stem_dir = root
+                break
+        
+        if not stem_dir:
+            logger.error("No stem files found after Demucs processing")
+            raise Exception("No stem files generated")
+        
+        # Create zip
+        zip_path = os.path.join(upload_dir, f"{file.filename.rsplit('.', 1)[0]}_stems.zip")
+        logger.info(f"Creating zip file: {zip_path}")
         with zipfile.ZipFile(zip_path, "w") as zf:
-            for stem_file in stems_folder.glob("*.wav"):
-                zf.write(stem_file, arcname=stem_file.name)
-
-        jobs[job_id]["status"] = "complete"
-        jobs[job_id]["zip_path"] = str(zip_path)
-
-        # Permanently save this split to the database, tied to this user,
-        # so it survives a server restart and shows up in their tape rack.
-        stem_row = Stem(
-            user_id=user.id,
-            track_name=file.filename,
-            zip_path=str(zip_path),
+            for root, dirs, files in os.walk(stem_dir):
+                for f in files:
+                    file_full_path = os.path.join(root, f)
+                    arcname = os.path.relpath(file_full_path, stem_dir)
+                    zf.write(file_full_path, arcname)
+        
+        # Save to DB
+        stem_record = Stem(
+            user_id=user_id,
+            track_name=file.filename.rsplit('.', 1)[0],
+            zip_path=zip_path
         )
-        db.add(stem_row)
+        db.add(stem_record)
         db.commit()
-        jobs[job_id]["stem_id"] = stem_row.id
-
-    except subprocess.TimeoutExpired:
-        jobs[job_id]["status"] = "error"
-        jobs[job_id]["error"] = "Processing timed out (song may be too long)."
-        raise HTTPException(status_code=504, detail="Processing timed out.")
-
-    return {"job_id": job_id, "status": jobs[job_id]["status"]}
-
-
-@app.get("/api/v1/status/{job_id}")
-def check_status(job_id: str, user: User = Depends(get_current_user)):
-    if job_id not in jobs:
-        raise HTTPException(status_code=404, detail="Job not found.")
-    return jobs[job_id]
-
-
-@app.get("/api/v1/download/{job_id}")
-def download_stems(job_id: str, user: User = Depends(get_current_user)):
-    if job_id not in jobs:
-        raise HTTPException(status_code=404, detail="Job not found.")
-
-    job = jobs[job_id]
-    if job["status"] != "complete":
-        raise HTTPException(status_code=400, detail=f"Job is not complete yet (status: {job['status']}).")
-
-    zip_path = job["zip_path"]
-    return FileResponse(
-        zip_path,
-        media_type="application/zip",
-        filename="stems.zip"
-    )
-
+        db.refresh(stem_record)
+        
+        logger.info(f"Stem split successful, saved as ID {stem_record.id}")
+        return {"stem_id": stem_record.id, "track_name": stem_record.track_name}
+    
+    except Exception as e:
+        logger.error(f"Split error: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Split failed: {str(e)}")
 
 @app.get("/api/v1/my-stems")
-def my_stems(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """
-    Returns this user's saved split history — this is what will power the
-    'tape rack' in the Remix Room (real saved songs instead of fake demo data).
-    """
-    rows = db.query(Stem).filter(Stem.user_id == user.id).order_by(Stem.created_at.desc()).all()
-    return [
-        {"id": s.id, "track_name": s.track_name, "created_at": s.created_at.isoformat()}
-        for s in rows
-    ]
-
+def get_my_stems(token: str = None, db: Session = Depends(get_db)):
+    user_id = get_current_user(token)
+    try:
+        stems = db.query(Stem).filter(Stem.user_id == user_id).all()
+        return [{"id": s.id, "track_name": s.track_name, "created_at": s.created_at} for s in stems]
+    except Exception as e:
+        logger.error(f"Get stems error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/v1/my-stems/{stem_id}/download")
-def download_saved_stem(stem_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Lets a logged-in user re-download any of their past saved splits."""
-    stem_row = db.query(Stem).filter(Stem.id == stem_id, Stem.user_id == user.id).first()
-    if not stem_row:
-        raise HTTPException(status_code=404, detail="Saved stem not found.")
-    return FileResponse(
-        stem_row.zip_path,
-        media_type="application/zip",
-        filename=f"{stem_row.track_name}_stems.zip"
-    )
-
+def download_stem(stem_id: int, token: str = None, db: Session = Depends(get_db)):
+    user_id = get_current_user(token)
+    try:
+        stem_row = db.query(Stem).filter(Stem.id == stem_id, Stem.user_id == user_id).first()
+        if not stem_row:
+            raise HTTPException(status_code=404, detail="Saved stem not found.")
+        return FileResponse(
+            stem_row.zip_path,
+            media_type="application/zip",
+            filename=f"{stem_row.track_name}_stems.zip"
+        )
+    except Exception as e:
+        logger.error(f"Download error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8080)))
