@@ -304,5 +304,29 @@ def download_stem(stem_id: int, token: str = None, db: Session = Depends(get_db)
         logger.error(f"Download error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+class RenameStemRequest(BaseModel):
+    track_name: str
+
+@app.patch("/api/v1/my-stems/{stem_id}")
+def rename_stem(stem_id: int, body: RenameStemRequest, token: str = None, db: Session = Depends(get_db)):
+    user_id = get_current_user(token)
+    try:
+        new_name = body.track_name.strip()
+        if not new_name:
+            raise HTTPException(status_code=400, detail="Name can't be empty.")
+        if len(new_name) > 200:
+            raise HTTPException(status_code=400, detail="Name is too long.")
+        stem_row = db.query(Stem).filter(Stem.id == stem_id, Stem.user_id == user_id).first()
+        if not stem_row:
+            raise HTTPException(status_code=404, detail="Saved stem not found.")
+        stem_row.track_name = new_name
+        db.commit()
+        return {"id": stem_row.id, "track_name": stem_row.track_name}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Rename error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8080)))
