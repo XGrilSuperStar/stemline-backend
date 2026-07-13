@@ -142,6 +142,10 @@ def get_db():
 
 @app.get("/")
 def root():
+    return FileResponse("stemline_landing_page.html", media_type="text/html")
+
+@app.get("/api/v1/health")
+def health():
     return {"status": "Stemline API is running"}
 
 @app.post("/api/v1/signup")
