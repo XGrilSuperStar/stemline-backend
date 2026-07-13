@@ -83,8 +83,30 @@ try:
         )).scalar()
         if col_type != "integer":
             logger.warning(f"users.id has type {col_type}, converting to integer")
+
+            # Drop any foreign keys referencing users.id so the type change isn't blocked
+            fk_rows = conn.execute(text("""
+                SELECT tc.constraint_name, tc.table_name
+                FROM information_schema.table_constraints tc
+                JOIN information_schema.constraint_column_usage ccu
+                  ON tc.constraint_name = ccu.constraint_name
+                WHERE tc.constraint_type = 'FOREIGN KEY' AND ccu.table_name = 'users'
+            """)).fetchall()
+            for constraint_name, table_name in fk_rows:
+                conn.execute(text(f'ALTER TABLE "{table_name}" DROP CONSTRAINT "{constraint_name}"'))
+            conn.commit()
+
             conn.execute(text("ALTER TABLE users ALTER COLUMN id TYPE INTEGER USING id::integer"))
             conn.commit()
+
+            # Bring stems.user_id into line so it can still be compared/joined against users.id
+            stems_col_type = conn.execute(text(
+                "SELECT data_type FROM information_schema.columns WHERE table_name='stems' AND column_name='user_id'"
+            )).scalar()
+            if stems_col_type and stems_col_type != "integer":
+                conn.execute(text("ALTER TABLE stems ALTER COLUMN user_id TYPE INTEGER USING NULLIF(user_id, '')::integer"))
+                conn.commit()
+
         conn.execute(text("CREATE SEQUENCE IF NOT EXISTS users_id_seq OWNED BY users.id"))
         conn.execute(text("SELECT setval('users_id_seq', COALESCE((SELECT MAX(id) FROM users), 0) + 1, false)"))
         conn.execute(text("ALTER TABLE users ALTER COLUMN id SET DEFAULT nextval('users_id_seq')"))
