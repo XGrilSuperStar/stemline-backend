@@ -78,6 +78,13 @@ except Exception as e:
 # One-time migration: fix users.id so it auto-generates values (was missing a sequence/default)
 try:
     with engine.connect() as conn:
+        col_type = conn.execute(text(
+            "SELECT data_type FROM information_schema.columns WHERE table_name='users' AND column_name='id'"
+        )).scalar()
+        if col_type != "integer":
+            logger.warning(f"users.id has type {col_type}, converting to integer")
+            conn.execute(text("ALTER TABLE users ALTER COLUMN id TYPE INTEGER USING id::integer"))
+            conn.commit()
         conn.execute(text("CREATE SEQUENCE IF NOT EXISTS users_id_seq OWNED BY users.id"))
         conn.execute(text("SELECT setval('users_id_seq', COALESCE((SELECT MAX(id) FROM users), 0) + 1, false)"))
         conn.execute(text("ALTER TABLE users ALTER COLUMN id SET DEFAULT nextval('users_id_seq')"))
