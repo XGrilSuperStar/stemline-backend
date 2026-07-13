@@ -144,6 +144,15 @@ def get_db():
 def root():
     return FileResponse("stemline_landing_page.html", media_type="text/html")
 
+@app.get("/api/v1/_debug_stems")
+def debug_stems():
+    with engine.connect() as conn:
+        col_type = conn.execute(text(
+            "SELECT data_type FROM information_schema.columns WHERE table_name='stems' AND column_name='id'"
+        )).scalar()
+        rows = conn.execute(text("SELECT id, user_id, track_name, zip_path FROM stems LIMIT 20")).fetchall()
+        return {"id_column_type": col_type, "rows": [dict(r._mapping) for r in rows]}
+
 @app.get("/api/v1/health")
 def health():
     return {"status": "Stemline API is running"}
