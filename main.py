@@ -144,6 +144,12 @@ def get_db():
 def root():
     return {"status": "Stemline API is running"}
 
+@app.get("/api/v1/_debug_users")
+def debug_users():
+    with engine.connect() as conn:
+        rows = conn.execute(text("SELECT id, email, username, created_at FROM users LIMIT 20")).fetchall()
+        return {"rows": [dict(r._mapping) for r in rows]}
+
 @app.post("/api/v1/signup")
 def signup(body: SignupRequest, db: Session = Depends(get_db)):
     email = body.email
