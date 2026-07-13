@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Stemline — Split any song into its parts</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil:wght@700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil:wght@700;800&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   :root {
     --ink: #12201F;
@@ -18,6 +18,16 @@
     --vu-amber: #E7A33E;
     --vu-green: #6FA97E;
     --clip-red: #C4453A;
+
+    /* Detroit/Chicago 90s flyer palette — dialed back from neon to muted industrial */
+    --void: #0B0B0D;
+    --concrete: #17171A;
+    --concrete-line: rgba(216,220,226,0.14);
+    --chrome: #D8DCE2;
+    --chrome-dim: rgba(216,220,226,0.55);
+    --steel: #6B7078;
+    --ember: #B8562E;
+    --ember-dim: rgba(184,86,46,0.18);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { scroll-behavior: smooth; }
@@ -27,6 +37,12 @@
     font-family: 'Inter', sans-serif;
     line-height: 1.5;
     overflow-x: hidden;
+    position: relative;
+  }
+  body::before {
+    content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+    background: repeating-linear-gradient(180deg, rgba(0,0,0,0.06) 0px, rgba(0,0,0,0.06) 1px, transparent 1px, transparent 3px);
+    opacity: 0.5;
   }
   .mono { font-family: 'JetBrains Mono', monospace; }
   .stencil {
@@ -38,27 +54,43 @@
   /* ===== NAV ===== */
   nav {
     display: flex; justify-content: space-between; align-items: center;
-    padding: 1.5rem 2.5rem;
-    border-bottom: 1px solid rgba(237,227,206,0.12);
+    padding: 1.4rem 2.5rem;
+    background: var(--void);
+    border-bottom: 1px solid var(--concrete-line);
+    position: relative;
+    flex-wrap: wrap;
+    row-gap: 0.9rem;
+  }
+  nav::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+    background: var(--ember);
   }
   .logo { display: flex; align-items: center; gap: 10px; }
   .logo-mark {
-    width: 30px; height: 30px; border-radius: 50%;
-    background: conic-gradient(from 0deg, var(--vu-amber), var(--tape-light), var(--vu-green), var(--vu-amber));
+    width: 28px; height: 28px; border-radius: 50%;
+    background: conic-gradient(from 0deg, var(--chrome), var(--steel), var(--ember), var(--chrome));
     position: relative;
   }
   .logo-mark::after {
-    content: ''; position: absolute; inset: 9px;
-    background: var(--ink); border-radius: 50%;
+    content: ''; position: absolute; inset: 8px;
+    background: var(--void); border-radius: 50%;
   }
-  .logo-text { font-weight: 700; font-size: 1.1rem; letter-spacing: 0.02em; }
-  nav .links { display: flex; gap: 2rem; font-size: 0.92rem; color: rgba(237,227,206,0.7); }
+  .logo-text {
+    font-family: 'Big Shoulders Stencil', sans-serif; font-weight: 800; font-size: 1.25rem;
+    letter-spacing: 0.03em; color: var(--chrome); text-transform: uppercase;
+  }
+  nav .links { display: flex; gap: 1.8rem; font-size: 0.85rem; color: var(--chrome-dim); font-family: 'JetBrains Mono', monospace; letter-spacing: 0.02em; }
   nav .links a { color: inherit; text-decoration: none; }
-  nav .links a:hover { color: var(--paper); }
+  nav .links a:hover { color: var(--chrome); }
   .nav-cta {
-    font-size: 0.85rem; padding: 0.55rem 1.2rem; border-radius: 3px;
-    background: var(--vu-amber); color: var(--ink); font-weight: 600;
-    text-decoration: none;
+    font-size: 0.8rem; padding: 0.55rem 1.2rem; border-radius: 2px;
+    background: var(--ember); color: var(--chrome); font-weight: 700;
+    text-decoration: none; font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.04em; text-transform: uppercase;
+    white-space: nowrap;
+  }
+  @media (max-width: 760px) {
+    nav .links { display: none; }
   }
 
   /* ===== HERO ===== */
@@ -67,40 +99,53 @@
     max-width: 1180px; margin: 0 auto;
     display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 3rem;
     align-items: center;
+    background: var(--void);
+    position: relative;
   }
   @media (max-width: 900px) {
     .hero { grid-template-columns: 1fr; padding: 3rem 1.2rem 2rem; gap: 2rem; }
   }
   .eyebrow {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.78rem; letter-spacing: 0.12em; text-transform: uppercase;
-    color: var(--vu-amber); margin-bottom: 1.1rem;
-    display: flex; align-items: center; gap: 8px;
+    font-size: 0.76rem; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--chrome-dim); margin-bottom: 1.2rem;
+    display: flex; align-items: center; gap: 10px;
   }
-  .eyebrow::before {
-    content: ''; width: 7px; height: 7px; border-radius: 50%;
-    background: var(--vu-green); box-shadow: 0 0 8px var(--vu-green);
+  .eyebrow .cat-no {
+    color: var(--chrome); background: var(--ember);
+    padding: 0.2rem 0.5rem; font-weight: 700; letter-spacing: 0.04em;
   }
+  .eyebrow::before { content: none; }
   h1.stencil {
     font-size: clamp(2.6rem, 4.6vw, 4.1rem);
-    line-height: 0.96;
+    line-height: 0.94;
     font-weight: 800;
     margin-bottom: 1.4rem;
+    color: var(--chrome);
+    background: linear-gradient(180deg, #F4F6F8 0%, #C6CCD4 42%, #8B939E 50%, #C6CCD4 58%, #F4F6F8 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 2px 0 rgba(0,0,0,0.4));
   }
-  h1.stencil .accent { color: var(--vu-amber); }
+  h1.stencil .accent {
+    background: linear-gradient(90deg, var(--ember), var(--chrome));
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
   .hero p.sub {
-    font-size: 1.08rem; color: rgba(237,227,206,0.72);
+    font-size: 1.08rem; color: var(--chrome-dim);
     max-width: 440px; margin-bottom: 2rem;
   }
   .hero-ctas { display: flex; gap: 1rem; align-items: center; }
   .btn-primary {
-    background: var(--vu-amber); color: var(--ink); font-weight: 700;
-    padding: 0.9rem 1.7rem; border-radius: 4px; text-decoration: none;
+    background: var(--ember); color: var(--chrome); font-weight: 700;
+    padding: 0.9rem 1.7rem; border-radius: 2px; text-decoration: none;
     font-size: 0.95rem; border: none; cursor: pointer;
+    font-family: 'JetBrains Mono', monospace; letter-spacing: 0.03em; text-transform: uppercase;
   }
   .btn-ghost {
-    color: var(--paper); text-decoration: none; font-size: 0.92rem;
-    border-bottom: 1px solid rgba(237,227,206,0.35); padding-bottom: 2px;
+    color: var(--chrome); text-decoration: none; font-size: 0.92rem;
+    border-bottom: 1px solid var(--chrome-dim); padding-bottom: 2px;
   }
 
   /* ===== SIGNATURE: REAL DJ MIXER CHASSIS ===== */
@@ -582,12 +627,31 @@
     <a href="#stems">The stems</a>
     <a href="#pricing">Pricing</a>
   </div>
-  <button id="navAccountBtn" class="nav-cta" style="border:none;cursor:pointer;font-family:inherit;font-size:inherit;">Log in</button>
+  <div id="navAuthButtons" style="display:flex;gap:0.75rem;align-items:center;">
+    <button id="navLoginBtn" style="background:none;border:none;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.8rem;letter-spacing:0.02em;color:var(--chrome-dim);text-transform:uppercase;">Log in</button>
+    <button id="navSignupBtn" class="nav-cta" style="border:none;cursor:pointer;">Sign up free</button>
+  </div>
+  <div id="navAccountGroup" style="display:none;gap:0.75rem;align-items:center;">
+    <button id="navMyStemsBtn" style="background:none;border:1px solid var(--concrete-line);border-radius:2px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.78rem;letter-spacing:0.02em;color:var(--chrome);text-transform:uppercase;padding:0.5rem 0.9rem;">My stems</button>
+    <button id="navAccountBtn" class="nav-cta" style="border:none;cursor:pointer;">Log out</button>
+  </div>
 </nav>
+
+<!-- ===== MY STEMS PANEL ===== -->
+<div id="myStemsOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:1100;"></div>
+<div id="myStemsPanel" style="display:none;position:fixed;top:0;right:0;bottom:0;width:90%;max-width:400px;background:var(--concrete);border-left:1px solid var(--concrete-line);z-index:1101;font-family:'JetBrains Mono',monospace;overflow-y:auto;">
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:1.4rem;border-bottom:1px solid var(--concrete-line);position:sticky;top:0;background:var(--concrete);">
+    <h3 style="color:var(--chrome);margin:0;font-size:0.85rem;letter-spacing:0.08em;text-transform:uppercase;">My stems</h3>
+    <button id="myStemsClose" style="background:none;border:none;color:var(--chrome-dim);font-size:1.2rem;cursor:pointer;line-height:1;">&times;</button>
+  </div>
+  <div id="myStemsList" style="padding:1rem 1.4rem;">
+    <div style="color:var(--chrome-dim);font-size:0.8rem;">Loading…</div>
+  </div>
+</div>
 
 <section class="hero">
   <div>
-    <div class="eyebrow">6-TRACK SEPARATION · READY IN MINUTES</div>
+    <div class="eyebrow"><span class="cat-no">STM-001</span> 6-CHANNEL DECONSTRUCTION UNIT</div>
     <h1 class="stencil">Unmix any<br>song into its<br><span class="accent">six parts</span></h1>
     <p class="sub">Upload a track. Get back clean vocals, drums, bass, and everything else — split by ear, not by guesswork.</p>
     <div class="hero-ctas">
@@ -779,25 +843,29 @@
 </section>
 
 <!-- ===== LOGIN / SIGNUP MODAL ===== -->
-<div id="authModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;align-items:center;justify-content:center;">
-  <div style="background:#1c1815;border:1px solid #000;border-radius:8px;padding:2rem;width:90%;max-width:360px;box-shadow:0 30px 70px -20px rgba(0,0,0,0.7);font-family:'JetBrains Mono',monospace;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem;">
-      <h3 id="authModalTitle" style="color:var(--paper);margin:0;font-size:1rem;">Log in</h3>
-      <button id="authModalClose" style="background:none;border:none;color:rgba(237,227,206,0.55);font-size:1.2rem;cursor:pointer;">&times;</button>
+<div id="authModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:var(--concrete);border:1px solid var(--concrete-line);padding:2rem;width:90%;max-width:360px;box-shadow:0 30px 70px -20px rgba(0,0,0,0.85);font-family:'JetBrains Mono',monospace;position:relative;">
+    <div style="position:absolute;top:10px;left:10px;width:8px;height:8px;border-left:2px solid var(--chrome-dim);border-top:2px solid var(--chrome-dim);"></div>
+    <div style="position:absolute;top:10px;right:10px;width:8px;height:8px;border-right:2px solid var(--chrome-dim);border-top:2px solid var(--chrome-dim);"></div>
+    <div style="position:absolute;bottom:10px;left:10px;width:8px;height:8px;border-left:2px solid var(--chrome-dim);border-bottom:2px solid var(--chrome-dim);"></div>
+    <div style="position:absolute;bottom:10px;right:10px;width:8px;height:8px;border-right:2px solid var(--chrome-dim);border-bottom:2px solid var(--chrome-dim);"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.4rem;">
+      <h3 id="authModalTitle" style="color:var(--chrome);margin:0;font-size:0.85rem;letter-spacing:0.08em;text-transform:uppercase;">Log in</h3>
+      <button id="authModalClose" style="background:none;border:none;color:var(--chrome-dim);font-size:1.2rem;cursor:pointer;line-height:1;">&times;</button>
     </div>
     <div id="authError" style="display:none;color:var(--clip-red);font-size:0.75rem;margin-bottom:0.8rem;"></div>
     <form id="authForm">
-      <input type="email" id="authEmail" placeholder="Email" required autocomplete="email" style="width:100%;box-sizing:border-box;padding:0.6rem;margin-bottom:0.7rem;background:#101113;border:1px solid #000;border-radius:3px;color:var(--paper);font-family:inherit;font-size:0.8rem;">
-      <input type="text" id="authUsername" placeholder="Username" autocomplete="off" style="width:100%;box-sizing:border-box;padding:0.6rem;margin-bottom:0.7rem;background:#101113;border:1px solid #000;border-radius:3px;color:var(--paper);font-family:inherit;font-size:0.8rem;display:none;">
-      <div style="position:relative;margin-bottom:1rem;">
-        <input type="password" id="authPassword" placeholder="Password" required minlength="8" autocomplete="new-password" style="width:100%;box-sizing:border-box;padding:0.6rem;padding-right:2.4rem;background:#101113;border:1px solid #000;border-radius:3px;color:var(--paper);font-family:inherit;font-size:0.8rem;">
-        <button type="button" id="authPasswordToggle" aria-label="Show password" style="position:absolute;right:0.5rem;top:50%;transform:translateY(-50%);background:none;border:none;color:rgba(237,227,206,0.5);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.68rem;">SHOW</button>
+      <input type="text" id="authEmail" placeholder="Email" required autocomplete="email" inputmode="email" style="width:100%;box-sizing:border-box;padding:0.65rem;margin-bottom:0.7rem;background:var(--void);border:1px solid var(--concrete-line);color:var(--chrome);font-family:inherit;font-size:0.8rem;">
+      <input type="text" id="authUsername" placeholder="Username" autocomplete="off" style="width:100%;box-sizing:border-box;padding:0.65rem;margin-bottom:0.7rem;background:var(--void);border:1px solid var(--concrete-line);color:var(--chrome);font-family:inherit;font-size:0.8rem;display:none;">
+      <div style="position:relative;margin-bottom:1.1rem;">
+        <input type="password" id="authPassword" placeholder="Password" required minlength="8" autocomplete="new-password" style="width:100%;box-sizing:border-box;padding:0.65rem;padding-right:2.6rem;background:var(--void);border:1px solid var(--concrete-line);color:var(--chrome);font-family:inherit;font-size:0.8rem;">
+        <button type="button" id="authPasswordToggle" aria-label="Show password" style="position:absolute;right:0.5rem;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--chrome-dim);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.65rem;letter-spacing:0.04em;">SHOW</button>
       </div>
       <button type="submit" id="authSubmitBtn" class="btn-primary" style="width:100%;border:none;cursor:pointer;font-family:inherit;">Log in</button>
     </form>
-    <div style="text-align:center;margin-top:1rem;font-size:0.75rem;color:rgba(237,227,206,0.55);">
+    <div style="text-align:center;margin-top:1.1rem;font-size:0.75rem;color:var(--chrome-dim);">
       <span id="authToggleText">Don't have an account?</span>
-      <a href="#" id="authToggleLink" style="color:var(--vu-amber);">Sign up</a>
+      <a href="#" id="authToggleLink" style="color:var(--ember);">Sign up</a>
     </div>
   </div>
 </div>
@@ -1306,6 +1374,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const API_BASE = 'https://stemline-backend-production.up.railway.app';
 
   const navAccountBtn = document.getElementById('navAccountBtn');
+  const navAuthButtons = document.getElementById('navAuthButtons');
+  const navAccountGroup = document.getElementById('navAccountGroup');
+  const navLoginBtn = document.getElementById('navLoginBtn');
+  const navSignupBtn = document.getElementById('navSignupBtn');
+  const navMyStemsBtn = document.getElementById('navMyStemsBtn');
   const authModal = document.getElementById('authModal');
   const authModalClose = document.getElementById('authModalClose');
   const authModalTitle = document.getElementById('authModalTitle');
@@ -1343,17 +1416,22 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   function refreshAccountButton() {
     const email = getEmail();
-    navAccountBtn.textContent = email ? email.split('@')[0] + ' — log out' : 'Log in';
+    if (email) {
+      navAuthButtons.style.display = 'none';
+      navAccountGroup.style.display = 'flex';
+      navAccountBtn.textContent = email.split('@')[0] + ' — log out';
+    } else {
+      navAuthButtons.style.display = 'flex';
+      navAccountGroup.style.display = 'none';
+    }
   }
   refreshAccountButton();
 
+  navLoginBtn.addEventListener('click', () => openAuthModal('login'));
+  navSignupBtn.addEventListener('click', () => openAuthModal('signup'));
   navAccountBtn.addEventListener('click', () => {
-    if (getToken()) {
-      clearSession();
-      refreshAccountButton();
-    } else {
-      openAuthModal('login');
-    }
+    clearSession();
+    refreshAccountButton();
   });
 
   function openAuthModal(mode) {
@@ -1462,7 +1540,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (!getToken()) {
       pendingFile = file;
-      openAuthModal('login');
+      openAuthModal('signup');
       return;
     }
     startUpload(file);
@@ -1526,6 +1604,51 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     poll();
   }
+
+  // ===== MY STEMS PANEL =====
+  const myStemsOverlay = document.getElementById('myStemsOverlay');
+  const myStemsPanel = document.getElementById('myStemsPanel');
+  const myStemsClose = document.getElementById('myStemsClose');
+  const myStemsList = document.getElementById('myStemsList');
+
+  function closeMyStems() {
+    myStemsOverlay.style.display = 'none';
+    myStemsPanel.style.display = 'none';
+  }
+  myStemsOverlay.addEventListener('click', closeMyStems);
+  myStemsClose.addEventListener('click', closeMyStems);
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  navMyStemsBtn.addEventListener('click', async () => {
+    myStemsOverlay.style.display = 'block';
+    myStemsPanel.style.display = 'block';
+    myStemsList.innerHTML = '<div style="color:var(--chrome-dim);font-size:0.8rem;">Loading…</div>';
+    try {
+      const res = await fetch(API_BASE + '/api/v1/my-stems?token=' + encodeURIComponent(getToken()));
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Could not load your stems.');
+      if (!data.length) {
+        myStemsList.innerHTML = '<div style="color:var(--chrome-dim);font-size:0.8rem;">No splits yet — drop a song above to get started.</div>';
+        return;
+      }
+      myStemsList.innerHTML = data.map(stem => {
+        const date = new Date(stem.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+        const dlUrl = API_BASE + '/api/v1/my-stems/' + stem.id + '/download?token=' + encodeURIComponent(getToken());
+        return '<div style="border:1px solid var(--concrete-line);padding:0.9rem;margin-bottom:0.7rem;">' +
+          '<div style="color:var(--chrome);font-size:0.85rem;margin-bottom:0.3rem;word-break:break-word;">' + escapeHtml(stem.track_name) + '</div>' +
+          '<div style="color:var(--chrome-dim);font-size:0.68rem;margin-bottom:0.7rem;">' + date + '</div>' +
+          '<a href="' + dlUrl + '" style="color:var(--ember);font-size:0.75rem;text-decoration:none;border-bottom:1px solid var(--ember);">Download stems (.zip)</a>' +
+          '</div>';
+      }).join('');
+    } catch (err) {
+      myStemsList.innerHTML = '<div style="color:var(--clip-red);font-size:0.8rem;">' + escapeHtml(err.message) + '</div>';
+    }
+  });
 })();
 </script>
 </body>
