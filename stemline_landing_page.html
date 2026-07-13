@@ -215,6 +215,13 @@
   }
   .screen-row .cue-jack:hover { color: var(--ember); }
   .screen-row .cue-jack.active { background: var(--ember); color: #10151A; box-shadow: 0 0 6px var(--ember); }
+  .screen-row .rename-btn {
+    width: 18px; height: 18px; border-radius: 2px; flex-shrink: 0;
+    background: #1A1E23; border: 1px solid #000;
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(216,220,226,0.5); cursor: pointer;
+  }
+  .screen-row .rename-btn:hover { color: var(--ember); }
   .screen-row .assign-btn {
     flex-shrink: 0; font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
     font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
@@ -1805,6 +1812,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const safeName = escapeHtml(stem.track_name);
         return '<div class="screen-row" data-stem-id="' + stem.id + '" data-track-name="' + safeName + '">' +
           '<span class="track-name" title="' + safeName + '">' + safeName + '</span>' +
+          '<button type="button" class="rename-btn" title="Rename">' +
+            '<svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>' +
+          '</button>' +
           '<button type="button" class="cue-jack" title="Cue preview (headphone)">' +
             '<svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="2.5" y="13" width="4" height="7" rx="1.5"/><rect x="17.5" y="13" width="4" height="7" rx="1.5"/></svg>' +
           '</button>' +
@@ -1814,9 +1824,56 @@ document.addEventListener('DOMContentLoaded', () => {
 
       listEl.querySelectorAll('.screen-row').forEach(row => {
         const stemId = row.dataset.stemId;
-        const trackName = row.dataset.trackName;
+        let trackName = row.dataset.trackName;
         const assignBtn = row.querySelector('.assign-btn');
         const cueJack = row.querySelector('.cue-jack');
+        const renameBtn = row.querySelector('.rename-btn');
+        const nameSpan = row.querySelector('.track-name');
+
+        renameBtn.addEventListener('click', () => {
+          if (row.querySelector('.rename-input')) return; // already editing
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.className = 'rename-input mono';
+          input.value = trackName;
+          input.style.cssText = 'flex:1;min-width:0;background:#1A1E23;color:rgba(216,220,226,0.9);border:1px solid var(--ember);border-radius:2px;font-family:inherit;font-size:0.66rem;padding:0.15rem 0.3rem;';
+          nameSpan.replaceWith(input);
+          input.focus();
+          input.select();
+
+          const save = async () => {
+            const newName = input.value.trim();
+            if (!newName || newName === trackName) {
+              input.replaceWith(nameSpan);
+              return;
+            }
+            input.disabled = true;
+            try {
+              const res = await fetch(API_BASE + '/api/v1/my-stems/' + stemId + '?token=' + encodeURIComponent(getToken()), {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ track_name: newName })
+              });
+              const resData = await res.json();
+              if (!res.ok) throw new Error(resData.detail || 'Could not rename.');
+              trackName = resData.track_name;
+              row.dataset.trackName = trackName;
+              nameSpan.textContent = trackName;
+              nameSpan.title = trackName;
+              if (channelAssignments[stemId]) setChannelBadge(channelAssignments[stemId], trackName);
+            } catch (err) {
+              nameSpan.textContent = trackName;
+            } finally {
+              input.replaceWith(nameSpan);
+            }
+          };
+
+          input.addEventListener('blur', save);
+          input.addEventListener('keydown', e => {
+            if (e.key === 'Enter') input.blur();
+            if (e.key === 'Escape') { input.value = trackName; input.blur(); }
+          });
+        });
 
         assignBtn.addEventListener('click', () => {
           const current = channelAssignments[stemId];
