@@ -114,6 +114,24 @@ try:
 except Exception as e:
     logger.warning(f"users.id sequence migration skipped or already applied: {e}")
 
+# One-time migration: fix stems.id the same way (was also character varying, no working default)
+try:
+    with engine.connect() as conn:
+        col_type = conn.execute(text(
+            "SELECT data_type FROM information_schema.columns WHERE table_name='stems' AND column_name='id'"
+        )).scalar()
+        if col_type != "integer":
+            logger.warning(f"stems.id has type {col_type}, converting to integer")
+            conn.execute(text("ALTER TABLE stems ALTER COLUMN id TYPE INTEGER USING id::integer"))
+            conn.commit()
+
+        conn.execute(text("CREATE SEQUENCE IF NOT EXISTS stems_id_seq OWNED BY stems.id"))
+        conn.execute(text("SELECT setval('stems_id_seq', COALESCE((SELECT MAX(id) FROM stems), 0) + 1, false)"))
+        conn.execute(text("ALTER TABLE stems ALTER COLUMN id SET DEFAULT nextval('stems_id_seq')"))
+        conn.commit()
+except Exception as e:
+    logger.warning(f"stems.id sequence migration skipped or already applied: {e}")
+
 # JWT config
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "default-secret-key")
 JWT_ALGORITHM = "HS256"
@@ -143,15 +161,6 @@ def get_db():
 @app.get("/")
 def root():
     return FileResponse("stemline_landing_page.html", media_type="text/html")
-
-@app.get("/api/v1/_debug_stems")
-def debug_stems():
-    with engine.connect() as conn:
-        col_type = conn.execute(text(
-            "SELECT data_type FROM information_schema.columns WHERE table_name='stems' AND column_name='id'"
-        )).scalar()
-        rows = conn.execute(text("SELECT id, user_id, track_name, zip_path FROM stems LIMIT 20")).fetchall()
-        return {"id_column_type": col_type, "rows": [dict(r._mapping) for r in rows]}
 
 @app.get("/api/v1/health")
 def health():
