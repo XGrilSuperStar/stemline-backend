@@ -241,10 +241,20 @@ def split_stem(file: UploadFile = File(...), token: str = None, db: Session = De
         # Run Demucs
         output_dir = os.path.join(upload_dir, "output")
         os.makedirs(output_dir, exist_ok=True)
-        
-        logger.info(f"Running: demucs -n htdemucs_6s -o {output_dir} {file_path}")
+
+        # -j splits the track into chunks and processes them across CPU cores
+        # in parallel instead of one long single-threaded pass. More jobs
+        # multiplies memory use, and os.cpu_count() in a container often
+        # reports the host's full core count rather than what Railway
+        # actually allocates to this service — so default conservatively to
+        # 2 and let DEMUCS_JOBS override once you've confirmed how much
+        # headroom the Hobby plan actually gives this service.
+        jobs = int(os.getenv("DEMUCS_JOBS", "2"))
+
+        cmd = ["demucs", "-n", "htdemucs_6s", "-j", str(jobs), "-o", output_dir, file_path]
+        logger.info(f"Running: {' '.join(cmd)}")
         result = subprocess.run(
-            ["demucs", "-n", "htdemucs_6s", "-o", output_dir, file_path],
+            cmd,
             capture_output=True,
             text=True,
             timeout=300
