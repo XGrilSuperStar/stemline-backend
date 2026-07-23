@@ -1,5 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
@@ -330,6 +330,38 @@ def download_stem(stem_id: int, token: str = None, db: Session = Depends(get_db)
         )
     except Exception as e:
         logger.error(f"Download error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Instrument names Demucs' htdemucs_6s model actually outputs, and the only
+# values the mixer's channel keys ever send here.
+STEM_INSTRUMENTS = {"vocals", "drums", "bass", "guitar", "piano", "other"}
+
+@app.get("/api/v1/my-stems/{stem_id}/download/{instrument}")
+def download_stem_instrument(stem_id: int, instrument: str, token: str = None, db: Session = Depends(get_db)):
+    # A split saves all six instruments zipped together as one row. The mixer
+    # channels each need just ONE instrument's audio, so this pulls a single
+    # wav back out of that zip on demand instead of the whole bundle.
+    user_id = get_current_user(token)
+    try:
+        if instrument not in STEM_INSTRUMENTS:
+            raise HTTPException(status_code=400, detail=f"Unknown instrument: {instrument}")
+        stem_row = db.query(Stem).filter(Stem.id == stem_id, Stem.user_id == user_id).first()
+        if not stem_row:
+            raise HTTPException(status_code=404, detail="Saved stem not found.")
+        with zipfile.ZipFile(stem_row.zip_path) as zf:
+            match = next((n for n in zf.namelist() if n.lower().endswith(instrument + ".wav")), None)
+            if not match:
+                raise HTTPException(status_code=404, detail=f"No {instrument} track in this split.")
+            wav_bytes = zf.read(match)
+        return Response(
+            content=wav_bytes,
+            media_type="audio/wav",
+            headers={"Content-Disposition": f'attachment; filename="{stem_row.track_name}_{instrument}.wav"'}
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Instrument download error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 class RenameStemRequest(BaseModel):
