@@ -251,7 +251,7 @@ def split_stem(file: UploadFile = File(...), token: str = None, db: Session = De
         # headroom the Hobby plan actually gives this service.
         jobs = int(os.getenv("DEMUCS_JOBS", "2"))
 
-        cmd = ["demucs", "-n", "htdemucs_6s", "-j", str(jobs), "-o", output_dir, file_path]
+        cmd = ["demucs", "-n", "htdemucs_ft", "-j", str(jobs), "-o", output_dir, file_path]
         logger.info(f"Running: {' '.join(cmd)}")
         result = subprocess.run(
             cmd,
