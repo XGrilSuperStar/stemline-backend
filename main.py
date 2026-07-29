@@ -251,13 +251,35 @@ def split_stem(file: UploadFile = File(...), token: str = None, db: Session = De
         # headroom the Hobby plan actually gives this service.
         jobs = int(os.getenv("DEMUCS_JOBS", "2"))
 
-        cmd = ["demucs", "-n", "htdemucs_ft", "-j", str(jobs), "-o", output_dir, file_path]
+        # --shifts runs the model N times on randomly time-shifted copies of
+        # the input and averages the results. This is the main quality/bleed
+        # lever Demucs exposes: more shifts = less bleed between stems and
+        # cleaner isolation, at the cost of N times the processing time.
+        # Default 1 = no shifting (what was running before). 2 roughly
+        # doubles split time but is the standard quality tradeoff people use
+        # to cut down bleed without it getting too slow to be usable.
+        shifts = int(os.getenv("DEMUCS_SHIFTS", "2"))
+
+        # --overlap controls how much adjacent processing chunks overlap.
+        # Higher overlap smooths the seams between chunks (less "stitching"
+        # artifacts contributing to bleed) at a smaller speed cost than
+        # shifts. Demucs' own default is 0.25; bumping to 0.5 trades a bit
+        # more compute for real reduction in edge artifacts.
+        overlap = os.getenv("DEMUCS_OVERLAP", "0.5")
+
+        cmd = [
+            "demucs", "-n", "htdemucs_ft",
+            "-j", str(jobs),
+            "--shifts", str(shifts),
+            "--overlap", overlap,
+            "-o", output_dir, file_path,
+        ]
         logger.info(f"Running: {' '.join(cmd)}")
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
-            timeout=300
+            timeout=600
         )
         
         logger.info(f"Demucs stdout: {result.stdout}")
