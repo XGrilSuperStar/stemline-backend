@@ -10,6 +10,10 @@ import zipfile
 from datetime import datetime, timedelta
 import jwt
 import bcrypt
+import secrets
+import hashlib
+import smtplib
+from email.mime.text import MIMEText
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
@@ -47,6 +51,8 @@ class User(Base):
     username = Column(String, nullable=True)
     password_hash = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
+    reset_token_hash = Column(String, nullable=True)
+    reset_token_expires = Column(DateTime, nullable=True)
 
 class SignupRequest(BaseModel):
     email: str
@@ -56,6 +62,16 @@ class SignupRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+class ForgotUsernameRequest(BaseModel):
+    email: str
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
 
 class Stem(Base):
     __tablename__ = "stems"
@@ -131,6 +147,40 @@ try:
         conn.commit()
 except Exception as e:
     logger.warning(f"stems.id sequence migration skipped or already applied: {e}")
+
+# One-time migration: add password-reset columns to users table if missing
+try:
+    with engine.connect() as conn:
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_hash VARCHAR"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expires TIMESTAMP"))
+        conn.commit()
+except Exception as e:
+    logger.warning(f"Reset token column migration skipped or already applied: {e}")
+
+# Email config (set these in Railway env vars to enable real email delivery)
+SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
+FROM_EMAIL = os.getenv("FROM_EMAIL", SMTP_USER)
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://stemline101.com")
+
+def send_email(to_email: str, subject: str, body: str):
+    if not SMTP_USER or not SMTP_PASSWORD:
+        # Not configured yet — log it instead of failing, so the flow still works in dev
+        logger.warning(f"SMTP not configured. Would have emailed {to_email}: {subject}\n{body}")
+        return
+    msg = MIMEText(body)
+    msg["Subject"] = subject
+    msg["From"] = FROM_EMAIL
+    msg["To"] = to_email
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.sendmail(FROM_EMAIL, [to_email], msg.as_string())
+    except Exception as e:
+        logger.error(f"Failed to send email to {to_email}: {e}")
 
 # JWT config
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "default-secret-key")
@@ -221,6 +271,50 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
         logger.error(f"Login error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/v1/forgot-username")
+def forgot_username(body: ForgotUsernameRequest, db: Session = Depends(get_db)):
+    email = body.email.lower()
+    user = db.query(User).filter(User.email == email).first()
+    if user:
+        send_email(
+            email,
+            "Your Stemline username",
+            f"Hi,\n\nYour Stemline username is: {user.username}\n\nIf you didn't request this, you can ignore this email.",
+        )
+    # Same response either way, so we don't reveal which emails are registered
+    return {"message": "If that email is registered, we've sent the username to it."}
+
+@app.post("/api/v1/forgot-password")
+def forgot_password(body: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    email = body.email.lower()
+    user = db.query(User).filter(User.email == email).first()
+    if user:
+        raw_token = secrets.token_urlsafe(32)
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        user.reset_token_hash = token_hash
+        user.reset_token_expires = datetime.utcnow() + timedelta(minutes=30)
+        db.commit()
+        reset_link = f"{FRONTEND_URL}/reset-password?token={raw_token}"
+        send_email(
+            email,
+            "Reset your Stemline password",
+            f"Hi,\n\nClick the link below to reset your Stemline password. This link expires in 30 minutes.\n\n{reset_link}\n\nIf you didn't request this, you can ignore this email.",
+        )
+    return {"message": "If that email is registered, we've sent a password reset link to it."}
+
+@app.post("/api/v1/reset-password")
+def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_db)):
+    token_hash = hashlib.sha256(body.token.encode()).hexdigest()
+    user = db.query(User).filter(User.reset_token_hash == token_hash).first()
+    if not user or not user.reset_token_expires or user.reset_token_expires < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Invalid or expired reset link")
+    user.password_hash = bcrypt.hashpw(body.new_password.encode(), bcrypt.gensalt()).decode()
+    user.reset_token_hash = None
+    user.reset_token_expires = None
+    db.commit()
+    logger.info(f"Password reset successfully for user {user.id}")
+    return {"message": "Password updated. You can now log in with your new password."}
+
 @app.post("/api/v1/split")
 def split_stem(file: UploadFile = File(...), token: str = None, db: Session = Depends(get_db)):
     logger.info(f"Split request received: {file.filename}")
@@ -268,7 +362,7 @@ def split_stem(file: UploadFile = File(...), token: str = None, db: Session = De
         overlap = os.getenv("DEMUCS_OVERLAP", "0.5")
 
         cmd = [
-            "demucs", "-n", "htdemucs_ft",
+            "demucs", "-n", "htdemucs_6s",
             "-j", str(jobs),
             "--shifts", str(shifts),
             "--overlap", overlap,
