@@ -7,6 +7,7 @@ import os
 import shutil
 import subprocess
 import zipfile
+import uuid
 from datetime import datetime, timedelta
 import jwt
 import bcrypt
@@ -321,8 +322,17 @@ def split_stem(file: UploadFile = File(...), token: str = None, db: Session = De
     user_id = get_current_user(token)
     
     try:
-        # Save uploaded file
-        upload_dir = "/tmp/stemline_uploads"
+        # Every split gets its own isolated work directory, keyed by a fresh
+        # uuid — NOT shared across requests. Previously upload_dir/output was
+        # one fixed folder that every split on this container ever wrote
+        # into and nothing cleaned up, so the "find the stem folder" step
+        # below could — and did — pick up a leftover folder from a totally
+        # different user's earlier split instead of this request's own
+        # output. That's a real bug where users could get someone else's
+        # audio back, not a quality issue. A unique per-request dir makes
+        # that collision structurally impossible: there's never more than
+        # one track's output under output_dir for a given request.
+        upload_dir = os.path.join("/tmp/stemline_uploads", uuid.uuid4().hex)
         os.makedirs(upload_dir, exist_ok=True)
         file_path = os.path.join(upload_dir, file.filename)
         
@@ -404,7 +414,18 @@ def split_stem(file: UploadFile = File(...), token: str = None, db: Session = De
                     file_full_path = os.path.join(root, f)
                     arcname = os.path.relpath(file_full_path, stem_dir)
                     zf.write(file_full_path, arcname)
-        
+
+        # The zip is the only thing that needs to stick around (its path is
+        # what gets stored on the Stem row and served on download). The raw
+        # upload and Demucs' unzipped output dir are now redundant weight —
+        # with upload_dir unique per request, nothing else needs them, and
+        # nothing was ever deleting them before, so disk usage only grew.
+        try:
+            os.remove(file_path)
+            shutil.rmtree(output_dir, ignore_errors=True)
+        except OSError as cleanup_err:
+            logger.warning(f"Post-split cleanup failed (non-fatal): {cleanup_err}")
+
         # Save to DB
         stem_record = Stem(
             user_id=user_id,
