@@ -7,7 +7,6 @@ import os
 import shutil
 import subprocess
 import zipfile
-import uuid
 from datetime import datetime, timedelta
 import jwt
 import bcrypt
@@ -81,6 +80,9 @@ class Stem(Base):
     track_name = Column(String)
     zip_path = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
+    # Null for a normal split (zip_path points at the full 6-stem zip).
+    # Set for a single-channel save (zip_path points at just that one wav).
+    instrument = Column(String, nullable=True)
 
 Base.metadata.create_all(bind=engine)
 
@@ -148,6 +150,14 @@ try:
         conn.commit()
 except Exception as e:
     logger.warning(f"stems.id sequence migration skipped or already applied: {e}")
+
+# One-time migration: add instrument column to stems table if missing
+try:
+    with engine.connect() as conn:
+        conn.execute(text("ALTER TABLE stems ADD COLUMN IF NOT EXISTS instrument VARCHAR"))
+        conn.commit()
+except Exception as e:
+    logger.warning(f"Instrument column migration skipped or already applied: {e}")
 
 # One-time migration: add password-reset columns to users table if missing
 try:
@@ -322,17 +332,8 @@ def split_stem(file: UploadFile = File(...), token: str = None, db: Session = De
     user_id = get_current_user(token)
     
     try:
-        # Every split gets its own isolated work directory, keyed by a fresh
-        # uuid — NOT shared across requests. Previously upload_dir/output was
-        # one fixed folder that every split on this container ever wrote
-        # into and nothing cleaned up, so the "find the stem folder" step
-        # below could — and did — pick up a leftover folder from a totally
-        # different user's earlier split instead of this request's own
-        # output. That's a real bug where users could get someone else's
-        # audio back, not a quality issue. A unique per-request dir makes
-        # that collision structurally impossible: there's never more than
-        # one track's output under output_dir for a given request.
-        upload_dir = os.path.join("/tmp/stemline_uploads", uuid.uuid4().hex)
+        # Save uploaded file
+        upload_dir = "/tmp/stemline_uploads"
         os.makedirs(upload_dir, exist_ok=True)
         file_path = os.path.join(upload_dir, file.filename)
         
@@ -414,18 +415,7 @@ def split_stem(file: UploadFile = File(...), token: str = None, db: Session = De
                     file_full_path = os.path.join(root, f)
                     arcname = os.path.relpath(file_full_path, stem_dir)
                     zf.write(file_full_path, arcname)
-
-        # The zip is the only thing that needs to stick around (its path is
-        # what gets stored on the Stem row and served on download). The raw
-        # upload and Demucs' unzipped output dir are now redundant weight —
-        # with upload_dir unique per request, nothing else needs them, and
-        # nothing was ever deleting them before, so disk usage only grew.
-        try:
-            os.remove(file_path)
-            shutil.rmtree(output_dir, ignore_errors=True)
-        except OSError as cleanup_err:
-            logger.warning(f"Post-split cleanup failed (non-fatal): {cleanup_err}")
-
+        
         # Save to DB
         stem_record = Stem(
             user_id=user_id,
@@ -448,7 +438,7 @@ def get_my_stems(token: str = None, db: Session = Depends(get_db)):
     user_id = get_current_user(token)
     try:
         stems = db.query(Stem).filter(Stem.user_id == user_id).all()
-        return [{"id": s.id, "track_name": s.track_name, "created_at": s.created_at} for s in stems]
+        return [{"id": s.id, "track_name": s.track_name, "created_at": s.created_at, "instrument": s.instrument} for s in stems]
     except Exception as e:
         logger.error(f"Get stems error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -460,6 +450,13 @@ def download_stem(stem_id: int, token: str = None, db: Session = Depends(get_db)
         stem_row = db.query(Stem).filter(Stem.id == stem_id, Stem.user_id == user_id).first()
         if not stem_row:
             raise HTTPException(status_code=404, detail="Saved stem not found.")
+        if stem_row.instrument:
+            # Single-channel save — zip_path points at a lone wav, not a zip.
+            return FileResponse(
+                stem_row.zip_path,
+                media_type="audio/wav",
+                filename=f"{stem_row.track_name}.wav"
+            )
         return FileResponse(
             stem_row.zip_path,
             media_type="application/zip",
@@ -485,11 +482,20 @@ def download_stem_instrument(stem_id: int, instrument: str, token: str = None, d
         stem_row = db.query(Stem).filter(Stem.id == stem_id, Stem.user_id == user_id).first()
         if not stem_row:
             raise HTTPException(status_code=404, detail="Saved stem not found.")
-        with zipfile.ZipFile(stem_row.zip_path) as zf:
-            match = next((n for n in zf.namelist() if n.lower().endswith(instrument + ".wav")), None)
-            if not match:
-                raise HTTPException(status_code=404, detail=f"No {instrument} track in this split.")
-            wav_bytes = zf.read(match)
+        if stem_row.instrument:
+            # Single-channel save -- zip_path already points at a lone wav,
+            # not a zip. Only serve it if it actually matches the
+            # instrument being asked for.
+            if stem_row.instrument != instrument:
+                raise HTTPException(status_code=404, detail=f"This saved stem is {stem_row.instrument}, not {instrument}.")
+            with open(stem_row.zip_path, "rb") as f:
+                wav_bytes = f.read()
+        else:
+            with zipfile.ZipFile(stem_row.zip_path) as zf:
+                match = next((n for n in zf.namelist() if n.lower().endswith(instrument + ".wav")), None)
+                if not match:
+                    raise HTTPException(status_code=404, detail=f"No {instrument} track in this split.")
+                wav_bytes = zf.read(match)
         return Response(
             content=wav_bytes,
             media_type="audio/wav",
@@ -499,6 +505,51 @@ def download_stem_instrument(stem_id: int, instrument: str, token: str = None, d
         raise
     except Exception as e:
         logger.error(f"Instrument download error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/my-stems/{stem_id}/save-instrument/{instrument}")
+def save_stem_instrument(stem_id: int, instrument: str, token: str = None, db: Session = Depends(get_db)):
+    # Pulls one instrument's wav out of an existing split's zip and saves it
+    # as its own standalone stem row, so a mixer channel can be kept without
+    # having to keep the whole 6-stem bundle.
+    user_id = get_current_user(token)
+    try:
+        if instrument not in STEM_INSTRUMENTS:
+            raise HTTPException(status_code=400, detail=f"Unknown instrument: {instrument}")
+        stem_row = db.query(Stem).filter(Stem.id == stem_id, Stem.user_id == user_id).first()
+        if not stem_row:
+            raise HTTPException(status_code=404, detail="Saved stem not found.")
+        if stem_row.instrument:
+            raise HTTPException(status_code=400, detail="That save is already a single instrument.")
+
+        with zipfile.ZipFile(stem_row.zip_path) as zf:
+            match = next((n for n in zf.namelist() if n.lower().endswith(instrument + ".wav")), None)
+            if not match:
+                raise HTTPException(status_code=404, detail=f"No {instrument} track in this split.")
+            wav_bytes = zf.read(match)
+
+        save_dir = "/tmp/stemline_uploads/saved"
+        os.makedirs(save_dir, exist_ok=True)
+        wav_path = os.path.join(save_dir, f"{stem_id}_{instrument}_{secrets.token_hex(4)}.wav")
+        with open(wav_path, "wb") as f:
+            f.write(wav_bytes)
+
+        new_row = Stem(
+            user_id=user_id,
+            track_name=f"{stem_row.track_name} ({instrument.capitalize()})",
+            zip_path=wav_path,
+            instrument=instrument
+        )
+        db.add(new_row)
+        db.commit()
+        db.refresh(new_row)
+
+        logger.info(f"Saved single instrument, new stem ID {new_row.id}")
+        return {"id": new_row.id, "track_name": new_row.track_name, "instrument": new_row.instrument}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Save instrument error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 class RenameStemRequest(BaseModel):
