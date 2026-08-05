@@ -254,6 +254,10 @@ def get_db():
 def root():
     return FileResponse("stemline_landing_page.html", media_type="text/html")
 
+@app.get("/reset-password")
+def reset_password_page():
+    return FileResponse("stemline_landing_page.html", media_type="text/html")
+
 @app.get("/api/v1/health")
 def health():
     return {"status": "Stemline API is running"}
