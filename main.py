@@ -13,16 +13,8 @@ import bcrypt
 import secrets
 import hashlib
 import smtplib
-import socket
 from email.mime.text import MIMEText
-
-# Railway doesn't support outbound IPv6, and Python's SMTP connection will try
-# IPv6 first if the DNS lookup returns it, causing "Network is unreachable".
-# Force all DNS lookups to IPv4 only to fix this.
-_orig_getaddrinfo = socket.getaddrinfo
-def _ipv4_only_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
-    return _orig_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
-socket.getaddrinfo = _ipv4_only_getaddrinfo
+import requests
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
@@ -178,27 +170,32 @@ except Exception as e:
     logger.warning(f"Reset token column migration skipped or already applied: {e}")
 
 # Email config (set these in Railway env vars to enable real email delivery)
-SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER = os.getenv("SMTP_USER")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
-FROM_EMAIL = os.getenv("FROM_EMAIL", SMTP_USER)
+# Railway blocks outbound SMTP ports, so we send email over HTTPS via Resend
+# instead of raw SMTP. Sign up at resend.com, verify a sending domain (or use
+# their onboarding@resend.dev for testing), and set RESEND_API_KEY in Railway.
+RESEND_API_KEY = os.getenv("RESEND_API_KEY")
+FROM_EMAIL = os.getenv("FROM_EMAIL", "onboarding@resend.dev")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://stemline101.com")
 
 def send_email(to_email: str, subject: str, body: str):
-    if not SMTP_USER or not SMTP_PASSWORD:
+    if not RESEND_API_KEY:
         # Not configured yet — log it instead of failing, so the flow still works in dev
-        logger.warning(f"SMTP not configured. Would have emailed {to_email}: {subject}\n{body}")
+        logger.warning(f"RESEND_API_KEY not configured. Would have emailed {to_email}: {subject}\n{body}")
         return
-    msg = MIMEText(body)
-    msg["Subject"] = subject
-    msg["From"] = FROM_EMAIL
-    msg["To"] = to_email
     try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-            server.starttls()
-            server.login(SMTP_USER, SMTP_PASSWORD)
-            server.sendmail(FROM_EMAIL, [to_email], msg.as_string())
+        response = requests.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {RESEND_API_KEY}"},
+            json={
+                "from": FROM_EMAIL,
+                "to": [to_email],
+                "subject": subject,
+                "text": body,
+            },
+            timeout=10,
+        )
+        if response.status_code >= 400:
+            logger.error(f"Failed to send email to {to_email}: {response.status_code} {response.text}")
     except Exception as e:
         logger.error(f"Failed to send email to {to_email}: {e}")
 
