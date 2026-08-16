@@ -7,6 +7,7 @@ import os
 import shutil
 import subprocess
 import zipfile
+import uuid
 from datetime import datetime, timedelta
 import jwt
 import bcrypt
@@ -374,8 +375,15 @@ def split_stem(file: UploadFile = File(...), token: str = None, db: Session = De
     check_split_allowance(db, user_id)
 
     try:
-        # Save uploaded file
-        upload_dir = "/tmp/stemline_uploads"
+        # Each split gets its own uuid-keyed work directory so concurrent or
+        # repeated splits never share a folder or filename. Before this,
+        # every split used the same shared "/tmp/stemline_uploads" folder
+        # and named its zip after the uploaded filename — so a second split
+        # (even of a different song) could overwrite the zip file that an
+        # earlier saved stem's database row still pointed at, or the "find
+        # stem folder" walk could pick up leftover files from a prior run.
+        request_id = uuid.uuid4().hex
+        upload_dir = os.path.join("/tmp/stemline_uploads", request_id)
         os.makedirs(upload_dir, exist_ok=True)
         file_path = os.path.join(upload_dir, file.filename)
         
@@ -448,8 +456,12 @@ def split_stem(file: UploadFile = File(...), token: str = None, db: Session = De
             logger.error("No stem files found after Demucs processing")
             raise Exception("No stem files generated")
         
-        # Create zip
-        zip_path = os.path.join(upload_dir, f"{file.filename.rsplit('.', 1)[0]}_stems.zip")
+        # Create zip in a permanent stems folder, keyed by this request's
+        # uuid so it can never collide with any other split's zip — past or
+        # future, same filename or not.
+        stems_dir = "/tmp/stemline_uploads/saved_splits"
+        os.makedirs(stems_dir, exist_ok=True)
+        zip_path = os.path.join(stems_dir, f"{request_id}_{file.filename.rsplit('.', 1)[0]}_stems.zip")
         logger.info(f"Creating zip file: {zip_path}")
         with zipfile.ZipFile(zip_path, "w") as zf:
             for root, dirs, files in os.walk(stem_dir):
@@ -457,6 +469,14 @@ def split_stem(file: UploadFile = File(...), token: str = None, db: Session = De
                     file_full_path = os.path.join(root, f)
                     arcname = os.path.relpath(file_full_path, stem_dir)
                     zf.write(file_full_path, arcname)
+
+        # The raw upload and Demucs output are no longer needed now that the
+        # zip is safely saved elsewhere — clean up this request's work dir
+        # so /tmp doesn't fill up over time.
+        try:
+            shutil.rmtree(upload_dir, ignore_errors=True)
+        except Exception as cleanup_err:
+            logger.warning(f"Cleanup of {upload_dir} failed: {cleanup_err}")
         
         # Save to DB
         stem_record = Stem(
