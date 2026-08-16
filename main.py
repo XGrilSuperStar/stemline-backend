@@ -638,5 +638,29 @@ def rename_stem(stem_id: int, body: RenameStemRequest, token: str = None, db: Se
         logger.error(f"Rename error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.delete("/api/v1/my-stems/{stem_id}")
+def delete_stem(stem_id: int, token: str = None, db: Session = Depends(get_db)):
+    user_id = get_current_user(token)
+    try:
+        stem_row = db.query(Stem).filter(Stem.id == stem_id, Stem.user_id == user_id).first()
+        if not stem_row:
+            raise HTTPException(status_code=404, detail="Saved stem not found.")
+        # Remove the file on disk first — if this fails we still don't want
+        # a dangling DB row pointing at nothing, but we also don't want to
+        # silently leak files, so log any cleanup failure rather than hide it.
+        try:
+            if stem_row.zip_path and os.path.exists(stem_row.zip_path):
+                os.remove(stem_row.zip_path)
+        except Exception as file_err:
+            logger.warning(f"Could not remove file for stem {stem_id}: {file_err}")
+        db.delete(stem_row)
+        db.commit()
+        return {"deleted": True, "id": stem_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Delete stem error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8080)))
