@@ -3640,6 +3640,7 @@ document.addEventListener('DOMContentLoaded', () => {
           '<div style="display:flex;gap:0.9rem;align-items:center;">' +
           '<button type="button" class="load-all-mixer-btn" style="background:var(--ember);color:#1A1005;border:none;border-radius:2px;font-family:inherit;font-size:0.72rem;font-weight:600;padding:0.35rem 0.7rem;cursor:pointer;">' + loadLabel + '</button>' +
           '<a href="' + dlUrl + '" style="color:var(--ember);font-size:0.75rem;text-decoration:none;border-bottom:1px solid var(--ember);">Download ' + (isSingle ? '(.wav)' : 'stems (.zip)') + '</a>' +
+          '<button type="button" class="delete-stem-btn" title="Delete this stem" style="margin-left:auto;background:none;color:var(--clip-red);border:1px solid var(--clip-red);border-radius:2px;font-family:inherit;font-size:0.7rem;padding:0.3rem 0.55rem;cursor:pointer;">Delete</button>' +
           '</div>' +
           '</div>';
       }).join('');
@@ -3666,6 +3667,32 @@ document.addEventListener('DOMContentLoaded', () => {
             if (previewLabelEl && loadedCount > 0) previewLabelEl.textContent = trackName;
             btn.textContent = loadedCount === targets.length ? 'Loaded!' : ('Loaded ' + loadedCount + '/' + targets.length);
             setTimeout(() => { btn.textContent = prevText; btn.disabled = false; }, 1500);
+          } catch (e) {
+            btn.textContent = 'Failed';
+            setTimeout(() => { btn.textContent = prevText; btn.disabled = false; }, 1500);
+          }
+        });
+      });
+
+      myStemsList.querySelectorAll('.delete-stem-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const row = btn.closest('.my-stems-row');
+          const stemId = row.dataset.stemId;
+          const trackName = row.dataset.trackName;
+          if (!confirm('Delete "' + trackName + '"? This can\'t be undone.')) return;
+          btn.disabled = true;
+          const prevText = btn.textContent;
+          btn.textContent = '…';
+          try {
+            const res = await fetch(API_BASE + '/api/v1/my-stems/' + stemId + '?token=' + encodeURIComponent(getToken()), {
+              method: 'DELETE'
+            });
+            const resData = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(resData.detail || 'Could not delete.');
+            row.remove();
+            if (!myStemsList.querySelector('.my-stems-row')) {
+              myStemsList.innerHTML = '<div style="color:var(--chrome-dim);font-size:0.8rem;">No splits yet — drop a song above to get started.</div>';
+            }
           } catch (e) {
             btn.textContent = 'Failed';
             setTimeout(() => { btn.textContent = prevText; btn.disabled = false; }, 1500);
