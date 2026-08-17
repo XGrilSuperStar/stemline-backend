@@ -259,11 +259,11 @@ def get_db():
 
 @app.get("/")
 def root():
-    return FileResponse("stemline_landing_page.html", media_type="text/html")
+    return FileResponse("stemline101_landing_page.html", media_type="text/html")
 
 @app.get("/reset-password")
 def reset_password_page():
-    return FileResponse("stemline_landing_page.html", media_type="text/html")
+    return FileResponse("stemline101_landing_page.html", media_type="text/html")
 
 @app.get("/api/v1/health")
 def health():
