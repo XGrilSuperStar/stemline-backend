@@ -459,7 +459,7 @@ def split_stem(file: UploadFile = File(...), token: str = None, db: Session = De
         # Create zip in a permanent stems folder, keyed by this request's
         # uuid so it can never collide with any other split's zip — past or
         # future, same filename or not.
-        stems_dir = "/tmp/stemline_uploads/saved_splits"
+        stems_dir = "/data/stemline_uploads/saved_splits"
         os.makedirs(stems_dir, exist_ok=True)
         zip_path = os.path.join(stems_dir, f"{request_id}_{file.filename.rsplit('.', 1)[0]}_stems.zip")
         logger.info(f"Creating zip file: {zip_path}")
@@ -590,7 +590,7 @@ def save_stem_instrument(stem_id: int, instrument: str, token: str = None, db: S
                 raise HTTPException(status_code=404, detail=f"No {instrument} track in this split.")
             wav_bytes = zf.read(match)
 
-        save_dir = "/tmp/stemline_uploads/saved"
+        save_dir = "/data/stemline_uploads/saved"
         os.makedirs(save_dir, exist_ok=True)
         wav_path = os.path.join(save_dir, f"{stem_id}_{instrument}_{secrets.token_hex(4)}.wav")
         with open(wav_path, "wb") as f:
