@@ -3689,6 +3689,7 @@ document.addEventListener('DOMContentLoaded', () => {
           '<div style="color:var(--chrome);font-size:0.85rem;margin-bottom:0.3rem;word-break:break-word;">' + escapeHtml(stem.track_name) + '</div>' +
           '<div style="color:var(--chrome-dim);font-size:0.68rem;margin-bottom:0.7rem;">' + date + '</div>' +
           '<div style="display:flex;gap:0.9rem;align-items:center;">' +
+          (('<canvas class="preview-wave-canvas" title="Hover to preview" data-preview-url="' + (isSingle ? dlUrl : (API_BASE + '/api/v1/my-stems/' + stem.id + '/download/vocals?token=' + encodeURIComponent(getToken()))) + '" width="90" height="32" style="background:var(--asphalt,#111);border:1px solid var(--concrete-line);border-radius:2px;cursor:pointer;flex-shrink:0;"></canvas>')) +
           '<button type="button" class="load-all-mixer-btn" style="background:var(--ember);color:#1A1005;border:none;border-radius:2px;font-family:inherit;font-size:0.72rem;font-weight:600;padding:0.35rem 0.7rem;cursor:pointer;">' + loadLabel + '</button>' +
           '<a href="' + dlUrl + '" style="color:var(--ember);font-size:0.75rem;text-decoration:none;border-bottom:1px solid var(--ember);">Download ' + (isSingle ? '(.wav)' : 'stems (.zip)') + '</a>' +
           '<button type="button" class="delete-stem-btn" title="Delete this stem" style="margin-left:auto;background:none;color:var(--clip-red);border:1px solid var(--clip-red);border-radius:2px;font-family:inherit;font-size:0.7rem;padding:0.3rem 0.55rem;cursor:pointer;">Delete</button>' +
@@ -3721,6 +3722,79 @@ document.addEventListener('DOMContentLoaded', () => {
           } catch (e) {
             btn.textContent = 'Failed';
             setTimeout(() => { btn.textContent = prevText; btn.disabled = false; }, 1500);
+          }
+        });
+      });
+
+      let previewAudioCtx = null;
+      let previewActive = null; // { canvas, audio, buffer, raf }
+      function stopPreview() {
+        if (!previewActive) return;
+        try { previewActive.audio.pause(); } catch(e) {}
+        if (previewActive.raf) cancelAnimationFrame(previewActive.raf);
+        previewActive = null;
+      }
+      function drawWave(canvas, buffer, progress) {
+        const ctx = canvas.getContext('2d');
+        const w = canvas.width, h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+        const data = buffer.getChannelData(0);
+        const step = Math.ceil(data.length / w);
+        ctx.fillStyle = 'rgba(255,138,61,0.55)';
+        for (let x = 0; x < w; x++) {
+          let min = 1, max = -1;
+          const start = x * step;
+          for (let i = 0; i < step; i++) {
+            const v = data[start + i] || 0;
+            if (v < min) min = v;
+            if (v > max) max = v;
+          }
+          const y1 = (1 + min) * 0.5 * h;
+          const y2 = (1 + max) * 0.5 * h;
+          ctx.fillRect(x, y1, 1, Math.max(1, y2 - y1));
+        }
+        if (progress != null) {
+          const px = Math.floor(progress * w);
+          ctx.fillStyle = '#ff8a3d';
+          ctx.fillRect(px, 0, 1, h);
+        }
+      }
+      myStemsList.querySelectorAll('.preview-wave-canvas').forEach(canvas => {
+        let buffer = null;
+        let loading = false;
+        canvas.addEventListener('mouseenter', async () => {
+          stopPreview();
+          const url = canvas.dataset.previewUrl;
+          if (!previewAudioCtx) previewAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          if (!buffer) {
+            if (loading) return;
+            loading = true;
+            try {
+              const res = await fetch(url);
+              const arrBuf = await res.arrayBuffer();
+              buffer = await previewAudioCtx.decodeAudioData(arrBuf);
+              drawWave(canvas, buffer, 0);
+            } catch (e) {
+              loading = false;
+              return;
+            }
+            loading = false;
+          }
+          const audio = new Audio(url);
+          audio.play().catch(() => {});
+          previewActive = { canvas, audio, buffer };
+          const tick = () => {
+            if (!previewActive || previewActive.audio !== audio) return;
+            drawWave(canvas, buffer, audio.duration ? audio.currentTime / audio.duration : 0);
+            previewActive.raf = requestAnimationFrame(tick);
+          };
+          tick();
+          audio.addEventListener('ended', () => { if (previewActive && previewActive.audio === audio) { drawWave(canvas, buffer, 0); stopPreview(); } });
+        });
+        canvas.addEventListener('mouseleave', () => {
+          if (previewActive && previewActive.canvas === canvas) {
+            stopPreview();
+            if (buffer) drawWave(canvas, buffer, 0);
           }
         });
       });
