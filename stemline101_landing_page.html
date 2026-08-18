@@ -3689,6 +3689,7 @@ document.addEventListener('DOMContentLoaded', () => {
           '<div style="color:var(--chrome);font-size:0.85rem;margin-bottom:0.3rem;word-break:break-word;">' + escapeHtml(stem.track_name) + '</div>' +
           '<div style="color:var(--chrome-dim);font-size:0.68rem;margin-bottom:0.7rem;">' + date + '</div>' +
           '<div style="display:flex;gap:0.9rem;align-items:center;">' +
+          '<button type="button" class="preview-stem-btn" title="Preview" data-preview-url="' + dlUrl + '" style="background:none;color:var(--ember);border:1px solid var(--ember);border-radius:50%;width:1.8rem;height:1.8rem;min-width:1.8rem;font-family:inherit;font-size:0.7rem;cursor:pointer;display:flex;align-items:center;justify-content:center;">&#9658;</button>' +
           '<button type="button" class="load-all-mixer-btn" style="background:var(--ember);color:#1A1005;border:none;border-radius:2px;font-family:inherit;font-size:0.72rem;font-weight:600;padding:0.35rem 0.7rem;cursor:pointer;">' + loadLabel + '</button>' +
           '<a href="' + dlUrl + '" style="color:var(--ember);font-size:0.75rem;text-decoration:none;border-bottom:1px solid var(--ember);">Download ' + (isSingle ? '(.wav)' : 'stems (.zip)') + '</a>' +
           '<button type="button" class="delete-stem-btn" title="Delete this stem" style="margin-left:auto;background:none;color:var(--clip-red);border:1px solid var(--clip-red);border-radius:2px;font-family:inherit;font-size:0.7rem;padding:0.3rem 0.55rem;cursor:pointer;">Delete</button>' +
@@ -3722,6 +3723,30 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.textContent = 'Failed';
             setTimeout(() => { btn.textContent = prevText; btn.disabled = false; }, 1500);
           }
+        });
+      });
+
+      let previewAudioEl = null;
+      myStemsList.querySelectorAll('.preview-stem-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const url = btn.dataset.previewUrl;
+          const allPreviewBtns = myStemsList.querySelectorAll('.preview-stem-btn');
+          if (previewAudioEl && previewAudioEl.dataset.forUrl === url) {
+            previewAudioEl.pause();
+            previewAudioEl = null;
+            allPreviewBtns.forEach(b => b.innerHTML = '&#9658;');
+            return;
+          }
+          if (previewAudioEl) {
+            previewAudioEl.pause();
+            allPreviewBtns.forEach(b => b.innerHTML = '&#9658;');
+          }
+          const audio = new Audio(url);
+          audio.dataset.forUrl = url;
+          audio.addEventListener('ended', () => { btn.innerHTML = '&#9658;'; previewAudioEl = null; });
+          audio.play().catch(() => { btn.innerHTML = '&#9658;'; previewAudioEl = null; });
+          previewAudioEl = audio;
+          btn.innerHTML = '&#9632;';
         });
       });
 
