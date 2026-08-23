@@ -661,6 +661,88 @@ def delete_stem(stem_id: int, token: str = None, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Delete stem error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+"""
+Add this route to your FastAPI backend (main.py or wherever your other
+page routes like the landing page live). Serves the Terms of Service
+page at /terms, matching the link already in the landing page footer.
+"""
 
+from fastapi.responses import HTMLResponse
+
+TERMS_HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Terms of Service — Stemline101</title>
+<style>
+  body { background:#111; color:#eee; font-family: system-ui, sans-serif;
+         max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem 4rem; line-height: 1.6; }
+  h1 { color: #f0a500; }
+  h2 { color: #f0a500; margin-top: 2rem; }
+  a { color: #f0a500; }
+</style>
+</head>
+<body>
+<h1>Stemline101 Terms of Service</h1>
+<p><em>Last Updated: [Date]</em></p>
+
+<h2>1. Acceptance of Terms</h2>
+<p>By accessing or using Stemline101 ("the Service"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree, do not use the Service.</p>
+
+<h2>2. Description of Service</h2>
+<p>Stemline101 provides AI-powered audio stem separation and mixing tools. Users may upload audio files, which the Service processes to generate separated audio components ("stems").</p>
+
+<h2>3. User Responsibility for Uploaded Content</h2>
+<p><strong>You are solely responsible for the audio content you upload to Stemline101.</strong></p>
+<p>By uploading any audio file, you represent and warrant that:</p>
+<ul>
+  <li>You own the copyright to the audio, OR</li>
+  <li>You have obtained all necessary rights, licenses, and permissions from the copyright holder(s) to upload, process, and separate the audio using this Service, OR</li>
+  <li>Your use of the audio falls under a valid exception to copyright law (such as fair use) in your jurisdiction.</li>
+</ul>
+<p>Stemline101 does not review, verify, or monitor the copyright status of uploaded content. The Service is a neutral tool for audio processing, comparable to other audio software. <strong>Stemline101 is not responsible for copyright infringement resulting from a user's upload, separation, download, distribution, or commercial use of audio content that the user did not have the right to process.</strong></p>
+
+<h2>4. Prohibited Use</h2>
+<p>You may not use Stemline101 to:</p>
+<ul>
+  <li>Upload copyrighted audio you do not have rights to, for the purpose of extracting, redistributing, or commercially exploiting stems from that work</li>
+  <li>Circumvent copyright protections</li>
+  <li>Violate any applicable local, state, national, or international law</li>
+</ul>
+
+<h2>5. DMCA / Copyright Complaints</h2>
+<p>Stemline101 will respond to valid copyright infringement notices in accordance with the Digital Millennium Copyright Act (DMCA) and will remove or disable access to infringing content upon receipt of a proper notice. Repeat infringers may have their accounts terminated.</p>
+<p><strong>Copyright agent contact:</strong> [email/address to be added]</p>
+
+<h2>6. No Warranty</h2>
+<p>The Service is provided "as is" without warranties of any kind. Stemline101 does not guarantee the accuracy, quality, or legality of separated stems.</p>
+
+<h2>7. Limitation of Liability</h2>
+<p>To the maximum extent permitted by law, Stemline101 and its owners/operators shall not be liable for any indirect, incidental, special, or consequential damages, including but not limited to copyright claims arising from user-uploaded content.</p>
+
+<h2>8. Indemnification</h2>
+<p>You agree to indemnify and hold harmless Stemline101, its owners, and operators from any claims, damages, or liabilities (including legal fees) arising from your use of the Service or your uploaded content, including third-party claims that your uploaded content infringes their rights.</p>
+
+<h2>9. Account Termination</h2>
+<p>Stemline101 reserves the right to suspend or terminate accounts that violate these Terms, including repeated copyright infringement.</p>
+
+<h2>10. Changes to Terms</h2>
+<p>Stemline101 may update these Terms at any time. Continued use of the Service after changes constitutes acceptance of the new Terms.</p>
+
+<h2>11. Contact</h2>
+<p>Questions about these Terms can be directed to: [contact email]</p>
+
+<p style="margin-top:3rem; opacity:0.6; font-size:0.9rem;">
+This document is a general template and not a substitute for legal advice.
+</p>
+</body>
+</html>
+"""
+
+
+@app.get("/terms", response_class=HTMLResponse)
+async def terms_of_service():
+    return TERMS_HTML
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8080)))
