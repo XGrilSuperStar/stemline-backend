@@ -93,15 +93,22 @@
 
   /* ===== HERO ===== */
   .hero {
-    padding: 5rem 2.5rem 3rem;
-    max-width: 1180px; margin: 0 auto;
-    display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 3rem;
-    align-items: start;
+    padding: 4rem 2.5rem 3rem;
+    max-width: 1600px; margin: 0 auto;
+    display: flex; flex-direction: column; gap: 2.5rem;
+    align-items: center;
     background: var(--void);
     position: relative;
   }
+  .hero > div:first-child {
+    max-width: 640px; text-align: center;
+  }
+  .hero .hero-ctas { justify-content: center; }
+  .hero .studio-room {
+    width: 100%;
+  }
   @media (max-width: 900px) {
-    .hero { grid-template-columns: 1fr; padding: 3rem 1.2rem 2rem; gap: 2rem; }
+    .hero { padding: 3rem 1.2rem 2rem; gap: 2rem; }
   }
   .eyebrow {
     font-family: 'JetBrains Mono', monospace;
@@ -895,20 +902,20 @@
 
   .drop-zone {
     margin-top: 1.3rem;
-    background: #101113;
-    border: 1px solid #000;
+    background: linear-gradient(180deg, rgba(184,86,46,0.16) 0%, #101113 100%);
+    border: 1px solid var(--ember);
     border-radius: 3px;
     padding: 1.2rem;
     text-align: center;
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.78rem;
-    color: rgba(237,227,206,0.55);
+    color: rgba(237,227,206,0.7);
     transition: border-color 0.2s, background 0.2s;
     cursor: pointer;
     box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
   }
-  .drop-zone:hover { border-color: var(--vu-amber); }
-  .drop-zone strong { color: var(--vu-amber); }
+  .drop-zone:hover { border-color: var(--chrome); }
+  .drop-zone strong { color: var(--chrome); font-weight: 700; }
 
   /* ===== Transport bar: hardware-style Play / Pause / Stop ===== */
   .transport {
@@ -1214,8 +1221,8 @@
 <section class="hero">
   <div>
     <div class="eyebrow"><span class="cat-no">STM-001</span> 6-CHANNEL DECONSTRUCTION UNIT</div>
-    <h1 class="stencil">Unmix any<br>song into its<br><span class="accent">six parts</span></h1>
-    <p class="sub">Upload a track. Get back clean vocals, drums, bass, and everything else — split by ear, not by guesswork.</p>
+    <h1 class="stencil">Unmix any song<br>into its stems.<br><span class="accent">Mix them with any other.</span></h1>
+    <p class="sub">Split any track into clean vocals, drums, bass, and more — then pull in stems from other songs and blend them together on one mixer. Great for DJing.</p>
     <div class="hero-ctas">
       <a class="btn-primary" href="#drop">Split a song free</a>
       <a class="btn-ghost" href="#how">See how it works</a>
@@ -1646,56 +1653,49 @@
   <div class="steps">
     <div class="step">
       <span class="num mono">01 —</span>
-      <h3>Upload your track</h3>
-      <p>Any MP3 or WAV. Quick free account to get started.</p>
+      <h3>Upload any songs</h3>
+      <p>Drop in one track or several. Any MP3 or WAV. Quick free account to get started.</p>
     </div>
     <div class="step">
       <span class="num mono">02 —</span>
-      <h3>We separate the layers</h3>
-      <p>The engine listens for each instrument's signature and pulls it into its own track.</p>
+      <h3>Each one splits into stems</h3>
+      <p>The engine pulls out clean vocals, drums, bass, and more from every song you upload — saved to your My Stems library.</p>
     </div>
     <div class="step">
       <span class="num mono">03 —</span>
-      <h3>Download your stems</h3>
-      <p>Six clean WAV files, ready for your DAW, karaoke night, or remix.</p>
+      <h3>Mix stems across songs</h3>
+      <p>Load any stem from any song onto the mixer — blend the vocals from one track over the drums from another, live.</p>
     </div>
   </div>
 </section>
 
 <section class="section" id="pricing">
   <div class="section-head">
-    <div class="eyebrow">PRICING</div>
-    <h2>Start free. Upgrade when you need more.</h2>
+    <div class="eyebrow">FREE TO USE</div>
+    <h2>No subscriptions. No paywalls. Just split your track and mix away.</h2>
   </div>
-  <div class="pricing">
+  <div class="pricing" style="grid-template-columns: 1fr; max-width: 560px; margin: 0 auto;">
     <div class="price-card free">
-      <div class="tier mono">FREE</div>
-      <div class="amount">$0<span>/month</span></div>
-      <ul>
-        <li>2 songs per month</li>
-        <li>Standard quality stems</li>
-        <li>Songs up to 5 minutes</li>
-        <li>Standard processing speed</li>
-      </ul>
-      <a class="btn-primary" href="#drop">Start splitting</a>
-    </div>
-    <div class="price-card pro">
-      <div class="tier mono">PRO</div>
-      <div class="amount">$9<span>/month</span></div>
+      <div class="tier mono">STEMLINE 101</div>
+      <div class="amount">Free<span>&nbsp;forever</span></div>
       <ul>
         <li>Unlimited songs</li>
-        <li>Highest quality stems</li>
+        <li>Full quality stems</li>
         <li>No length limit</li>
-        <li>Priority processing</li>
-        <li>Batch upload</li>
+        <li>Supported by ads, not subscriptions</li>
       </ul>
-      <a class="btn-primary" href="#drop">Go Pro</a>
+      <a class="btn-primary" href="#drop">Start splitting</a>
     </div>
   </div>
 </section>
 
 <footer>
   STEMLINE 101 — SPLIT THE MIX
+  <div style="margin-top: 0.8rem; display: flex; gap: 1.2rem; justify-content: center; flex-wrap: wrap;">
+    <a href="/privacy" style="color: inherit; text-decoration: underline;">Privacy Policy</a>
+    <a href="/terms" style="color: inherit; text-decoration: underline;">Terms of Service</a>
+    <a href="/about" style="color: inherit; text-decoration: underline;">About</a>
+  </div>
 </footer>
 
 
@@ -3689,7 +3689,7 @@ document.addEventListener('DOMContentLoaded', () => {
           '<div style="color:var(--chrome);font-size:0.85rem;margin-bottom:0.3rem;word-break:break-word;">' + escapeHtml(stem.track_name) + '</div>' +
           '<div style="color:var(--chrome-dim);font-size:0.68rem;margin-bottom:0.7rem;">' + date + '</div>' +
           '<div style="display:flex;gap:0.9rem;align-items:center;">' +
-          (('<canvas class="preview-wave-canvas" title="Hover to preview" data-preview-url="' + (isSingle ? dlUrl : (API_BASE + '/api/v1/my-stems/' + stem.id + '/download/vocals?token=' + encodeURIComponent(getToken()))) + '" width="90" height="32" style="background:var(--asphalt,#111);border:1px solid var(--concrete-line);border-radius:2px;cursor:pointer;flex-shrink:0;"></canvas>')) +
+          (isSingle ? ('<canvas class="preview-wave-canvas" title="Hover to preview" data-preview-url="' + dlUrl + '" width="90" height="32" style="background:var(--asphalt,#111);border:1px solid var(--concrete-line);border-radius:2px;cursor:pointer;flex-shrink:0;"></canvas>') : '') +
           '<button type="button" class="load-all-mixer-btn" style="background:var(--ember);color:#1A1005;border:none;border-radius:2px;font-family:inherit;font-size:0.72rem;font-weight:600;padding:0.35rem 0.7rem;cursor:pointer;">' + loadLabel + '</button>' +
           '<a href="' + dlUrl + '" style="color:var(--ember);font-size:0.75rem;text-decoration:none;border-bottom:1px solid var(--ember);">Download ' + (isSingle ? '(.wav)' : 'stems (.zip)') + '</a>' +
           '<button type="button" class="delete-stem-btn" title="Delete this stem" style="margin-left:auto;background:none;color:var(--clip-red);border:1px solid var(--clip-red);border-radius:2px;font-family:inherit;font-size:0.7rem;padding:0.3rem 0.55rem;cursor:pointer;">Delete</button>' +
