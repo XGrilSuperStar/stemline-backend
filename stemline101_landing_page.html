@@ -114,7 +114,7 @@
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.76rem; letter-spacing: 0.1em; text-transform: uppercase;
     color: var(--chrome-dim); margin-bottom: 1.2rem;
-    display: flex; align-items: center; gap: 10px;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
   }
   .eyebrow .cat-no {
     color: var(--chrome); background: var(--ember);
@@ -900,6 +900,33 @@
     box-shadow: 0 0 7px rgba(60,253,224,0.6);
   }
 
+  /* ===== AD SLOTS ===== */
+  .ad-slot {
+    width: 100%;
+    max-width: 970px;
+    min-height: 90px;
+    margin: 1.4rem auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--concrete);
+    border: 1px dashed var(--concrete-line);
+    border-radius: 4px;
+    color: var(--chrome-dim);
+  }
+  .ad-slot-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    opacity: 0.5;
+  }
+  .ad-slot-top { margin: 0 auto; border-radius: 0; border-left: none; border-right: none; }
+  .ad-slot-mid { min-height: 250px; max-width: 728px; }
+  .ad-slot-footer { min-height: 90px; }
+  @media (max-width: 760px) {
+    .ad-slot { min-height: 50px; }
+    .ad-slot-mid { min-height: 100px; }
+  }
+
   .drop-zone {
     margin-top: 1.3rem;
     background: linear-gradient(180deg, rgba(184,86,46,0.16) 0%, #101113 100%);
@@ -1205,6 +1232,10 @@
     <button id="navAccountBtn" class="nav-cta" style="border:none;cursor:pointer;">Log out</button>
   </div>
 </nav>
+
+<!-- ===== AD SLOT: TOP BANNER ===== -->
+<div class="ad-slot ad-slot-top" id="adSlotTop" data-ad-slot="top-banner">
+</div>
 
 <!-- ===== MY STEMS PANEL ===== -->
 <div id="myStemsOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:1100;"></div>
@@ -1645,6 +1676,10 @@
   </div>
 </div>
 
+<!-- ===== AD SLOT: MID-PAGE BANNER (below mixer) ===== -->
+<div class="ad-slot ad-slot-mid" id="adSlotMid" data-ad-slot="mid-banner">
+</div>
+
 <section class="section" id="how">
   <div class="section-head">
     <div class="eyebrow">THE PROCESS</div>
@@ -1688,6 +1723,10 @@
     </div>
   </div>
 </section>
+
+<!-- ===== AD SLOT: FOOTER BANNER ===== -->
+<div class="ad-slot ad-slot-footer" id="adSlotFooter" data-ad-slot="footer-banner">
+</div>
 
 <footer>
   STEMLINE 101 — SPLIT THE MIX
