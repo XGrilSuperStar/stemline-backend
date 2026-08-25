@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import zipfile
 import uuid
+import threading
 from datetime import datetime, timedelta
 import jwt
 import bcrypt
@@ -85,8 +86,26 @@ class Stem(Base):
     # Null for a normal split (zip_path points at the full 6-stem zip).
     # Set for a single-channel save (zip_path points at just that one wav).
     instrument = Column(String, nullable=True)
+    # "processing" while Demucs runs in the background, then "done" or
+    # "error". Old rows (created before this column existed) default to
+    # "done" via the migration below, since they only ever got saved after
+    # a successful split.
+    status = Column(String, nullable=True, default="done")
+    error_message = Column(String, nullable=True)
 
 Base.metadata.create_all(bind=engine)
+
+# One-time migration: add status/error_message columns to stems table if they
+# don't exist yet, backfilling old rows as "done" so they still show up
+# normally in My Stems.
+try:
+    with engine.connect() as conn:
+        conn.execute(text("ALTER TABLE stems ADD COLUMN IF NOT EXISTS status VARCHAR DEFAULT 'done'"))
+        conn.execute(text("ALTER TABLE stems ADD COLUMN IF NOT EXISTS error_message VARCHAR"))
+        conn.execute(text("UPDATE stems SET status = 'done' WHERE status IS NULL"))
+        conn.commit()
+except Exception as e:
+    logger.warning(f"stems status/error_message column migration skipped or already applied: {e}")
 
 # One-time migration: add username column to users table if it doesn't exist yet
 try:
@@ -368,32 +387,18 @@ def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_db)):
     logger.info(f"Password reset successfully for user {user.id}")
     return {"message": "Password updated. You can now log in with your new password."}
 
-@app.post("/api/v1/split")
-def split_stem(file: UploadFile = File(...), token: str = None, db: Session = Depends(get_db)):
-    logger.info(f"Split request received: {file.filename}")
-    user_id = get_current_user(token)
-    check_split_allowance(db, user_id)
-
+def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str, filename: str):
+    """
+    Runs Demucs and finishes the split for an already-created Stem row.
+    Runs in a background thread so the HTTP request that kicked it off can
+    return immediately instead of holding the connection open for the
+    full 3+ minutes Demucs takes — that long open connection was getting
+    killed by a proxy/browser network timeout before the response came
+    back, even though the split itself succeeded on the backend every time.
+    Opens its own DB session since the request-scoped one is gone by now.
+    """
+    db = SessionLocal()
     try:
-        # Each split gets its own uuid-keyed work directory so concurrent or
-        # repeated splits never share a folder or filename. Before this,
-        # every split used the same shared "/tmp/stemline_uploads" folder
-        # and named its zip after the uploaded filename — so a second split
-        # (even of a different song) could overwrite the zip file that an
-        # earlier saved stem's database row still pointed at, or the "find
-        # stem folder" walk could pick up leftover files from a prior run.
-        request_id = uuid.uuid4().hex
-        upload_dir = os.path.join("/tmp/stemline_uploads", request_id)
-        os.makedirs(upload_dir, exist_ok=True)
-        file_path = os.path.join(upload_dir, file.filename)
-        
-        logger.info(f"Saving uploaded file to: {file_path}")
-        with open(file_path, "wb") as f:
-            shutil.copyfileobj(file.file, f)
-        
-        logger.info(f"File saved, starting Demucs processing...")
-        
-        # Run Demucs
         output_dir = os.path.join(upload_dir, "output")
         os.makedirs(output_dir, exist_ok=True)
 
@@ -429,40 +434,38 @@ def split_stem(file: UploadFile = File(...), token: str = None, db: Session = De
             "--overlap", overlap,
             "-o", output_dir, file_path,
         ]
-        logger.info(f"Running: {' '.join(cmd)}")
+        logger.info(f"[job {request_id}] Running: {' '.join(cmd)}")
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             timeout=600
         )
-        
-        logger.info(f"Demucs stdout: {result.stdout}")
-        logger.info(f"Demucs stderr: {result.stderr}")
-        logger.info(f"Demucs return code: {result.returncode}")
-        
+
+        logger.info(f"[job {request_id}] Demucs stdout: {result.stdout}")
+        logger.info(f"[job {request_id}] Demucs stderr: {result.stderr}")
+        logger.info(f"[job {request_id}] Demucs return code: {result.returncode}")
+
         if result.returncode != 0:
-            logger.error(f"Demucs failed with return code {result.returncode}")
             raise Exception(f"Demucs processing failed: {result.stderr}")
-        
+
         # Find output stems
         stem_dir = None
         for root, dirs, files in os.walk(output_dir):
             if any(f.endswith(".wav") for f in files):
                 stem_dir = root
                 break
-        
+
         if not stem_dir:
-            logger.error("No stem files found after Demucs processing")
             raise Exception("No stem files generated")
-        
+
         # Create zip in a permanent stems folder, keyed by this request's
         # uuid so it can never collide with any other split's zip — past or
         # future, same filename or not.
         stems_dir = "/data/stemline_uploads/saved_splits"
         os.makedirs(stems_dir, exist_ok=True)
-        zip_path = os.path.join(stems_dir, f"{request_id}_{file.filename.rsplit('.', 1)[0]}_stems.zip")
-        logger.info(f"Creating zip file: {zip_path}")
+        zip_path = os.path.join(stems_dir, f"{request_id}_{filename.rsplit('.', 1)[0]}_stems.zip")
+        logger.info(f"[job {request_id}] Creating zip file: {zip_path}")
         with zipfile.ZipFile(zip_path, "w") as zf:
             for root, dirs, files in os.walk(stem_dir):
                 for f in files:
@@ -476,30 +479,102 @@ def split_stem(file: UploadFile = File(...), token: str = None, db: Session = De
         try:
             shutil.rmtree(upload_dir, ignore_errors=True)
         except Exception as cleanup_err:
-            logger.warning(f"Cleanup of {upload_dir} failed: {cleanup_err}")
-        
-        # Save to DB
-        stem_record = Stem(
-            user_id=user_id,
-            track_name=file.filename.rsplit('.', 1)[0],
-            zip_path=zip_path
-        )
-        db.add(stem_record)
-        db.commit()
-        db.refresh(stem_record)
-        
-        logger.info(f"Stem split successful, saved as ID {stem_record.id}")
-        return {"stem_id": stem_record.id, "track_name": stem_record.track_name}
-    
+            logger.warning(f"[job {request_id}] Cleanup of {upload_dir} failed: {cleanup_err}")
+
+        stem_record = db.query(Stem).filter(Stem.id == stem_id).first()
+        if stem_record:
+            stem_record.zip_path = zip_path
+            stem_record.status = "done"
+            db.commit()
+        logger.info(f"[job {request_id}] Stem split successful, saved as ID {stem_id}")
+
     except Exception as e:
-        logger.error(f"Split error: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Split failed: {str(e)}")
+        logger.error(f"[job {request_id}] Split error: {str(e)}", exc_info=True)
+        try:
+            shutil.rmtree(upload_dir, ignore_errors=True)
+        except Exception:
+            pass
+        stem_record = db.query(Stem).filter(Stem.id == stem_id).first()
+        if stem_record:
+            stem_record.status = "error"
+            stem_record.error_message = str(e)
+            db.commit()
+    finally:
+        db.close()
+
+
+@app.post("/api/v1/split")
+def split_stem(file: UploadFile = File(...), token: str = None, db: Session = Depends(get_db)):
+    logger.info(f"Split request received: {file.filename}")
+    user_id = get_current_user(token)
+    check_split_allowance(db, user_id)
+
+    # Each split gets its own uuid-keyed work directory so concurrent or
+    # repeated splits never share a folder or filename. Before this,
+    # every split used the same shared "/tmp/stemline_uploads" folder
+    # and named its zip after the uploaded filename — so a second split
+    # (even of a different song) could overwrite the zip file that an
+    # earlier saved stem's database row still pointed at, or the "find
+    # stem folder" walk could pick up leftover files from a prior run.
+    request_id = uuid.uuid4().hex
+    upload_dir = os.path.join("/tmp/stemline_uploads", request_id)
+    os.makedirs(upload_dir, exist_ok=True)
+    file_path = os.path.join(upload_dir, file.filename)
+
+    logger.info(f"Saving uploaded file to: {file_path}")
+    with open(file_path, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+
+    # Create the DB row up front in "processing" state, then hand the actual
+    # Demucs run off to a background thread and return right away. Demucs
+    # takes 3+ minutes on a real song — holding the HTTP request open that
+    # whole time meant a proxy or browser network timeout could kill the
+    # connection before the response ever came back, even though the split
+    # itself always finished successfully server-side. Now the frontend
+    # polls /api/v1/split/status/{stem_id} instead of waiting on one long
+    # request.
+    stem_record = Stem(
+        user_id=user_id,
+        track_name=file.filename.rsplit('.', 1)[0],
+        zip_path=None,
+        status="processing",
+    )
+    db.add(stem_record)
+    db.commit()
+    db.refresh(stem_record)
+
+    thread = threading.Thread(
+        target=run_split_job,
+        args=(stem_record.id, request_id, upload_dir, file_path, file.filename),
+        daemon=True,
+    )
+    thread.start()
+
+    logger.info(f"Split job {request_id} started in background as stem ID {stem_record.id}")
+    return {"stem_id": stem_record.id, "track_name": stem_record.track_name, "status": "processing"}
+
+
+@app.get("/api/v1/split/status/{stem_id}")
+def get_split_status(stem_id: int, token: str = None, db: Session = Depends(get_db)):
+    user_id = get_current_user(token)
+    stem_record = db.query(Stem).filter(Stem.id == stem_id, Stem.user_id == user_id).first()
+    if not stem_record:
+        raise HTTPException(status_code=404, detail="Stem not found")
+    return {
+        "stem_id": stem_record.id,
+        "track_name": stem_record.track_name,
+        "status": stem_record.status or "done",
+        "error": stem_record.error_message,
+    }
 
 @app.get("/api/v1/my-stems")
 def get_my_stems(token: str = None, db: Session = Depends(get_db)):
     user_id = get_current_user(token)
     try:
-        stems = db.query(Stem).filter(Stem.user_id == user_id).all()
+        # Only list stems that finished successfully — rows still
+        # "processing" (or that ended in "error") don't have a usable
+        # zip_path yet and would 404/500 if the frontend tried to load them.
+        stems = db.query(Stem).filter(Stem.user_id == user_id, Stem.status == "done").all()
         return [{"id": s.id, "track_name": s.track_name, "created_at": s.created_at, "instrument": s.instrument} for s in stems]
     except Exception as e:
         logger.error(f"Get stems error: {str(e)}")
