@@ -3354,6 +3354,30 @@ document.addEventListener('DOMContentLoaded', () => {
     if (splitTimerId) { clearInterval(splitTimerId); splitTimerId = null; }
   }
 
+  // Polls /api/v1/split/status/{stemId} until the backend reports the
+  // split as done or errored. Demucs takes 3+ minutes on a real song, so
+  // the actual split call now returns immediately (see startUpload) instead
+  // of holding one long request open — a long-open connection was getting
+  // killed by a proxy/browser network timeout before the response came
+  // back, even though the split itself always finished fine server-side.
+  async function pollSplitStatus(stemId) {
+    const token = encodeURIComponent(getToken());
+    while (true) {
+      await new Promise(r => setTimeout(r, 4000));
+      const res = await fetch(API_BASE + '/api/v1/split/status/' + stemId + '?token=' + token);
+      if (!res.ok) {
+        if (res.status === 401) throw new Error('Your session expired. Please log in again.');
+        // A transient blip polling status shouldn't kill the whole upload —
+        // just try again on the next tick.
+        continue;
+      }
+      const data = await res.json();
+      if (data.status === 'done') return data;
+      if (data.status === 'error') throw new Error(data.error || 'Split failed.');
+      // else still "processing" — keep polling
+    }
+  }
+
   async function startUpload(file) {
     dropZoneLabel.textContent = 'Uploading ' + file.name + '…';
     showStatus('Uploading…', false);
@@ -3361,27 +3385,33 @@ document.addEventListener('DOMContentLoaded', () => {
       const formData = new FormData();
       formData.append('file', file);
       // Give it a beat to actually upload the file before switching to the
-      // splitting message — then the fetch() call below is the long block.
+      // splitting message.
       setTimeout(() => {
         dropZoneLabel.textContent = 'Splitting ' + file.name + '…';
         startSplitLoader();
       }, 600);
       // Backend reads the token from the query string, not an Authorization header.
+      // This call now only covers the upload + kicking off the split — it
+      // returns right away with status "processing" instead of waiting for
+      // Demucs to finish.
       const res = await fetch(API_BASE + '/api/v1/split?token=' + encodeURIComponent(getToken()), {
         method: 'POST',
         body: formData
       });
-      const data = await res.json();
-      stopSplitLoader();
+      const kickoff = await res.json();
       if (!res.ok) {
+        stopSplitLoader();
         if (res.status === 401) {
           clearSession();
           refreshAccountButton();
   loadScreenStems();
           throw new Error('Your session expired. Please log in again.');
         }
-        throw new Error(data.detail || 'Upload failed.');
+        throw new Error(kickoff.detail || 'Upload failed.');
       }
+
+      const data = await pollSplitStatus(kickoff.stem_id);
+      stopSplitLoader();
       dropZoneLabel.innerHTML = 'Drop an MP3 or WAV here, or <strong>click to browse</strong>';
       const dlUrl = API_BASE + '/api/v1/my-stems/' + data.stem_id + '/download?token=' + encodeURIComponent(getToken());
       uploadStatus.innerHTML = 'Loading stems into the mixer…';
