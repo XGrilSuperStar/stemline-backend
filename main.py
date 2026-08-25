@@ -420,7 +420,7 @@ def split_stem(file: UploadFile = File(...), token: str = None, db: Session = De
         # artifacts contributing to bleed) at a smaller speed cost than
         # shifts. Demucs' own default is 0.25; bumping to 0.5 trades a bit
         # more compute for real reduction in edge artifacts.
-        overlap = os.getenv("DEMUCS_OVERLAP", "0.5")
+        overlap = os.getenv("DEMUCS_OVERLAP", "0.75")
 
         cmd = [
             "demucs", "-n", "htdemucs_6s",
@@ -746,3 +746,4 @@ async def terms_of_service():
     return TERMS_HTML
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8080)))
+
