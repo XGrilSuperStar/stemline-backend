@@ -139,7 +139,7 @@
   }
   .hero p.sub {
     font-size: 1.08rem; color: var(--chrome-dim);
-    max-width: 440px; margin: 0 auto 2rem;
+    max-width: 440px; margin-bottom: 2rem;
   }
   .hero-ctas { display: flex; gap: 1rem; align-items: center; }
   .btn-primary {
@@ -898,6 +898,26 @@
   .keylock-btn.active {
     background: var(--sci-glow); color: #06201C; border-color: var(--sci-glow);
     box-shadow: 0 0 7px rgba(60,253,224,0.6);
+  }
+
+  /* ===== MOBILE MIXER (stacked, larger touch targets) ===== */
+  @media (max-width: 700px) {
+    .mixer-row { flex-wrap: wrap; overflow-x: visible; }
+    .channels {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      flex: 1 1 100%; width: 100%; gap: 10px;
+    }
+    .channel { padding: 0.7rem 0.35rem 0.8rem; gap: 0.55rem; }
+    .channel .name { font-size: 0.68rem; }
+    .knob { width: 32px; height: 32px; }
+    .knob-tag, .ch-pitch-tag, .eq-label { font-size: 0.52rem; }
+    .ch-pitch-btn, .mute-btn, .cue-btn { width: 34px; height: 30px; }
+    .ch-btn-row { gap: 1px; }
+    .ch-browse, .ch-save, .ch-clear { min-height: 30px; font-size: 0.5rem; padding-left: 0; padding-right: 0; }
+    .ch-save { padding: 0 3px; }
+    .master-strip { width: 100%; flex-direction: row; flex-wrap: wrap; justify-content: center; align-items: center; gap: 1rem 1.5rem; order: 99; }
+    .master-strip .name { width: 100%; text-align: center; }
+    .crossfader-track, .crossfader-labels { width: 100%; max-width: 320px; }
   }
 
   /* ===== AD SLOTS ===== */
