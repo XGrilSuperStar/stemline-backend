@@ -3789,6 +3789,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const dlUrl = API_BASE + '/api/v1/my-stems/' + stem.id + '/download?token=' + encodeURIComponent(getToken());
         const isSingle = !!stem.instrument;
         const loadLabel = isSingle ? ('Load ' + stem.instrument) : 'Load into mixer';
+        // Whole-song splits get a hover-reveal panel listing each of the 6
+        // stems with a checkbox, so the user can save just the ones they want
+        // (via the existing save-instrument endpoint) instead of the whole zip.
+        const stemsPanel = isSingle ? '' :
+          '<div class="stems-hover-panel" style="display:none;margin-top:0.7rem;padding-top:0.7rem;border-top:1px solid var(--concrete-line);">' +
+            '<div style="display:flex;flex-wrap:wrap;gap:0.6rem;margin-bottom:0.6rem;">' +
+            CHANNEL_LIST.map(inst =>
+              '<label style="display:flex;align-items:center;gap:0.3rem;font-size:0.72rem;color:var(--chrome-dim);cursor:pointer;">' +
+              '<input type="checkbox" class="stem-pick-cb" value="' + inst + '"> ' + inst +
+              '</label>'
+            ).join('') +
+            '</div>' +
+            '<button type="button" class="save-selected-stems-btn" style="background:none;color:var(--ember);border:1px solid var(--ember);border-radius:2px;font-family:inherit;font-size:0.72rem;font-weight:600;padding:0.3rem 0.6rem;cursor:pointer;">Save Selected</button>' +
+          '</div>';
         return '<div class="my-stems-row" data-stem-id="' + stem.id + '" data-track-name="' + escapeHtml(stem.track_name) + '" data-instrument="' + escapeHtml(stem.instrument || '') + '" style="border:1px solid var(--concrete-line);padding:0.9rem;margin-bottom:0.7rem;">' +
           '<div style="color:var(--chrome);font-size:0.85rem;margin-bottom:0.3rem;word-break:break-word;">' + escapeHtml(stem.track_name) + '</div>' +
           '<div style="color:var(--chrome-dim);font-size:0.68rem;margin-bottom:0.7rem;">' + date + '</div>' +
@@ -3798,8 +3812,45 @@ document.addEventListener('DOMContentLoaded', () => {
           '<a href="' + dlUrl + '" style="color:var(--ember);font-size:0.75rem;text-decoration:none;border-bottom:1px solid var(--ember);">Download ' + (isSingle ? '(.wav)' : 'stems (.zip)') + '</a>' +
           '<button type="button" class="delete-stem-btn" title="Delete this stem" style="margin-left:auto;background:none;color:var(--clip-red);border:1px solid var(--clip-red);border-radius:2px;font-family:inherit;font-size:0.7rem;padding:0.3rem 0.55rem;cursor:pointer;">Delete</button>' +
           '</div>' +
+          stemsPanel +
           '</div>';
       }).join('');
+
+      // Hover a whole-song row to reveal its stem picker.
+      myStemsList.querySelectorAll('.my-stems-row').forEach(row => {
+        const panel = row.querySelector('.stems-hover-panel');
+        if (!panel) return;
+        row.addEventListener('mouseenter', () => { panel.style.display = 'block'; });
+        row.addEventListener('mouseleave', () => { panel.style.display = 'none'; });
+      });
+
+      myStemsList.querySelectorAll('.save-selected-stems-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const row = btn.closest('.my-stems-row');
+          const stemId = row.dataset.stemId;
+          const checked = Array.from(row.querySelectorAll('.stem-pick-cb:checked')).map(cb => cb.value);
+          if (!checked.length) return;
+          btn.disabled = true;
+          const prevText = btn.textContent;
+          btn.textContent = 'Saving…';
+          try {
+            for (const inst of checked) {
+              const res = await fetch(API_BASE + '/api/v1/my-stems/' + stemId + '/save-instrument/' + inst + '?token=' + encodeURIComponent(getToken()), {
+                method: 'POST'
+              });
+              if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.detail || ('Failed to save ' + inst));
+              }
+            }
+            btn.textContent = 'Saved!';
+            setTimeout(() => { navMyStemsBtn.click(); }, 700);
+          } catch (e) {
+            btn.textContent = 'Failed';
+            setTimeout(() => { btn.textContent = prevText; btn.disabled = false; }, 1500);
+          }
+        });
+      });
 
       myStemsList.querySelectorAll('.load-all-mixer-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
