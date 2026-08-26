@@ -271,6 +271,12 @@
     box-shadow: inset 2px 0 0 var(--sci-glow);
   }
   .screen-row.selected .track-name { color: var(--sci-glow); text-shadow: 0 0 6px rgba(60,253,224,0.5); }
+  .screen-row .stem-chan-tag {
+    flex-shrink: 0; width: 44px; text-align: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 0.56rem; font-weight: 700;
+    letter-spacing: 0.03em; border: 1px solid; border-radius: 2px; padding: 0.18rem 0;
+    background: rgba(0,0,0,0.35);
+  }
   .screen-row .track-name {
     flex: 1; min-width: 0; color: rgba(216,220,226,0.85);
     font-family: 'JetBrains Mono', monospace; font-size: 0.66rem;
@@ -310,7 +316,7 @@
   }
   .screen-row .rename-btn:hover { color: var(--sci-glow); }
   .screen-row .assign-btn {
-    flex-shrink: 0; font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
+    flex-shrink: 0; min-width: 54px; font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
     font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
     background: #1A1E23; color: rgba(216,220,226,0.6); border: 1px solid #000;
     border-radius: 2px; padding: 0.28rem 0.4rem; cursor: pointer; white-space: nowrap;
@@ -3489,7 +3495,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ===== SCREEN STEM BROWSER (mixer LCD) =====
   const CHANNEL_LIST = ['vocals', 'drums', 'bass', 'guitar', 'piano', 'other'];
-  const channelAssignments = {}; // stemRowId -> channelKey
+  // Each split is one song, but is rendered as SIX rows here — one per
+  // instrument — so it's obvious the song actually got separated instead of
+  // looking like one opaque "whole song" entry. channelAssignments is keyed
+  // by channel (only one stem can occupy a channel at a time), pointing at
+  // whichever stem_id currently loaded there.
+  const channelAssignments = {}; // channelKey -> stemId
+  const STEM_ROW_META = {
+    vocals: { label: 'VOCALS', accent: '#ff5540' },
+    drums:  { label: 'DRUMS',  accent: '#ffa022' },
+    bass:   { label: 'BASS',   accent: '#2fe08a' },
+    guitar: { label: 'GUITAR', accent: '#9b6dff' },
+    piano:  { label: 'SYNTH',  accent: '#ff5cb0' },
+    other:  { label: 'OTHER',  accent: '#3ab6ff' }
+  };
 
   window.__refreshMyStems = () => loadScreenStems();
 
@@ -3509,6 +3528,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Could not load stems.');
 
+      // Count is songs (splits), not rows — each song still shows as 6 rows below.
       if (countEl) countEl.textContent = '(' + data.length + ')';
 
       if (!data.length) {
@@ -3518,26 +3538,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
       listEl.innerHTML = data.map(stem => {
         const safeName = escapeHtml(stem.track_name);
-        const stemType = escapeHtml(stem.stem_type || '');
-        return '<div class="screen-row" data-stem-id="' + stem.id + '" data-track-name="' + safeName + '" data-stem-type="' + stemType + '">' +
-          '<div class="name-wrap">' +
-            '<span class="track-name" title="' + safeName + '">' + safeName + '</span>' +
-            '<button type="button" class="name-delete" title="Delete this stem">' +
-              '<svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6"/></svg>' +
+        return CHANNEL_LIST.map(chan => {
+          const meta = STEM_ROW_META[chan];
+          return '<div class="screen-row" data-stem-id="' + stem.id + '" data-track-name="' + safeName + '" data-stem-type="' + chan + '" data-chan="' + chan + '">' +
+            '<span class="stem-chan-tag" style="color:' + meta.accent + ';border-color:' + meta.accent + ';">' + meta.label + '</span>' +
+            '<div class="name-wrap">' +
+              '<span class="track-name" title="' + safeName + '">' + safeName + '</span>' +
+              '<button type="button" class="name-delete" title="Delete this split (all 6 stems)">' +
+                '<svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6"/></svg>' +
+              '</button>' +
+            '</div>' +
+            '<button type="button" class="rename-btn" title="Rename">' +
+              '<svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>' +
             '</button>' +
-          '</div>' +
-          '<button type="button" class="rename-btn" title="Rename">' +
-            '<svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>' +
-          '</button>' +
-          '<button type="button" class="cue-jack" title="Cue preview (headphone)">' +
-            '<svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="2.5" y="13" width="4" height="7" rx="1.5"/><rect x="17.5" y="13" width="4" height="7" rx="1.5"/></svg>' +
-          '</button>' +
-          '<button type="button" class="assign-btn">Assign</button>' +
-        '</div>';
+            '<button type="button" class="cue-jack" title="Cue preview (headphone)">' +
+              '<svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="2.5" y="13" width="4" height="7" rx="1.5"/><rect x="17.5" y="13" width="4" height="7" rx="1.5"/></svg>' +
+            '</button>' +
+            '<button type="button" class="assign-btn">LOAD</button>' +
+          '</div>';
+        }).join('');
       }).join('');
 
       listEl.querySelectorAll('.screen-row').forEach(row => {
         const stemId = row.dataset.stemId;
+        const chan = row.dataset.chan;
         let trackName = row.dataset.trackName;
         const assignBtn = row.querySelector('.assign-btn');
         const cueJack = row.querySelector('.cue-jack');
@@ -3545,29 +3569,43 @@ document.addEventListener('DOMContentLoaded', () => {
         const nameDeleteBtn = row.querySelector('.name-delete');
         const nameSpan = row.querySelector('.track-name');
 
+        // Reflect whatever's already loaded into this channel (e.g. after
+        // a re-render from a search/filter change).
+        if (channelAssignments[chan] === stemId) {
+          assignBtn.textContent = 'LOADED';
+          assignBtn.classList.add('assigned');
+        }
+
         nameDeleteBtn.addEventListener('click', async (e) => {
           e.stopPropagation();
-          if (!confirm('Delete "' + trackName + '"? This can\'t be undone.')) return;
-          nameDeleteBtn.disabled = true;
+          if (!confirm('Delete "' + trackName + '"? This removes all 6 separated stems and can\'t be undone.')) return;
+          const allRows = listEl.querySelectorAll('.screen-row[data-stem-id="' + stemId + '"]');
+          allRows.forEach(r => { r.querySelector('.name-delete').disabled = true; });
           try {
             const res = await fetch(API_BASE + '/api/v1/my-stems/' + stemId + '?token=' + encodeURIComponent(getToken()), {
               method: 'DELETE'
             });
             const resData = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(resData.detail || 'Could not delete.');
-            if (channelAssignments[stemId]) {
-              const chan = channelAssignments[stemId];
-              clearChannelBadge(chan);
-              if (window.__restoreOriginalStem) window.__restoreOriginalStem(chan);
-              delete channelAssignments[stemId];
-            }
-            row.remove();
+            // Release any channel this split's stems were loaded into.
+            Object.keys(channelAssignments).forEach(ch => {
+              if (channelAssignments[ch] === stemId) {
+                clearChannelBadge(ch);
+                if (window.__restoreOriginalStem) window.__restoreOriginalStem(ch);
+                delete channelAssignments[ch];
+              }
+            });
+            allRows.forEach(r => r.remove());
             if (!listEl.querySelector('.screen-row')) {
               listEl.innerHTML = '<div class="screen-empty">No splits yet — drop a song below to get started.</div>';
             }
-            if (countEl) countEl.textContent = '(' + listEl.querySelectorAll('.screen-row').length + ')';
+            if (countEl) {
+              const remaining = new Set(Array.from(listEl.querySelectorAll('.screen-row')).map(r => r.dataset.stemId));
+              countEl.textContent = '(' + remaining.size + ')';
+            }
+            updateLcdLoaded();
           } catch (err) {
-            nameDeleteBtn.disabled = false;
+            allRows.forEach(r => { r.querySelector('.name-delete').disabled = false; });
             alert(err.message || 'Could not delete.');
           }
         });
@@ -3599,10 +3637,17 @@ document.addEventListener('DOMContentLoaded', () => {
               const resData = await res.json();
               if (!res.ok) throw new Error(resData.detail || 'Could not rename.');
               trackName = resData.track_name;
-              row.dataset.trackName = trackName;
-              nameSpan.textContent = trackName;
-              nameSpan.title = trackName;
-              if (channelAssignments[stemId]) setChannelBadge(channelAssignments[stemId], trackName);
+              // Propagate the new name to all 6 rows for this split, plus
+              // any channel badge currently showing it.
+              listEl.querySelectorAll('.screen-row[data-stem-id="' + stemId + '"]').forEach(r => {
+                r.dataset.trackName = trackName;
+                const ns = r.querySelector('.track-name');
+                ns.textContent = trackName;
+                ns.title = trackName;
+              });
+              Object.keys(channelAssignments).forEach(ch => {
+                if (channelAssignments[ch] === stemId) setChannelBadge(ch, trackName);
+              });
             } catch (err) {
               nameSpan.textContent = trackName;
             } finally {
@@ -3617,75 +3662,46 @@ document.addEventListener('DOMContentLoaded', () => {
           });
         });
 
-        assignBtn.addEventListener('click', (e) => {
+        // One row = one instrument = one channel. LOAD pulls just that
+        // instrument's separated audio straight into its matching channel —
+        // no picker needed since the mapping is always 1:1.
+        assignBtn.addEventListener('click', async (e) => {
           e.stopPropagation();
-          // Close any other open menus.
-          document.querySelectorAll('.assign-menu').forEach(m => m.remove());
-          if (assignBtn.dataset.menuOpen === '1') {
-            assignBtn.dataset.menuOpen = '';
+          if (assignBtn.disabled) return;
+
+          if (channelAssignments[chan] === stemId) {
+            // Toggle off: unload.
+            delete channelAssignments[chan];
+            clearChannelBadge(chan);
+            if (window.__restoreOriginalStem) window.__restoreOriginalStem(chan);
+            assignBtn.textContent = 'LOAD';
+            assignBtn.classList.remove('assigned');
+            updateLcdLoaded();
             return;
           }
-          const menu = document.createElement('div');
-          menu.className = 'assign-menu';
-          menu.style.cssText = 'position:absolute;background:#0e1013;border:1px solid var(--sci-glow);border-radius:3px;padding:4px;display:flex;gap:2px;box-shadow:0 4px 12px rgba(0,0,0,0.5);z-index:20;font-family:JetBrains Mono,monospace;font-size:0.6rem;';
-          const btnRect = assignBtn.getBoundingClientRect();
-          const listRect = listEl.getBoundingClientRect();
-          menu.style.right = (listRect.right - btnRect.right) + 'px';
-          menu.style.top = (btnRect.bottom - listRect.top + 2) + 'px';
-          menu.style.position = 'absolute';
-          listEl.style.position = 'relative';
 
-          const labels = { vocals: 'V', drums: 'D', bass: 'B', guitar: 'G', piano: 'S', other: 'O' };
-          CHANNEL_LIST.forEach(chan => {
-            const chBtn = document.createElement('button');
-            chBtn.type = 'button';
-            chBtn.textContent = labels[chan] || chan[0].toUpperCase();
-            chBtn.title = 'Load into ' + chan.toUpperCase();
-            const isThis = channelAssignments[stemId] === chan;
-            chBtn.style.cssText = 'width:22px;height:22px;border-radius:50%;border:1px solid ' + (isThis ? 'var(--sci-glow)' : 'rgba(216,220,226,0.35)') + ';background:' + (isThis ? 'var(--sci-glow)' : 'transparent') + ';color:' + (isThis ? '#06201C' : 'var(--chrome-dim)') + ';cursor:pointer;font-family:inherit;font-size:0.6rem;font-weight:600;padding:0;';
-            chBtn.addEventListener('click', async (ev) => {
-              ev.stopPropagation();
-              // Remove any previous assignment for this stem elsewhere.
-              const prev = channelAssignments[stemId];
-              if (prev && prev !== chan) {
-                clearChannelBadge(prev);
-                if (window.__restoreOriginalStem) window.__restoreOriginalStem(prev);
-              }
-              if (isThis) {
-                // Toggle off: unassign.
-                delete channelAssignments[stemId];
-                clearChannelBadge(chan);
-                if (window.__restoreOriginalStem) window.__restoreOriginalStem(chan);
-                assignBtn.textContent = 'Assign';
-                assignBtn.classList.remove('assigned');
-              } else {
-                channelAssignments[stemId] = chan;
-                assignBtn.textContent = '→ ' + chan.toUpperCase();
-                assignBtn.classList.add('assigned');
-                // Actually load the audio into that channel.
-                if (window.__loadBackendStemToChannel) {
-                  await window.__loadBackendStemToChannel(chan, stemId, trackName);
-                } else {
-                  setChannelBadge(chan, trackName);
-                }
-              }
-              menu.remove();
-              assignBtn.dataset.menuOpen = '';
-              updateLcdLoaded();
-            });
-            menu.appendChild(chBtn);
-          });
-          listEl.appendChild(menu);
-          assignBtn.dataset.menuOpen = '1';
+          // If this channel already holds a different split's stem, reset
+          // that row's button back to LOAD.
+          const prevStemId = channelAssignments[chan];
+          if (prevStemId && prevStemId !== stemId) {
+            const prevBtn = listEl.querySelector('.screen-row[data-chan="' + chan + '"][data-stem-id="' + prevStemId + '"] .assign-btn');
+            if (prevBtn) { prevBtn.textContent = 'LOAD'; prevBtn.classList.remove('assigned'); }
+          }
 
-          // Click-away closes the menu.
-          const closeMenu = (evt) => {
-            if (menu.contains(evt.target) || evt.target === assignBtn) return;
-            menu.remove();
-            assignBtn.dataset.menuOpen = '';
-            document.removeEventListener('click', closeMenu);
-          };
-          setTimeout(() => document.addEventListener('click', closeMenu), 0);
+          assignBtn.disabled = true;
+          assignBtn.textContent = 'LOADING…';
+          const ok = window.__loadBackendStemToChannel
+            ? await window.__loadBackendStemToChannel(chan, stemId, trackName)
+            : false;
+          assignBtn.disabled = false;
+          if (ok) {
+            channelAssignments[chan] = stemId;
+            assignBtn.textContent = 'LOADED';
+            assignBtn.classList.add('assigned');
+          } else {
+            assignBtn.textContent = 'LOAD';
+          }
+          updateLcdLoaded();
         });
 
         cueJack.addEventListener('click', () => {
@@ -3725,21 +3741,14 @@ document.addEventListener('DOMContentLoaded', () => {
   // library, so CLR has to clear this too — otherwise the channel keeps
   // showing as occupied and the stem is never really released.
   window.__clearChannelAssignment = function (channelKey) {
-    let changed = false;
-    Object.keys(channelAssignments).forEach(stemId => {
-      if (channelAssignments[stemId] === channelKey) {
-        delete channelAssignments[stemId];
-        changed = true;
-      }
+    const changed = channelAssignments[channelKey] !== undefined;
+    if (changed) delete channelAssignments[channelKey];
+    // Reset whichever row's LOAD button was showing "LOADED" for this channel.
+    document.querySelectorAll('.screen-row[data-chan="' + channelKey + '"] .assign-btn.assigned').forEach(btn => {
+      btn.textContent = 'LOAD';
+      btn.classList.remove('assigned');
     });
-    // Reset any "Assign" buttons that were showing this channel.
-    document.querySelectorAll('.assign-menu').forEach(m => m.remove());
-    if (changed) {
-      updateLcdLoaded();
-      if (typeof loadScreenStems === 'function') {
-        try { loadScreenStems(); } catch (e) {}
-      }
-    }
+    if (changed) updateLcdLoaded();
     return changed;
   };
 
