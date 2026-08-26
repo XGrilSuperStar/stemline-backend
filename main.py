@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends
 from fastapi.responses import FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -392,7 +392,7 @@ def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_db)):
     logger.info(f"Password reset successfully for user {user.id}")
     return {"message": "Password updated. You can now log in with your new password."}
 
-def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str, filename: str):
+def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str, filename: str, stem_count: str = "6"):
     """
     Runs Demucs and finishes the split for an already-created Stem row.
     Runs in a background thread so the HTTP request that kicked it off can
@@ -432,8 +432,13 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
         # more compute for real reduction in edge artifacts.
         overlap = os.getenv("DEMUCS_OVERLAP", "0.75")
 
+        # Mobile uploads request the 4-stem model (vocals/drums/bass/other) —
+        # faster and lighter than the 6-stem model, which also splits out
+        # guitar/piano. Any value other than "4" falls back to 6-stem.
+        model_name = "htdemucs_ft" if stem_count == "4" else "htdemucs_6s"
+
         cmd = [
-            "demucs", "-n", "htdemucs_6s",
+            "demucs", "-n", model_name,
             "-j", str(jobs),
             "--shifts", str(shifts),
             "--overlap", overlap,
@@ -509,8 +514,8 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
 
 
 @app.post("/api/v1/split")
-def split_stem(file: UploadFile = File(...), token: str = None, db: Session = Depends(get_db)):
-    logger.info(f"Split request received: {file.filename}")
+def split_stem(file: UploadFile = File(...), token: str = None, stems: str = Form("6"), db: Session = Depends(get_db)):
+    logger.info(f"Split request received: {file.filename} (stems={stems})")
     user_id = get_current_user(token)
     check_split_allowance(db, user_id)
 
@@ -550,7 +555,7 @@ def split_stem(file: UploadFile = File(...), token: str = None, db: Session = De
 
     thread = threading.Thread(
         target=run_split_job,
-        args=(stem_record.id, request_id, upload_dir, file_path, file.filename),
+        args=(stem_record.id, request_id, upload_dir, file_path, file.filename, stems),
         daemon=True,
     )
     thread.start()

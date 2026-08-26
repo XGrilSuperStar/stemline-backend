@@ -903,6 +903,9 @@
   /* ===== MOBILE MIXER (stacked, larger touch targets) ===== */
   @media (max-width: 700px) {
     .mixer-row { flex-wrap: wrap; overflow-x: visible; }
+    /* Mobile splits use the 4-stem engine (vocals/drums/bass/other), so
+       guitar and piano never have audio here — hide those channels. */
+    .channel[data-stem="guitar"], .channel[data-stem="piano"] { display: none; }
     .channels {
       grid-template-columns: repeat(2, minmax(0, 1fr));
       flex: 1 1 100%; width: 100%; gap: 10px;
@@ -3404,6 +3407,9 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const formData = new FormData();
       formData.append('file', file);
+      // Phones get the lighter 4-stem model (vocals/drums/bass/other) —
+      // matches the mobile mixer's smaller 4-channel layout below 700px.
+      formData.append('stems', window.innerWidth <= 700 ? '4' : '6');
       // Give it a beat to actually upload the file before switching to the
       // splitting message.
       setTimeout(() => {
