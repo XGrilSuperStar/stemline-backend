@@ -3787,6 +3787,7 @@ document.addEventListener('DOMContentLoaded', () => {
       myStemsList.innerHTML = data.map(stem => {
         const date = new Date(stem.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
         const dlUrl = API_BASE + '/api/v1/my-stems/' + stem.id + '/download?token=' + encodeURIComponent(getToken());
+        const origUrl = API_BASE + '/api/v1/my-stems/' + stem.id + '/download-original?token=' + encodeURIComponent(getToken());
         const isSingle = !!stem.instrument;
         const loadLabel = isSingle ? ('Load ' + stem.instrument) : 'Load into mixer';
         // Whole-song splits get a hover-reveal panel listing each of the 6
@@ -3809,6 +3810,7 @@ document.addEventListener('DOMContentLoaded', () => {
           '<div style="display:flex;gap:0.9rem;align-items:center;">' +
           (isSingle ? ('<canvas class="preview-wave-canvas" title="Hover to preview" data-preview-url="' + dlUrl + '" width="90" height="32" style="background:var(--asphalt,#111);border:1px solid var(--concrete-line);border-radius:2px;cursor:pointer;flex-shrink:0;"></canvas>') : '') +
           '<button type="button" class="load-all-mixer-btn" style="background:var(--ember);color:#1A1005;border:none;border-radius:2px;font-family:inherit;font-size:0.72rem;font-weight:600;padding:0.35rem 0.7rem;cursor:pointer;">' + loadLabel + '</button>' +
+          (!isSingle && stem.has_original ? ('<a href="' + origUrl + '" style="color:var(--chrome);font-size:0.75rem;text-decoration:none;border-bottom:1px solid var(--chrome);">Download song</a>') : '') +
           '<a href="' + dlUrl + '" style="color:var(--ember);font-size:0.75rem;text-decoration:none;border-bottom:1px solid var(--ember);">Download ' + (isSingle ? '(.wav)' : 'stems (.zip)') + '</a>' +
           '<button type="button" class="delete-stem-btn" title="Delete this stem" style="margin-left:auto;background:none;color:var(--clip-red);border:1px solid var(--clip-red);border-radius:2px;font-family:inherit;font-size:0.7rem;padding:0.3rem 0.55rem;cursor:pointer;">Delete</button>' +
           '</div>' +

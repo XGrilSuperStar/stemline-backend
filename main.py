@@ -92,6 +92,9 @@ class Stem(Base):
     # a successful split.
     status = Column(String, nullable=True, default="done")
     error_message = Column(String, nullable=True)
+    # Path to the original, un-split upload — kept so the user can download
+    # the whole song back, not just the separated stems.
+    orig_path = Column(String, nullable=True)
 
 Base.metadata.create_all(bind=engine)
 
@@ -184,6 +187,14 @@ try:
         conn.commit()
 except Exception as e:
     logger.warning(f"Instrument column migration skipped or already applied: {e}")
+
+# One-time migration: add orig_path column to stems table if missing
+try:
+    with engine.connect() as conn:
+        conn.execute(text("ALTER TABLE stems ADD COLUMN IF NOT EXISTS orig_path VARCHAR"))
+        conn.commit()
+except Exception as e:
+    logger.warning(f"orig_path column migration skipped or already applied: {e}")
 
 # One-time migration: add password-reset columns to users table if missing
 try:
@@ -483,9 +494,20 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
                     arcname = os.path.relpath(file_full_path, stem_dir)
                     zf.write(file_full_path, arcname)
 
-        # The raw upload and Demucs output are no longer needed now that the
-        # zip is safely saved elsewhere — clean up this request's work dir
-        # so /tmp doesn't fill up over time.
+        # Keep the original, un-split upload too, so the user can still get
+        # the whole song back — not just the separated stems. Move it (not
+        # copy) into the same permanent folder as the zip.
+        orig_ext = filename.rsplit('.', 1)[-1] if '.' in filename else 'audio'
+        orig_path = os.path.join(stems_dir, f"{request_id}_{filename.rsplit('.', 1)[0]}_original.{orig_ext}")
+        try:
+            shutil.move(file_path, orig_path)
+        except Exception as orig_err:
+            logger.warning(f"[job {request_id}] Could not preserve original upload: {orig_err}")
+            orig_path = None
+
+        # The Demucs output dir is no longer needed now that the zip (and
+        # original) are safely saved elsewhere — clean up this request's
+        # work dir so /tmp doesn't fill up over time.
         try:
             shutil.rmtree(upload_dir, ignore_errors=True)
         except Exception as cleanup_err:
@@ -494,6 +516,7 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
         stem_record = db.query(Stem).filter(Stem.id == stem_id).first()
         if stem_record:
             stem_record.zip_path = zip_path
+            stem_record.orig_path = orig_path
             stem_record.status = "done"
             db.commit()
         logger.info(f"[job {request_id}] Stem split successful, saved as ID {stem_id}")
@@ -585,7 +608,7 @@ def get_my_stems(token: str = None, db: Session = Depends(get_db)):
         # "processing" (or that ended in "error") don't have a usable
         # zip_path yet and would 404/500 if the frontend tried to load them.
         stems = db.query(Stem).filter(Stem.user_id == user_id, Stem.status == "done").all()
-        return [{"id": s.id, "track_name": s.track_name, "created_at": s.created_at, "instrument": s.instrument} for s in stems]
+        return [{"id": s.id, "track_name": s.track_name, "created_at": s.created_at, "instrument": s.instrument, "has_original": bool(s.orig_path)} for s in stems]
     except Exception as e:
         logger.error(f"Get stems error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -612,6 +635,22 @@ def download_stem(stem_id: int, token: str = None, db: Session = Depends(get_db)
     except Exception as e:
         logger.error(f"Download error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/v1/my-stems/{stem_id}/download-original")
+def download_stem_original(stem_id: int, token: str = None, db: Session = Depends(get_db)):
+    # Serves the whole, un-split song back — not the separated stems.
+    user_id = get_current_user(token)
+    stem_row = db.query(Stem).filter(Stem.id == stem_id, Stem.user_id == user_id).first()
+    if not stem_row:
+        raise HTTPException(status_code=404, detail="Saved stem not found.")
+    if not stem_row.orig_path or not os.path.exists(stem_row.orig_path):
+        raise HTTPException(status_code=404, detail="Original song isn't available for this split.")
+    ext = stem_row.orig_path.rsplit('.', 1)[-1]
+    return FileResponse(
+        stem_row.orig_path,
+        media_type="audio/" + ext,
+        filename=f"{stem_row.track_name}.{ext}"
+    )
 
 # Instrument names Demucs' htdemucs_6s model actually outputs, and the only
 # values the mixer's channel keys ever send here.
