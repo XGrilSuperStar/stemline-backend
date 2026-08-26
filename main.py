@@ -103,6 +103,11 @@ try:
         conn.execute(text("ALTER TABLE stems ADD COLUMN IF NOT EXISTS status VARCHAR DEFAULT 'done'"))
         conn.execute(text("ALTER TABLE stems ADD COLUMN IF NOT EXISTS error_message VARCHAR"))
         conn.execute(text("UPDATE stems SET status = 'done' WHERE status IS NULL"))
+        # zip_path was originally created NOT NULL, back when every row got
+        # its zip_path set at creation time. Now a "processing" row is
+        # inserted with zip_path=None before Demucs has run, which violates
+        # that old constraint and crashes the request with a 500. Drop it.
+        conn.execute(text("ALTER TABLE stems ALTER COLUMN zip_path DROP NOT NULL"))
         conn.commit()
 except Exception as e:
     logger.warning(f"stems status/error_message column migration skipped or already applied: {e}")
