@@ -2097,8 +2097,14 @@ function startStem(name, masterPos) {
   src.buffer = buffer;
   src.loop = true;
   src.playbackRate.value = tempoRatio * (stemAutoStretch[name] || 1);
+  // Loop every stem on the SAME 6s master window, not its own buffer.duration.
+  // Real backend stems are full-length songs (minutes long) — without this,
+  // each one loops at its own natural length instead of the shared window,
+  // so stems fall out of phase with each other a few seconds after starting.
+  src.loopStart = 0;
+  src.loopEnd = Math.min(LOOP_DUR, buffer.duration);
   src.connect(stemNodes[name].trimNode);
-  const eff = wrapOffset(masterPos + stemNudge[name], buffer.duration);
+  const eff = wrapOffset(masterPos + stemNudge[name], LOOP_DUR);
   src.start(0, eff);
   activeSources[name] = src;
 }
