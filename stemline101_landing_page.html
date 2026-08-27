@@ -261,6 +261,28 @@
     color: rgba(60,253,224,0.45); font-family: 'JetBrains Mono', monospace;
     font-size: 0.68rem; padding: 0.6rem 0.2rem; line-height: 1.5;
   }
+  .song-folder { border-bottom: 1px solid rgba(216,220,226,0.08); }
+  .song-folder:last-child { border-bottom: none; }
+  .song-folder-head {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.4rem 0.2rem; cursor: pointer;
+  }
+  .folder-toggle {
+    background: none; border: none; color: var(--sci-glow, #3CFDE0);
+    font-size: 0.6rem; cursor: pointer; padding: 0 0.2rem; flex-shrink: 0;
+  }
+  .folder-name {
+    flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem; color: rgba(216,220,226,0.9);
+  }
+  .folder-count {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.62rem;
+    color: rgba(216,220,226,0.45);
+  }
+  .song-folder-body { padding-left: 1rem; }
+  .song-folder-body .screen-row { border-bottom: 1px solid rgba(216,220,226,0.05); }
+  .song-folder-body .screen-row:last-child { border-bottom: none; }
   .screen-row {
     display: flex; align-items: center; gap: 0.5rem;
     padding: 0.4rem 0.2rem; border-bottom: 1px solid rgba(216,220,226,0.08);
@@ -3528,23 +3550,37 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Could not load stems.');
 
-      // Count is songs (splits), not rows — each song still shows as 6 rows below.
-      if (countEl) countEl.textContent = '(' + data.length + ')';
+      // Group saved instruments back under the song they came from. Older
+      // rows saved before parent_stem_id existed fall back to grouping by
+      // the base track name (stripping the " (Vocals)" etc. suffix).
+      const INSTR_SUFFIX = /\s\((Vocals|Drums|Bass|Guitar|Piano|Other)\)$/i;
+      const groups = new Map(); // groupKey -> { songName, rows: [] }
+      data.forEach(stem => {
+        const groupKey = stem.parent_stem_id != null ? ('p' + stem.parent_stem_id) : ('n' + stem.track_name.replace(INSTR_SUFFIX, ''));
+        const songName = stem.track_name.replace(INSTR_SUFFIX, '');
+        if (!groups.has(groupKey)) groups.set(groupKey, { songName, rows: [] });
+        groups.get(groupKey).rows.push(stem);
+      });
+
+      // Count is songs (folders), not individual saved stems.
+      if (countEl) countEl.textContent = '(' + groups.size + ')';
 
       if (!data.length) {
-        listEl.innerHTML = '<div class="screen-empty">No splits yet — drop a song below to get started.</div>';
+        listEl.innerHTML = '<div class="screen-empty">No saved stems yet — hit SAVE on a mixer channel to keep one here.</div>';
         return;
       }
 
-      listEl.innerHTML = data.map(stem => {
-        const safeName = escapeHtml(stem.track_name);
-        return CHANNEL_LIST.map(chan => {
-          const meta = STEM_ROW_META[chan];
+      listEl.innerHTML = Array.from(groups.entries()).map(([groupKey, group]) => {
+        const safeSong = escapeHtml(group.songName);
+        const rowsHtml = group.rows.map(stem => {
+          const chan = stem.instrument;
+          const meta = STEM_ROW_META[chan] || { label: chan.toUpperCase(), accent: '#3CFDE0' };
+          const safeName = escapeHtml(stem.track_name);
           return '<div class="screen-row" data-stem-id="' + stem.id + '" data-track-name="' + safeName + '" data-stem-type="' + chan + '" data-chan="' + chan + '">' +
             '<span class="stem-chan-tag" style="color:' + meta.accent + ';border-color:' + meta.accent + ';">' + meta.label + '</span>' +
             '<div class="name-wrap">' +
               '<span class="track-name" title="' + safeName + '">' + safeName + '</span>' +
-              '<button type="button" class="name-delete" title="Delete this split (all 6 stems)">' +
+              '<button type="button" class="name-delete" title="Delete this saved stem">' +
                 '<svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6"/></svg>' +
               '</button>' +
             '</div>' +
@@ -3557,7 +3593,27 @@ document.addEventListener('DOMContentLoaded', () => {
             '<button type="button" class="assign-btn">LOAD</button>' +
           '</div>';
         }).join('');
+        return '<div class="song-folder" data-group-key="' + groupKey + '">' +
+          '<div class="song-folder-head">' +
+            '<button type="button" class="folder-toggle" aria-expanded="true">&#9660;</button>' +
+            '<span class="folder-name" title="' + safeSong + '">' + safeSong + '</span>' +
+            '<span class="folder-count">' + group.rows.length + '</span>' +
+          '</div>' +
+          '<div class="song-folder-body">' + rowsHtml + '</div>' +
+        '</div>';
       }).join('');
+
+      listEl.querySelectorAll('.song-folder-head').forEach(head => {
+        head.addEventListener('click', () => {
+          const btn = head.querySelector('.folder-toggle');
+          const folder = head.closest('.song-folder');
+          const body = folder.querySelector('.song-folder-body');
+          const open = btn.getAttribute('aria-expanded') === 'true';
+          btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+          btn.innerHTML = open ? '&#9658;' : '&#9660;';
+          body.style.display = open ? 'none' : '';
+        });
+      });
 
       listEl.querySelectorAll('.screen-row').forEach(row => {
         const stemId = row.dataset.stemId;
@@ -3578,7 +3634,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         nameDeleteBtn.addEventListener('click', async (e) => {
           e.stopPropagation();
-          if (!confirm('Delete "' + trackName + '"? This removes all 6 separated stems and can\'t be undone.')) return;
+          if (!confirm('Delete "' + trackName + '"? This can\'t be undone.')) return;
           const allRows = listEl.querySelectorAll('.screen-row[data-stem-id="' + stemId + '"]');
           allRows.forEach(r => { r.querySelector('.name-delete').disabled = true; });
           try {
@@ -3595,13 +3651,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 delete channelAssignments[ch];
               }
             });
-            allRows.forEach(r => r.remove());
+            allRows.forEach(r => {
+              const folder = r.closest('.song-folder');
+              r.remove();
+              if (folder && !folder.querySelector('.screen-row')) folder.remove();
+            });
             if (!listEl.querySelector('.screen-row')) {
-              listEl.innerHTML = '<div class="screen-empty">No splits yet — drop a song below to get started.</div>';
+              listEl.innerHTML = '<div class="screen-empty">No saved stems yet — hit SAVE on a mixer channel to keep one here.</div>';
             }
             if (countEl) {
-              const remaining = new Set(Array.from(listEl.querySelectorAll('.screen-row')).map(r => r.dataset.stemId));
-              countEl.textContent = '(' + remaining.size + ')';
+              countEl.textContent = '(' + listEl.querySelectorAll('.song-folder').length + ')';
             }
             updateLcdLoaded();
           } catch (err) {
@@ -3777,7 +3836,9 @@ document.addEventListener('DOMContentLoaded', () => {
     myStemsPanel.style.display = 'block';
     myStemsList.innerHTML = '<div style="color:var(--chrome-dim);font-size:0.8rem;">Loading…</div>';
     try {
-      const res = await fetch(API_BASE + '/api/v1/my-stems?token=' + encodeURIComponent(getToken()));
+      // This panel needs raw, not-yet-saved splits too — it's the picker
+      // where you choose which instruments from a split to actually save.
+      const res = await fetch(API_BASE + '/api/v1/my-stems?include_unsaved=true&token=' + encodeURIComponent(getToken()));
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Could not load your stems.');
       if (!data.length) {
@@ -4321,7 +4382,9 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadLibraries() {
       if (typeof getToken !== 'function' || !getToken()) return;
       try {
-        const res = await fetch(API_BASE + '/api/v1/my-stems?token=' + encodeURIComponent(getToken()));
+        // The per-channel BROWSE popups need raw, not-yet-saved splits too,
+        // so a song you just split can still be loaded/browsed per channel.
+        const res = await fetch(API_BASE + '/api/v1/my-stems?include_unsaved=true&token=' + encodeURIComponent(getToken()));
         const data = await res.json();
         if (!res.ok || !Array.isArray(data)) return;
         // A full split (instrument === null) has all 6 instruments in one

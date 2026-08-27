@@ -95,6 +95,10 @@ class Stem(Base):
     # Path to the original, un-split upload — kept so the user can download
     # the whole song back, not just the separated stems.
     orig_path = Column(String, nullable=True)
+    # For a single-channel save (instrument set): the id of the original
+    # full split it was saved out of. Lets My Stems group saved instruments
+    # back under the song they came from instead of listing them flat.
+    parent_stem_id = Column(Integer, nullable=True)
 
 Base.metadata.create_all(bind=engine)
 
@@ -105,6 +109,7 @@ try:
     with engine.connect() as conn:
         conn.execute(text("ALTER TABLE stems ADD COLUMN IF NOT EXISTS status VARCHAR DEFAULT 'done'"))
         conn.execute(text("ALTER TABLE stems ADD COLUMN IF NOT EXISTS error_message VARCHAR"))
+        conn.execute(text("ALTER TABLE stems ADD COLUMN IF NOT EXISTS parent_stem_id INTEGER"))
         conn.execute(text("UPDATE stems SET status = 'done' WHERE status IS NULL"))
         # zip_path was originally created NOT NULL, back when every row got
         # its zip_path set at creation time. Now a "processing" row is
@@ -601,14 +606,25 @@ def get_split_status(stem_id: int, token: str = None, db: Session = Depends(get_
     }
 
 @app.get("/api/v1/my-stems")
-def get_my_stems(token: str = None, db: Session = Depends(get_db)):
+def get_my_stems(token: str = None, include_unsaved: bool = False, db: Session = Depends(get_db)):
     user_id = get_current_user(token)
     try:
         # Only list stems that finished successfully — rows still
         # "processing" (or that ended in "error") don't have a usable
         # zip_path yet and would 404/500 if the frontend tried to load them.
-        stems = db.query(Stem).filter(Stem.user_id == user_id, Stem.status == "done").all()
-        return [{"id": s.id, "track_name": s.track_name, "created_at": s.created_at, "instrument": s.instrument, "has_original": bool(s.orig_path)} for s in stems]
+        query = db.query(Stem).filter(Stem.user_id == user_id, Stem.status == "done")
+        # A fresh split creates one row with instrument=None (the full
+        # 6-stem zip). That row auto-appearing here was the actual bug
+        # Kelly flagged — every split silently "saved itself" whether she
+        # wanted to keep it or not. Now My Stems only shows a song once she
+        # explicitly hits SAVE on a channel (instrument set on that row).
+        # The mixer's per-channel BROWSE popups still need the raw,
+        # not-yet-saved splits so a just-split song can be loaded/browsed —
+        # they pass include_unsaved=true to see everything.
+        if not include_unsaved:
+            query = query.filter(Stem.instrument.isnot(None))
+        stems = query.all()
+        return [{"id": s.id, "track_name": s.track_name, "created_at": s.created_at, "instrument": s.instrument, "parent_stem_id": s.parent_stem_id, "has_original": bool(s.orig_path)} for s in stems]
     except Exception as e:
         logger.error(f"Get stems error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -724,7 +740,8 @@ def save_stem_instrument(stem_id: int, instrument: str, token: str = None, db: S
             user_id=user_id,
             track_name=f"{stem_row.track_name} ({instrument.capitalize()})",
             zip_path=wav_path,
-            instrument=instrument
+            instrument=instrument,
+            parent_stem_id=stem_row.id
         )
         db.add(new_row)
         db.commit()
