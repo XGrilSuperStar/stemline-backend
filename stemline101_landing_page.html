@@ -3790,11 +3790,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const origUrl = API_BASE + '/api/v1/my-stems/' + stem.id + '/download-original?token=' + encodeURIComponent(getToken());
         const isSingle = !!stem.instrument;
         const loadLabel = isSingle ? ('Load ' + stem.instrument) : 'Load into mixer';
-        // Whole-song splits get a hover-reveal panel listing each of the 6
+        // Whole-song splits get a click-to-expand panel listing each of the 6
         // stems with a checkbox, so the user can save just the ones they want
         // (via the existing save-instrument endpoint) instead of the whole zip.
+        // Stays open until the track name is clicked again to collapse it.
         const stemsPanel = isSingle ? '' :
-          '<div class="stems-hover-panel" style="display:none;margin-top:0.7rem;padding-top:0.7rem;border-top:1px solid var(--concrete-line);">' +
+          '<div class="stems-drop-panel" style="display:none;margin-top:0.7rem;padding-top:0.7rem;border-top:1px solid var(--concrete-line);">' +
             '<div style="display:flex;flex-wrap:wrap;gap:0.6rem;margin-bottom:0.6rem;">' +
             CHANNEL_LIST.map(inst =>
               '<label style="display:flex;align-items:center;gap:0.3rem;font-size:0.72rem;color:var(--chrome-dim);cursor:pointer;">' +
@@ -3805,7 +3806,7 @@ document.addEventListener('DOMContentLoaded', () => {
             '<button type="button" class="save-selected-stems-btn" style="background:none;color:var(--ember);border:1px solid var(--ember);border-radius:2px;font-family:inherit;font-size:0.72rem;font-weight:600;padding:0.3rem 0.6rem;cursor:pointer;">Save Selected</button>' +
           '</div>';
         return '<div class="my-stems-row" data-stem-id="' + stem.id + '" data-track-name="' + escapeHtml(stem.track_name) + '" data-instrument="' + escapeHtml(stem.instrument || '') + '" style="border:1px solid var(--concrete-line);padding:0.9rem;margin-bottom:0.7rem;">' +
-          '<div style="color:var(--chrome);font-size:0.85rem;margin-bottom:0.3rem;word-break:break-word;">' + escapeHtml(stem.track_name) + '</div>' +
+          '<div class="' + (isSingle ? '' : 'track-name-toggle') + '" style="color:var(--chrome);font-size:0.85rem;margin-bottom:0.3rem;word-break:break-word;' + (isSingle ? '' : 'cursor:pointer;') + '">' + escapeHtml(stem.track_name) + (isSingle ? '' : ' <span class="stems-drop-caret" style="color:var(--chrome-dim);font-size:0.7rem;">▾</span>') + '</div>' +
           '<div style="color:var(--chrome-dim);font-size:0.68rem;margin-bottom:0.7rem;">' + date + '</div>' +
           '<div style="display:flex;gap:0.9rem;align-items:center;">' +
           (isSingle ? ('<canvas class="preview-wave-canvas" title="Hover to preview" data-preview-url="' + dlUrl + '" width="90" height="32" style="background:var(--asphalt,#111);border:1px solid var(--concrete-line);border-radius:2px;cursor:pointer;flex-shrink:0;"></canvas>') : '') +
@@ -3818,12 +3819,18 @@ document.addEventListener('DOMContentLoaded', () => {
           '</div>';
       }).join('');
 
-      // Hover a whole-song row to reveal its stem picker.
+      // Click a whole-song's track name to expand/collapse its stem picker.
+      // Stays open until clicked again — no more hover-only reveal.
       myStemsList.querySelectorAll('.my-stems-row').forEach(row => {
-        const panel = row.querySelector('.stems-hover-panel');
-        if (!panel) return;
-        row.addEventListener('mouseenter', () => { panel.style.display = 'block'; });
-        row.addEventListener('mouseleave', () => { panel.style.display = 'none'; });
+        const panel = row.querySelector('.stems-drop-panel');
+        const toggle = row.querySelector('.track-name-toggle');
+        if (!panel || !toggle) return;
+        toggle.addEventListener('click', () => {
+          const isOpen = panel.style.display === 'block';
+          panel.style.display = isOpen ? 'none' : 'block';
+          const caret = toggle.querySelector('.stems-drop-caret');
+          if (caret) caret.textContent = isOpen ? '▾' : '▴';
+        });
       });
 
       myStemsList.querySelectorAll('.save-selected-stems-btn').forEach(btn => {
