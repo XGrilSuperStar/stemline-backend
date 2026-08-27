@@ -212,6 +212,18 @@
     color: rgba(60,253,224,0.5); border-radius: 2px; padding: 0.2rem 0.4rem; cursor: pointer;
   }
   .screen-tab.active { background: rgba(60,253,224,0.15); color: var(--sci-glow); border-color: var(--sci-glow); }
+  .save-hint-tip {
+    position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+    background: var(--sci-glow, #3CFDE0); color: #06201C; font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem; font-weight: 600; padding: 0.4rem 0.7rem; border-radius: 3px;
+    white-space: nowrap; z-index: 50; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    animation: saveHintFade 5s ease forwards;
+  }
+  .save-hint-tip::after {
+    content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+    border: 5px solid transparent; border-top-color: var(--sci-glow, #3CFDE0);
+  }
+  @keyframes saveHintFade { 0%,80% { opacity: 1; } 100% { opacity: 0; } }
   .waveform-rows { display: flex; flex-direction: column; gap: 0.28rem; position: relative; }
   .wave-canvas {
     flex: 1; width: 100%; height: 24px; display: block;
@@ -1279,7 +1291,7 @@
     <button id="navSignupBtn" class="nav-cta" style="border:none;cursor:pointer;">Sign up free</button>
   </div>
   <div id="navAccountGroup" style="display:none;gap:0.75rem;align-items:center;">
-    <button id="navMyStemsBtn" style="background:none;border:1px solid var(--concrete-line);border-radius:2px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.78rem;letter-spacing:0.02em;color:var(--chrome);text-transform:uppercase;padding:0.5rem 0.9rem;">My stems</button>
+    <button id="navMyStemsBtn" style="background:none;border:1px solid var(--concrete-line);border-radius:2px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.78rem;letter-spacing:0.02em;color:var(--chrome);text-transform:uppercase;padding:0.5rem 0.9rem;">Save stems</button>
     <button id="navAccountBtn" class="nav-cta" style="border:none;cursor:pointer;">Log out</button>
   </div>
 </nav>
@@ -2320,6 +2332,17 @@ function restoreOriginalStem(channelKey) {
 // MY STEMS, separate from the full 6-stem split it came from. Only works for
 // channels loaded from a saved split (currentStemMeta tracks that origin) —
 // there's nothing to save server-side for a channel still on the demo tone.
+function showSaveHint() {
+  const tab = document.getElementById('screenStemsTab');
+  if (!tab) return;
+  const tip = document.createElement('div');
+  tip.className = 'save-hint-tip';
+  tip.textContent = 'Saved! Find it here anytime';
+  tab.style.position = 'relative';
+  tab.appendChild(tip);
+  setTimeout(() => { tip.remove(); }, 5000);
+}
+
 async function saveChannelAsStem(channelKey, btn) {
   const meta = currentStemMeta[channelKey];
   if (!meta) {
@@ -2347,6 +2370,12 @@ async function saveChannelAsStem(channelKey, btn) {
     }
     // Refresh the MY STEMS list if it's loaded, so the new entry shows up.
     if (typeof window.__refreshMyStems === 'function') window.__refreshMyStems();
+    // First-time hint: point the user at the MY STEMS tab so they know
+    // where saved stems go. Shown once per browser via localStorage.
+    if (!localStorage.getItem('stemline_seen_save_hint')) {
+      localStorage.setItem('stemline_seen_save_hint', '1');
+      showSaveHint();
+    }
     return true;
   } catch (e) {
     console.error('Save channel failed:', e);
