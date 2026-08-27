@@ -244,6 +244,28 @@
     /* offset past the label column so 0 = start of the wave, not start of row */
   }
   .wave-playhead.on { display: block; }
+  /* Small grip at the top so the amber line reads as grabbable. Purely
+     visual — the actual drag hit-test happens on #waveformRows in JS so
+     you can grab anywhere along the line, not just this triangle. */
+  .wave-playhead::before {
+    content: ''; position: absolute; top: -5px; left: -4px;
+    width: 0; height: 0; pointer-events: none;
+    border-left: 4px solid transparent; border-right: 4px solid transparent;
+    border-top: 6px solid var(--vu-amber);
+  }
+  .waveform-rows.scrubbing { cursor: grabbing; }
+  .wave-marker {
+    position: absolute; top: -5px; bottom: 0; width: 2px;
+    background: var(--vu-teal, #3CFDE0);
+    box-shadow: 0 0 4px rgba(60,253,224,0.7);
+    cursor: pointer; z-index: 5;
+  }
+  .wave-marker::before {
+    content: ''; position: absolute; top: -5px; left: -3px;
+    width: 0; height: 0;
+    border-left: 4px solid transparent; border-right: 4px solid transparent;
+    border-top: 5px solid var(--vu-teal, #3CFDE0);
+  }
   .wave-row { display: flex; align-items: center; gap: 0.5rem; height: 26px; }
   .wave-row-label {
     width: 46px; flex-shrink: 0; font-family: 'JetBrains Mono', monospace; font-size: 0.5rem;
@@ -730,16 +752,16 @@
     padding: 0 6px;
     height: 20px;
     border-radius: 3px;
-    border: 1px solid var(--sci-glow, #3CFDE0);
-    background: linear-gradient(180deg, #1a2f2c, #0f1a18);
-    color: var(--sci-glow, #3CFDE0);
+    border: 1px solid rgba(216,220,226,0.35);
+    background: linear-gradient(180deg, #26282C, #17181B);
+    color: var(--chrome-dim, #9aa0a6);
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.55rem;
-    font-weight: 700;
+    font-weight: 600;
     letter-spacing: 0.03em;
     cursor: pointer;
   }
-  .ch-save:hover { background: linear-gradient(180deg, #234139, #14231f); }
+  .ch-save:hover { background: linear-gradient(180deg, #34363B, #17181B); }
   .ch-save:active { background: var(--sci-glow, #3CFDE0); color: #06201C; }
   .ch-save.saving { opacity: 0.5; pointer-events: none; }
   .ch-save.saved { color: var(--sci-glow, #3CFDE0); border-color: var(--sci-glow, #3CFDE0); }
@@ -2486,7 +2508,6 @@ function stopPreview() {
   if (rafId) cancelAnimationFrame(rafId);
   document.querySelectorAll('.status-led').forEach(led => led.classList.remove('playing'));
   document.querySelectorAll('.meter-seg').forEach(seg => seg.classList.remove('lit'));
-  document.getElementById('wavePlayhead')?.classList.remove('on');
   updatePlayheadPosition();
 }
 
@@ -2751,16 +2772,114 @@ function renderStemWaveforms() {
   });
 }
 
+// ===== Markers: drop a marker on any wave to mark a point in the song =====
+// Double-click a wave to add one; click a marker to jump to it; double-click
+// a marker to remove it. Kept in a plain array of seconds, re-rendered as
+// small teal flags positioned the same way the playhead is.
+let markers = [];
+
+function formatMarkerTime(t) {
+  const s = Math.max(0, t);
+  const mm = Math.floor(s / 60);
+  const ss = (s % 60).toFixed(2).padStart(5, '0');
+  return mm + ':' + ss;
+}
+
+function addMarkerAt(t) {
+  if (markers.some(m => Math.abs(m - t) < 0.05)) return; // avoid dupes on double-click jitter
+  markers.push(t);
+  markers.sort((a, b) => a - b);
+  renderMarkers();
+}
+
+function removeMarker(t) {
+  markers = markers.filter(m => m !== t);
+  renderMarkers();
+}
+
+function renderMarkers() {
+  const rowsEl = document.getElementById('waveformRows');
+  const firstCanvas = document.querySelector('.wave-row .wave-canvas');
+  if (!rowsEl || !firstCanvas) return;
+  rowsEl.querySelectorAll('.wave-marker').forEach(el => el.remove());
+  const canvasRect = firstCanvas.getBoundingClientRect();
+  const rowsRect = rowsEl.getBoundingClientRect();
+  const canvasLeftInRows = canvasRect.left - rowsRect.left;
+  markers.forEach(t => {
+    const x = canvasLeftInRows + (t / LOOP_DUR) * canvasRect.width;
+    const el = document.createElement('div');
+    el.className = 'wave-marker';
+    el.style.left = x + 'px';
+    el.title = 'Marker at ' + formatMarkerTime(t) + ' — click to jump, double-click to remove';
+    el.addEventListener('pointerdown', (e) => e.stopPropagation());
+    el.addEventListener('click', (e) => { e.stopPropagation(); seekTo(t); });
+    el.addEventListener('dblclick', (e) => { e.stopPropagation(); removeMarker(t); });
+    rowsEl.appendChild(el);
+  });
+}
+
+// ===== Playhead scrub: grab the amber line and drag it anywhere along the
+// wave. Hit-tested on the whole waveformRows container (not just the 1px
+// line) so it's easy to grab, and clamped to the canvas width so it can
+// never leave the visible waveform. =====
+(function setupPlayheadScrub() {
+  const rowsEl = document.getElementById('waveformRows');
+  if (!rowsEl) return;
+  const GRAB_PX = 10;
+  let scrubbing = false;
+
+  const playheadX = () => {
+    const ph = document.getElementById('wavePlayhead');
+    return ph ? parseFloat(ph.style.left) || 0 : 0;
+  };
+  const scrubTo = (clientX) => {
+    const firstCanvas = document.querySelector('.wave-row .wave-canvas');
+    if (!firstCanvas) return;
+    const rect = firstCanvas.getBoundingClientRect();
+    const fraction = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    seekTo(fraction * LOOP_DUR);
+  };
+
+  rowsEl.addEventListener('pointerdown', (e) => {
+    const rowsRect = rowsEl.getBoundingClientRect();
+    const xInRows = e.clientX - rowsRect.left;
+    if (Math.abs(xInRows - playheadX()) > GRAB_PX) return; // not grabbing the playhead
+    scrubbing = true;
+    rowsEl.classList.add('scrubbing');
+    try { rowsEl.setPointerCapture(e.pointerId); } catch (err) {}
+    e.stopPropagation();
+    e.preventDefault();
+  }, true);
+
+  rowsEl.addEventListener('pointermove', (e) => {
+    if (!scrubbing) return;
+    scrubTo(e.clientX);
+  });
+
+  const endScrub = (e) => {
+    if (!scrubbing) return;
+    scrubbing = false;
+    rowsEl.classList.remove('scrubbing');
+    try { rowsEl.releasePointerCapture(e.pointerId); } catch (err) {}
+  };
+  rowsEl.addEventListener('pointerup', endScrub);
+  rowsEl.addEventListener('pointercancel', endScrub);
+})();
+
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('playBtn')?.addEventListener('click', playPreview);
   document.getElementById('pauseBtn')?.addEventListener('click', pausePreview);
   document.getElementById('stopBtn')?.addEventListener('click', stopPreview);
 
   renderStemWaveforms();
+  document.getElementById('wavePlayhead')?.classList.add('on');
+  updatePlayheadPosition();
+  renderMarkers();
+  window.addEventListener('resize', () => { updatePlayheadPosition(); renderMarkers(); });
 
   // Click-to-seek on any waveform row — jumps ALL stems to that position
   // together, keeping them in lockstep. Drag-to-nudge (see below) offsets a
-  // single stem instead.
+  // single stem instead. Double-click drops a marker at that point instead.
   document.querySelectorAll('.wave-canvas').forEach(canvas => {
     canvas.addEventListener('click', (e) => {
       // If a drag just happened, ignore the trailing click (see nudge wiring).
@@ -2768,6 +2887,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const rect = canvas.getBoundingClientRect();
       const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
       seekTo(fraction * LOOP_DUR);
+    });
+    canvas.addEventListener('dblclick', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      addMarkerAt(fraction * LOOP_DUR);
     });
   });
 
