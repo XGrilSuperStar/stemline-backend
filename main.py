@@ -1,4 +1,3 @@
-from typing import Optional
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends
 from fastapi.responses import FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -671,10 +670,10 @@ def download_stem_instrument(stem_id: int, instrument: str, token: str = None, d
             raise HTTPException(status_code=404, detail="Saved stem not found.")
         if stem_row.instrument:
             # Single-channel save -- zip_path already points at a lone wav,
-            # not a zip. The `instrument` path param here is really just the
-            # mixer channel the frontend wants to load it into, which the
-            # user can now freely reassign from the saved stem's own label,
-            # so it no longer has to match stem_row.instrument.
+            # not a zip. Only serve it if it actually matches the
+            # instrument being asked for.
+            if stem_row.instrument != instrument:
+                raise HTTPException(status_code=404, detail=f"This saved stem is {stem_row.instrument}, not {instrument}.")
             with open(stem_row.zip_path, "rb") as f:
                 wav_bytes = f.read()
         else:
@@ -740,34 +739,23 @@ def save_stem_instrument(stem_id: int, instrument: str, token: str = None, db: S
         raise HTTPException(status_code=500, detail=str(e))
 
 class RenameStemRequest(BaseModel):
-    track_name: Optional[str] = None
-    instrument: Optional[str] = None
+    track_name: str
 
 @app.patch("/api/v1/my-stems/{stem_id}")
 def rename_stem(stem_id: int, body: RenameStemRequest, token: str = None, db: Session = Depends(get_db)):
     user_id = get_current_user(token)
     try:
+        new_name = body.track_name.strip()
+        if not new_name:
+            raise HTTPException(status_code=400, detail="Name can't be empty.")
+        if len(new_name) > 200:
+            raise HTTPException(status_code=400, detail="Name is too long.")
         stem_row = db.query(Stem).filter(Stem.id == stem_id, Stem.user_id == user_id).first()
         if not stem_row:
             raise HTTPException(status_code=404, detail="Saved stem not found.")
-        if body.track_name is not None:
-            new_name = body.track_name.strip()
-            if not new_name:
-                raise HTTPException(status_code=400, detail="Name can't be empty.")
-            if len(new_name) > 200:
-                raise HTTPException(status_code=400, detail="Name is too long.")
-            stem_row.track_name = new_name
-        if body.instrument is not None:
-            # Re-categorize a saved single-instrument stem (e.g. relabel a
-            # saved "guitar" as "other"). Only meaningful for per-instrument
-            # saves, not whole-song split rows.
-            if not stem_row.instrument:
-                raise HTTPException(status_code=400, detail="Only a saved single stem can be re-categorized.")
-            if body.instrument not in STEM_INSTRUMENTS:
-                raise HTTPException(status_code=400, detail=f"Unknown category: {body.instrument}")
-            stem_row.instrument = body.instrument
+        stem_row.track_name = new_name
         db.commit()
-        return {"id": stem_row.id, "track_name": stem_row.track_name, "instrument": stem_row.instrument}
+        return {"id": stem_row.id, "track_name": stem_row.track_name}
     except HTTPException:
         raise
     except Exception as e:
