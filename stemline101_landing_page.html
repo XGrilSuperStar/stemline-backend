@@ -2795,16 +2795,25 @@ function drawWaveformFromSamples(canvas, data, color) {
   ctx.beginPath();
   for (let x = 0; x < width; x++) {
     const start = x * samplesPerPixel;
-    let min = 1, max = -1;
+    let sumSq = 0, peak = 0, count = 0;
     for (let i = 0; i < samplesPerPixel; i++) {
       const sample = data[start + i];
       if (sample === undefined) break;
-      if (sample < min) min = sample;
-      if (sample > max) max = sample;
+      const abs = Math.abs(sample);
+      sumSq += sample * sample;
+      if (abs > peak) peak = abs;
+      count++;
     }
-    if (min > max) { min = 0; max = 0; }
-    const y1 = mid - max * mid * 0.92;
-    const y2 = mid - min * mid * 0.92;
+    // Raw min/max-per-column pins to ±1 on almost every column for dense,
+    // loud material (drums, bass) since a single sample hitting full scale
+    // is enough — the whole row renders as a solid block with no visible
+    // shape. Blending in RMS (average energy across the column) instead of
+    // pure peak keeps the display responsive to actual loudness variation,
+    // so dense stems still show a real waveform shape instead of a block.
+    const rms = count ? Math.sqrt(sumSq / count) : 0;
+    const amp = count ? Math.min(1, rms * 1.8 + peak * 0.2) : 0;
+    const y1 = mid - amp * mid * 0.92;
+    const y2 = mid + amp * mid * 0.92;
     ctx.moveTo(x + 0.5, y1);
     ctx.lineTo(x + 0.5, y2);
   }
