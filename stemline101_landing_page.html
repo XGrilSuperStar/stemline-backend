@@ -254,11 +254,15 @@
     border-top: 6px solid var(--vu-amber);
   }
   .waveform-rows.scrubbing { cursor: grabbing; }
+  /* Per-stem start markers (cue points). One flag per marker, positioned
+     inside its own .wave-row (not the shared rowsEl), so every stem has its
+     own independent set. Active marker (the stem's actual Play start point)
+     renders amber instead of teal. */
   .wave-marker {
     position: absolute; top: -5px; bottom: 0; width: 2px;
     background: var(--vu-teal, #3CFDE0);
     box-shadow: 0 0 4px rgba(60,253,224,0.7);
-    cursor: pointer; z-index: 5;
+    cursor: grab; z-index: 6; touch-action: none;
   }
   .wave-marker::before {
     content: ''; position: absolute; top: -5px; left: -3px;
@@ -266,7 +270,22 @@
     border-left: 4px solid transparent; border-right: 4px solid transparent;
     border-top: 5px solid var(--vu-teal, #3CFDE0);
   }
-  .wave-row { display: flex; align-items: center; gap: 0.5rem; height: 26px; }
+  .wave-marker.active {
+    background: var(--vu-amber, #E7A33E);
+  }
+  .wave-marker.active::before { border-top-color: var(--vu-amber, #E7A33E); }
+  .wave-marker::after {
+    content: attr(data-label);
+    position: absolute; top: -20px; left: -3px; transform: translateX(-50%);
+    font-family: 'JetBrains Mono', monospace; font-size: 0.46rem; font-weight: 700;
+    letter-spacing: 0.02em; white-space: nowrap; padding: 1px 4px; border-radius: 2px;
+    background: rgba(6,32,28,0.92); color: var(--vu-teal, #3CFDE0);
+    border: 1px solid rgba(60,253,224,0.4); display: none; pointer-events: none;
+  }
+  .wave-marker.active::after { color: var(--vu-amber, #E7A33E); border-color: rgba(231,163,62,0.5); }
+  .wave-marker:hover::after, .wave-marker.active::after { display: block; }
+  .wave-marker.dragging { cursor: grabbing; }
+  .wave-row { display: flex; align-items: center; gap: 0.5rem; height: 26px; position: relative; }
   .wave-row-label {
     width: 46px; flex-shrink: 0; font-family: 'JetBrains Mono', monospace; font-size: 0.5rem;
     font-weight: 700; color: var(--row-accent, rgba(60,253,224,0.55)); letter-spacing: 0.02em;
@@ -2104,7 +2123,12 @@ function startStem(name, masterPos) {
   src.loopStart = 0;
   src.loopEnd = Math.min(LOOP_DUR, buffer.duration);
   src.connect(stemNodes[name].trimNode);
-  const eff = wrapOffset(masterPos + stemNudge[name], LOOP_DUR);
+  // A stem with an active cue marker starts from that marker instead of the
+  // shared master position — lets different stems kick in from different
+  // parts of the song. Nudge still layers on top as a fine-alignment offset.
+  const activeMarker = (stemMarkers[name] || []).find(m => m.active);
+  const base = activeMarker ? activeMarker.time : masterPos;
+  const eff = wrapOffset(base + stemNudge[name], LOOP_DUR);
   src.start(0, eff);
   activeSources[name] = src;
 }
@@ -2778,11 +2802,13 @@ function renderStemWaveforms() {
   });
 }
 
-// ===== Markers: drop a marker on any wave to mark a point in the song =====
-// Double-click a wave to add one; click a marker to jump to it; double-click
-// a marker to remove it. Kept in a plain array of seconds, re-rendered as
-// small teal flags positioned the same way the playhead is.
-let markers = [];
+// ===== Per-stem cue markers =====
+// Each stem (row) keeps its own independent list of markers — unlimited,
+// draggable, labeled. Exactly one marker per stem can be "active": that's
+// the point this stem actually starts from on Play (see startStem()), so
+// different stems can kick in from different parts of the song.
+const stemMarkers = { vocals: [], drums: [], bass: [], guitar: [], piano: [], other: [] };
+let markerIdCounter = 0;
 
 function formatMarkerTime(t) {
   const s = Math.max(0, t);
@@ -2791,37 +2817,110 @@ function formatMarkerTime(t) {
   return mm + ':' + ss;
 }
 
-function addMarkerAt(t) {
-  if (markers.some(m => Math.abs(m - t) < 0.05)) return; // avoid dupes on double-click jitter
-  markers.push(t);
-  markers.sort((a, b) => a - b);
-  renderMarkers();
+function addStemMarkerAt(stem, t, label) {
+  const list = stemMarkers[stem];
+  if (!list) return null;
+  if (list.some(m => Math.abs(m.time - t) < 0.05)) return null; // avoid dupes on dblclick jitter
+  const marker = { id: 'm' + (++markerIdCounter), time: t, label: label || ('Cue ' + (list.length + 1)), active: list.length === 0 };
+  list.push(marker);
+  list.sort((a, b) => a.time - b.time);
+  renderStemMarkers(stem);
+  return marker;
 }
 
-function removeMarker(t) {
-  markers = markers.filter(m => m !== t);
-  renderMarkers();
+function removeStemMarker(stem, id) {
+  const list = stemMarkers[stem];
+  if (!list) return;
+  const wasActive = list.find(m => m.id === id)?.active;
+  stemMarkers[stem] = list.filter(m => m.id !== id);
+  // If we removed the active marker, the stem falls back to the master position.
+  renderStemMarkers(stem);
 }
 
-function renderMarkers() {
-  const rowsEl = document.getElementById('waveformRows');
-  const firstCanvas = document.querySelector('.wave-row .wave-canvas');
-  if (!rowsEl || !firstCanvas) return;
-  rowsEl.querySelectorAll('.wave-marker').forEach(el => el.remove());
-  const canvasRect = firstCanvas.getBoundingClientRect();
-  const rowsRect = rowsEl.getBoundingClientRect();
-  const canvasLeftInRows = canvasRect.left - rowsRect.left;
-  markers.forEach(t => {
-    const x = canvasLeftInRows + (t / LOOP_DUR) * canvasRect.width;
+function setActiveStemMarker(stem, id) {
+  const list = stemMarkers[stem];
+  if (!list) return;
+  list.forEach(m => { m.active = (m.id === id); });
+  renderStemMarkers(stem);
+  // Restart this stem immediately from its new cue point if we're playing,
+  // so selecting a cue previews it right away.
+  if (transportState === 'playing') {
+    const marker = list.find(m => m.id === id);
+    if (marker) startStem(stem, masterOffset);
+  }
+}
+
+function renameStemMarker(stem, id) {
+  const list = stemMarkers[stem];
+  const marker = list && list.find(m => m.id === id);
+  if (!marker) return;
+  const next = window.prompt('Label this cue:', marker.label);
+  if (next === null) return;
+  const trimmed = next.trim();
+  if (trimmed) marker.label = trimmed;
+  renderStemMarkers(stem);
+}
+
+function renderStemMarkers(stem) {
+  const row = document.querySelector('.wave-row[data-stem="' + stem + '"]');
+  const canvas = row && row.querySelector('.wave-canvas');
+  if (!row || !canvas) return;
+  row.querySelectorAll('.wave-marker').forEach(el => el.remove());
+  const canvasRect = canvas.getBoundingClientRect();
+  const rowRect = row.getBoundingClientRect();
+  const canvasLeftInRow = canvasRect.left - rowRect.left;
+  (stemMarkers[stem] || []).forEach(marker => {
+    const x = canvasLeftInRow + (marker.time / LOOP_DUR) * canvasRect.width;
     const el = document.createElement('div');
-    el.className = 'wave-marker';
+    el.className = 'wave-marker' + (marker.active ? ' active' : '');
     el.style.left = x + 'px';
-    el.title = 'Marker at ' + formatMarkerTime(t) + ' — click to jump, double-click to remove';
-    el.addEventListener('pointerdown', (e) => e.stopPropagation());
-    el.addEventListener('click', (e) => { e.stopPropagation(); seekTo(t); });
-    el.addEventListener('dblclick', (e) => { e.stopPropagation(); removeMarker(t); });
-    rowsEl.appendChild(el);
+    el.dataset.label = marker.label;
+    el.title = marker.label + ' — ' + formatMarkerTime(marker.time)
+      + (marker.active ? ' (start point)' : ' — click to make this the start point')
+      + ', double-click to rename, right-click to remove';
+
+    let dragging = false, moved = false, startClientX = 0, startTime = marker.time;
+    el.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      dragging = true; moved = false;
+      startClientX = e.clientX; startTime = marker.time;
+      el.classList.add('dragging');
+      try { el.setPointerCapture(e.pointerId); } catch (err) {}
+    });
+    el.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      const dx = e.clientX - startClientX;
+      if (Math.abs(dx) > 2) moved = true;
+      const secPerPx = LOOP_DUR / canvasRect.width;
+      marker.time = Math.max(0, Math.min(LOOP_DUR, startTime + dx * secPerPx));
+      el.style.left = (canvasLeftInRow + (marker.time / LOOP_DUR) * canvasRect.width) + 'px';
+      el.title = marker.label + ' — ' + formatMarkerTime(marker.time);
+    });
+    const endDrag = (e) => {
+      if (!dragging) return;
+      dragging = false;
+      el.classList.remove('dragging');
+      try { el.releasePointerCapture(e.pointerId); } catch (err) {}
+      if (moved) {
+        stemMarkers[stem].sort((a, b) => a.time - b.time);
+        if (marker.active && transportState === 'playing') startStem(stem, masterOffset);
+      }
+    };
+    el.addEventListener('pointerup', endDrag);
+    el.addEventListener('pointercancel', endDrag);
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (moved) { moved = false; return; } // trailing click after a drag
+      setActiveStemMarker(stem, marker.id);
+    });
+    el.addEventListener('dblclick', (e) => { e.stopPropagation(); renameStemMarker(stem, marker.id); });
+    el.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); removeStemMarker(stem, marker.id); });
+    row.appendChild(el);
   });
+}
+
+function renderAllStemMarkers() {
+  Object.keys(stemMarkers).forEach(renderStemMarkers);
 }
 
 // ===== Playhead scrub: grab the amber line and drag it anywhere along the
@@ -2880,8 +2979,8 @@ document.addEventListener('DOMContentLoaded', () => {
   renderStemWaveforms();
   document.getElementById('wavePlayhead')?.classList.add('on');
   updatePlayheadPosition();
-  renderMarkers();
-  window.addEventListener('resize', () => { updatePlayheadPosition(); renderMarkers(); });
+  renderAllStemMarkers();
+  window.addEventListener('resize', () => { updatePlayheadPosition(); renderAllStemMarkers(); });
 
   // Click-to-seek on any waveform row — jumps ALL stems to that position
   // together, keeping them in lockstep. Drag-to-nudge (see below) offsets a
@@ -2895,9 +2994,12 @@ document.addEventListener('DOMContentLoaded', () => {
       seekTo(fraction * LOOP_DUR);
     });
     canvas.addEventListener('dblclick', (e) => {
+      const row = canvas.closest('.wave-row');
+      const stem = row && row.dataset.stem;
+      if (!stem) return;
       const rect = canvas.getBoundingClientRect();
       const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-      addMarkerAt(fraction * LOOP_DUR);
+      addStemMarkerAt(stem, fraction * LOOP_DUR);
     });
   });
 
