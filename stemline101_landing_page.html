@@ -225,8 +225,11 @@
   }
   @keyframes saveHintFade { 0%,80% { opacity: 1; } 100% { opacity: 0; } }
   .waveform-rows { display: flex; flex-direction: column; gap: 0.28rem; position: relative; }
+  .wave-canvas-wrap {
+    flex: 1; width: 100%; height: 24px; overflow: hidden; position: relative;
+  }
   .wave-canvas {
-    flex: 1; width: 100%; height: 24px; display: block;
+    width: 100%; height: 24px; display: block;
     cursor: grab;
     transition: transform 0.05s linear;
     touch-action: none; /* let pointerdown handle drags on mobile without scrolling */
@@ -1383,12 +1386,12 @@
             </span>
           </div>
           <div class="waveform-rows" id="waveformRows">
-            <div class="wave-row" data-stem="vocals"><span class="wave-row-label">VOCALS</span><canvas class="wave-canvas"></canvas></div>
-            <div class="wave-row" data-stem="drums"><span class="wave-row-label">DRUMS</span><canvas class="wave-canvas"></canvas></div>
-            <div class="wave-row" data-stem="bass"><span class="wave-row-label">BASS</span><canvas class="wave-canvas"></canvas></div>
-            <div class="wave-row" data-stem="guitar"><span class="wave-row-label">GUITAR</span><canvas class="wave-canvas"></canvas></div>
-            <div class="wave-row" data-stem="piano"><span class="wave-row-label">SYNTH</span><canvas class="wave-canvas"></canvas></div>
-            <div class="wave-row" data-stem="other"><span class="wave-row-label">OTHER</span><canvas class="wave-canvas"></canvas></div>
+            <div class="wave-row" data-stem="vocals"><span class="wave-row-label">VOCALS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div></div>
+            <div class="wave-row" data-stem="drums"><span class="wave-row-label">DRUMS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div></div>
+            <div class="wave-row" data-stem="bass"><span class="wave-row-label">BASS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div></div>
+            <div class="wave-row" data-stem="guitar"><span class="wave-row-label">GUITAR</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div></div>
+            <div class="wave-row" data-stem="piano"><span class="wave-row-label">SYNTH</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div></div>
+            <div class="wave-row" data-stem="other"><span class="wave-row-label">OTHER</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div></div>
             <div class="wave-playhead" id="wavePlayhead"></div>
           </div>
           <div class="screen-browse" id="screenBrowse" style="display:none;">
@@ -2256,10 +2259,17 @@ async function loadBackendStemToChannel(channelKey, stemId, trackName) {
     stemBuffers[channelKey] = audioBuffer;
     currentStemMeta[channelKey] = { stemId, trackName };
 
-    // Re-render waveform from the new buffer's samples.
+    // Re-render waveform from the new buffer's samples. The mixer only ever
+    // plays/loops the first LOOP_DUR seconds of a stem (see startStem), so
+    // draw just that window — not the whole (often minutes-long) track.
+    // Drawing the full song here made the waveform look like a solid block:
+    // compressed into ~600px, a full track's loud/quiet peaks all collapse
+    // into near-full-height columns almost everywhere.
     const canvas = document.querySelector('.wave-row[data-stem="' + channelKey + '"] .wave-canvas');
     if (canvas) {
-      drawWaveformFromSamples(canvas, audioBuffer.getChannelData(0), WAVE_COLORS[channelKey] || '#3CFDE0');
+      const full = audioBuffer.getChannelData(0);
+      const windowLen = Math.min(full.length, Math.round(LOOP_DUR * audioBuffer.sampleRate));
+      drawWaveformFromSamples(canvas, full.subarray(0, windowLen), WAVE_COLORS[channelKey] || '#3CFDE0');
     }
 
     // Set badge + LED on the channel strip.
