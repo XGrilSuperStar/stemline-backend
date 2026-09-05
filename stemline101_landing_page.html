@@ -2788,11 +2788,17 @@ function drawWaveformFromSamples(canvas, data, color) {
   const samplesPerPixel = Math.max(1, Math.floor(data.length / width));
   const mid = height / 2;
 
-  ctx.strokeStyle = color;
-  ctx.lineWidth = Math.max(1, dpr);
-  ctx.shadowColor = color;
-  ctx.shadowBlur = 4 * dpr;
-  ctx.beginPath();
+  // Pass 1: per-column blended amplitude (RMS body + a touch of peak so
+  // transients still register), plus the loudest column in this window.
+  // Raw min/max-per-column pins to ±1 on almost every column for dense,
+  // loud material (drums, bass) — the whole row renders as a solid block.
+  // Blending RMS in fixes that, but a fixed scale then makes quieter stems
+  // (vocals, a soft bass take) draw too faint to see even though they're
+  // audible. Normalizing to this stem's own loudest column — like a real
+  // DAW waveform — fixes both: dense stems show real shape, quiet stems
+  // still fill a visible range.
+  const amps = new Array(width);
+  let loudest = 0;
   for (let x = 0; x < width; x++) {
     const start = x * samplesPerPixel;
     let sumSq = 0, peak = 0, count = 0;
@@ -2804,14 +2810,20 @@ function drawWaveformFromSamples(canvas, data, color) {
       if (abs > peak) peak = abs;
       count++;
     }
-    // Raw min/max-per-column pins to ±1 on almost every column for dense,
-    // loud material (drums, bass) since a single sample hitting full scale
-    // is enough — the whole row renders as a solid block with no visible
-    // shape. Blending in RMS (average energy across the column) instead of
-    // pure peak keeps the display responsive to actual loudness variation,
-    // so dense stems still show a real waveform shape instead of a block.
     const rms = count ? Math.sqrt(sumSq / count) : 0;
-    const amp = count ? Math.min(1, rms * 1.8 + peak * 0.2) : 0;
+    const amp = count ? (rms * 1.8 + peak * 0.2) : 0;
+    amps[x] = amp;
+    if (amp > loudest) loudest = amp;
+  }
+  const scale = loudest > 0.001 ? Math.min(1 / loudest, 12) : 1;
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(1, dpr);
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 4 * dpr;
+  ctx.beginPath();
+  for (let x = 0; x < width; x++) {
+    const amp = Math.min(1, amps[x] * scale);
     const y1 = mid - amp * mid * 0.92;
     const y2 = mid + amp * mid * 0.92;
     ctx.moveTo(x + 0.5, y1);
