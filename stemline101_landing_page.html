@@ -228,6 +228,14 @@
   .wave-canvas-wrap {
     flex: 1; width: 100%; height: 24px; overflow: hidden; position: relative;
   }
+  .add-marker-btn {
+    flex-shrink: 0; width: 16px; height: 16px; line-height: 14px; padding: 0;
+    font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; font-weight: 700;
+    color: var(--vu-teal, #3CFDE0); background: rgba(60,253,224,0.08);
+    border: 1px solid rgba(60,253,224,0.4); border-radius: 3px; cursor: pointer;
+  }
+  .add-marker-btn:hover { background: rgba(60,253,224,0.25); }
+  .add-marker-btn:active { background: rgba(60,253,224,0.4); }
   .wave-canvas {
     width: 100%; height: 24px; display: block;
     cursor: grab;
@@ -1386,12 +1394,12 @@
             </span>
           </div>
           <div class="waveform-rows" id="waveformRows">
-            <div class="wave-row" data-stem="vocals"><span class="wave-row-label">VOCALS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div></div>
-            <div class="wave-row" data-stem="drums"><span class="wave-row-label">DRUMS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div></div>
-            <div class="wave-row" data-stem="bass"><span class="wave-row-label">BASS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div></div>
-            <div class="wave-row" data-stem="guitar"><span class="wave-row-label">GUITAR</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div></div>
-            <div class="wave-row" data-stem="piano"><span class="wave-row-label">SYNTH</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div></div>
-            <div class="wave-row" data-stem="other"><span class="wave-row-label">OTHER</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div></div>
+            <div class="wave-row" data-stem="vocals"><span class="wave-row-label">VOCALS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="add-marker-btn" data-stem="vocals" title="Add a cue marker here">+</button></div>
+            <div class="wave-row" data-stem="drums"><span class="wave-row-label">DRUMS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="add-marker-btn" data-stem="drums" title="Add a cue marker here">+</button></div>
+            <div class="wave-row" data-stem="bass"><span class="wave-row-label">BASS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="add-marker-btn" data-stem="bass" title="Add a cue marker here">+</button></div>
+            <div class="wave-row" data-stem="guitar"><span class="wave-row-label">GUITAR</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="add-marker-btn" data-stem="guitar" title="Add a cue marker here">+</button></div>
+            <div class="wave-row" data-stem="piano"><span class="wave-row-label">SYNTH</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="add-marker-btn" data-stem="piano" title="Add a cue marker here">+</button></div>
+            <div class="wave-row" data-stem="other"><span class="wave-row-label">OTHER</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="add-marker-btn" data-stem="other" title="Add a cue marker here">+</button></div>
             <div class="wave-playhead" id="wavePlayhead"></div>
           </div>
           <div class="screen-browse" id="screenBrowse" style="display:none;">
@@ -3013,6 +3021,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // Visible "+" button — the discoverable way to drop a cue marker (the
+  // waveform double-click above still works too, for anyone used to DAWs).
+  // Adds the marker at the current playhead position for that stem.
+  document.querySelectorAll('.add-marker-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const stem = btn.dataset.stem;
+      if (!stem) return;
+      addStemMarkerAt(stem, currentPlaybackTime());
+    });
+  });
+
   // ===== Drag-to-nudge on a single wave =====
   // Grab a waveform and drag horizontally to shift THAT stem's playback
   // earlier or later than the others. Lets you align kicks/vocals/etc. across
@@ -3055,11 +3075,9 @@ document.addEventListener('DOMContentLoaded', () => {
     canvas.addEventListener('pointerup', endDrag);
     canvas.addEventListener('pointercancel', endDrag);
 
-    // Double-click to zero-out that stem's nudge — the "snap back" shortcut.
-    canvas.addEventListener('dblclick', () => {
-      setStemNudge(stem, 0);
-      canvas._suppressClick = true;
-    });
+    // Note: double-click on the wave is reserved for dropping a cue marker
+    // (wired above) — the old "double-click resets nudge" shortcut was
+    // removed since it competed with marker placement on the same canvas.
   });
 
   // Screen tabs: WAVES (per-stem waveforms) vs MY STEMS (saved-track browser)
