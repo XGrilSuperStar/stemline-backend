@@ -2586,12 +2586,19 @@ function setStemNudge(name, nudgeSec) {
 }
 
 // Shift the waveform visually to match the nudge — so you SEE the stem
-// slide as you drag, and can eyeball alignment against other stems.
+// slide as you drag, and can eyeball alignment against other stems. Cue
+// markers were never re-rendered here, so they stayed put on-screen while
+// the waveform slid underneath — no longer pointing at the sound they were
+// placed on. Re-rendering after the transform fixes that: marker x-position
+// is computed from the canvas's bounding rect, which already reflects the
+// CSS transform, so the marker now shifts along with the waveform.
 function updateNudgeVisual(row, nudgeSec) {
   const canvas = row.querySelector('.wave-canvas');
   if (!canvas) return;
   const px = (nudgeSec / LOOP_DUR) * canvas.getBoundingClientRect().width;
   canvas.style.transform = 'translateX(' + px + 'px)';
+  const stem = row.dataset.stem;
+  if (stem) renderStemMarkers(stem);
 }
 
 // Small ms-offset readout on the label so you can see the exact nudge.
