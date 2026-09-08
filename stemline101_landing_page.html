@@ -93,9 +93,9 @@
 
   /* ===== HERO ===== */
   .hero {
-    padding: 4rem 2.5rem 3rem;
+    padding: 2.2rem 2.5rem 3rem;
     max-width: 1600px; margin: 0 auto;
-    display: flex; flex-direction: column; gap: 2.5rem;
+    display: flex; flex-direction: column; gap: 1.6rem;
     align-items: center;
     background: var(--void);
     position: relative;
@@ -225,13 +225,19 @@
   }
   @keyframes saveHintFade { 0%,80% { opacity: 1; } 100% { opacity: 0; } }
   .waveform-rows { display: flex; flex-direction: column; gap: 0.28rem; position: relative; }
-  .scope-view {
-    width: 100%; height: 168px;
-    background: #06070a; border-radius: 3px;
-    box-shadow: inset 0 0 8px rgba(0,0,0,0.8);
-    position: relative; overflow: hidden;
+  .scope-square-wrap {
+    max-width: 1600px; margin: 0 auto; padding: 0 2.5rem 2rem;
+    display: flex; justify-content: center;
   }
-  .scope-view canvas { width: 100%; height: 100%; display: block; }
+  .scope-square {
+    width: 260px; height: 260px;
+    background: #06070a; border-radius: 50%;
+    box-shadow: inset 0 0 16px rgba(0,0,0,0.85), 0 0 0 1px #000, 0 0 22px rgba(60,253,224,0.08);
+    display: block;
+  }
+  @media (max-width: 760px) {
+    .scope-square { width: 190px; height: 190px; }
+  }
   .wave-canvas-wrap {
     flex: 1; width: 100%; height: 24px; overflow: hidden; position: relative;
   }
@@ -1405,7 +1411,6 @@
             <span class="screen-tabs">
               <button type="button" class="screen-tab active" data-view="waves">WAVES</button>
               <button type="button" class="screen-tab" data-view="stems" id="screenStemsTab">MY STEMS <span id="screenCount">(0)</span></button>
-              <button type="button" class="screen-tab" data-view="scope">SCOPE</button>
             </span>
           </div>
           <div class="transport" role="group" aria-label="Playback transport">
@@ -1442,9 +1447,6 @@
           </div>
           <div class="screen-list" id="screenStemList" style="display:none;">
             <div class="screen-empty">Log in to browse your saved stems here.</div>
-          </div>
-          <div class="scope-view" id="scopeView" style="display:none;">
-            <canvas id="scopeCanvas"></canvas>
           </div>
           <div class="screen-footer">
             <span>BPM <b id="lcdBpm">120.0</b></span>
@@ -1808,6 +1810,11 @@
   </div>
 </div>
 
+<!-- ===== SCOPE: real-time circular oscilloscope of the master output ===== -->
+<div class="scope-square-wrap">
+  <canvas id="scopeCanvas" class="scope-square"></canvas>
+</div>
+
 <!-- ===== AD SLOT: MID-PAGE BANNER (below mixer) ===== -->
 <div class="ad-slot ad-slot-mid" id="adSlotMid" data-ad-slot="mid-banner">
 </div>
@@ -2049,7 +2056,7 @@ function initScope() {
   if (!scopeCanvas) return;
   scopeCtx = scopeCanvas.getContext('2d');
   const resize = () => {
-    const rect = scopeCanvas.parentElement.getBoundingClientRect();
+    const rect = scopeCanvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
     scopeCanvas.width = rect.width * dpr;
     scopeCanvas.height = rect.height * dpr;
@@ -2058,30 +2065,40 @@ function initScope() {
   resize();
   window.addEventListener('resize', resize);
 }
+// Circular scope: maps the same real time-domain samples used for the
+// meters around a ring, radius modulated by the live signal, so it
+// pulses/warps with the actual master audio instead of a straight trace.
 function drawScope(dataArray) {
   if (!scopeCtx || !scopeCanvas) return;
   const w = scopeCanvas.clientWidth, h = scopeCanvas.clientHeight;
   if (!w || !h) return;
+  const cx = w / 2, cy = h / 2;
+  const baseR = Math.min(w, h) * 0.32;
+  const ampR = Math.min(w, h) * 0.14;
+
   scopeCtx.clearRect(0, 0, w, h);
-  scopeCtx.strokeStyle = 'rgba(60,253,224,0.12)';
+
+  scopeCtx.strokeStyle = 'rgba(60,253,224,0.10)';
   scopeCtx.lineWidth = 1;
   scopeCtx.beginPath();
-  scopeCtx.moveTo(0, h / 2);
-  scopeCtx.lineTo(w, h / 2);
+  scopeCtx.arc(cx, cy, baseR, 0, Math.PI * 2);
   scopeCtx.stroke();
 
   scopeCtx.strokeStyle = '#3cfde0';
   scopeCtx.lineWidth = 1.5;
   scopeCtx.shadowColor = '#3cfde0';
-  scopeCtx.shadowBlur = 6;
+  scopeCtx.shadowBlur = 8;
   scopeCtx.beginPath();
-  const step = w / dataArray.length;
-  for (let i = 0; i < dataArray.length; i++) {
-    const v = dataArray[i] / 128.0;
-    const y = (v * h) / 2;
-    const x = i * step;
+  const n = dataArray.length;
+  for (let i = 0; i <= n; i++) {
+    const v = (dataArray[i % n] - 128) / 128; // -1..1 real sample
+    const angle = (i / n) * Math.PI * 2;
+    const r = baseR + v * ampR;
+    const x = cx + Math.cos(angle) * r;
+    const y = cy + Math.sin(angle) * r;
     if (i === 0) scopeCtx.moveTo(x, y); else scopeCtx.lineTo(x, y);
   }
+  scopeCtx.closePath();
   scopeCtx.stroke();
   scopeCtx.shadowBlur = 0;
 }
@@ -3177,7 +3194,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const waveformRows = document.getElementById('waveformRows');
   const screenStemList = document.getElementById('screenStemList');
   const screenTitle = document.getElementById('screenTitle');
-  const scopeView = document.getElementById('scopeView');
   document.querySelectorAll('.screen-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       document.querySelectorAll('.screen-tab').forEach(t => t.classList.remove('active'));
@@ -3185,10 +3201,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const view = tab.dataset.view;
       if (waveformRows) waveformRows.style.display = view === 'waves' ? 'flex' : 'none';
       if (screenStemList) screenStemList.style.display = view === 'stems' ? 'block' : 'none';
-      if (scopeView) scopeView.style.display = view === 'scope' ? 'block' : 'none';
       const browseBar = document.getElementById('screenBrowse');
       if (browseBar) browseBar.style.display = view === 'stems' ? 'flex' : 'none';
-      if (screenTitle) screenTitle.textContent = view === 'waves' ? 'STEM WAVEFORMS' : view === 'scope' ? 'OSCILLOSCOPE' : 'MY STEMS';
+      if (screenTitle) screenTitle.textContent = view === 'waves' ? 'STEM WAVEFORMS' : 'MY STEMS';
     });
   });
 
