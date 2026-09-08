@@ -225,6 +225,13 @@
   }
   @keyframes saveHintFade { 0%,80% { opacity: 1; } 100% { opacity: 0; } }
   .waveform-rows { display: flex; flex-direction: column; gap: 0.28rem; position: relative; }
+  .scope-view {
+    width: 100%; height: 168px;
+    background: #06070a; border-radius: 3px;
+    box-shadow: inset 0 0 8px rgba(0,0,0,0.8);
+    position: relative; overflow: hidden;
+  }
+  .scope-view canvas { width: 100%; height: 100%; display: block; }
   .wave-canvas-wrap {
     flex: 1; width: 100%; height: 24px; overflow: hidden; position: relative;
   }
@@ -1398,6 +1405,7 @@
             <span class="screen-tabs">
               <button type="button" class="screen-tab active" data-view="waves">WAVES</button>
               <button type="button" class="screen-tab" data-view="stems" id="screenStemsTab">MY STEMS <span id="screenCount">(0)</span></button>
+              <button type="button" class="screen-tab" data-view="scope">SCOPE</button>
             </span>
           </div>
           <div class="transport" role="group" aria-label="Playback transport">
@@ -1434,6 +1442,9 @@
           </div>
           <div class="screen-list" id="screenStemList" style="display:none;">
             <div class="screen-empty">Log in to browse your saved stems here.</div>
+          </div>
+          <div class="scope-view" id="scopeView" style="display:none;">
+            <canvas id="scopeCanvas"></canvas>
           </div>
           <div class="screen-footer">
             <span>BPM <b id="lcdBpm">120.0</b></span>
@@ -2029,6 +2040,52 @@ function crossGainFor(name, pos) {
   return pos >= 50 ? 1 : Math.max(0, pos / 50);
 }
 
+// Real oscilloscope trace of the master output, drawn from the same
+// masterAnalyser byte-time-domain buffer already read each frame for the
+// master meter — no synthetic/decorative data, this is the actual signal.
+let scopeCanvas = null, scopeCtx = null;
+function initScope() {
+  scopeCanvas = document.getElementById('scopeCanvas');
+  if (!scopeCanvas) return;
+  scopeCtx = scopeCanvas.getContext('2d');
+  const resize = () => {
+    const rect = scopeCanvas.parentElement.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    scopeCanvas.width = rect.width * dpr;
+    scopeCanvas.height = rect.height * dpr;
+    scopeCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  };
+  resize();
+  window.addEventListener('resize', resize);
+}
+function drawScope(dataArray) {
+  if (!scopeCtx || !scopeCanvas) return;
+  const w = scopeCanvas.clientWidth, h = scopeCanvas.clientHeight;
+  if (!w || !h) return;
+  scopeCtx.clearRect(0, 0, w, h);
+  scopeCtx.strokeStyle = 'rgba(60,253,224,0.12)';
+  scopeCtx.lineWidth = 1;
+  scopeCtx.beginPath();
+  scopeCtx.moveTo(0, h / 2);
+  scopeCtx.lineTo(w, h / 2);
+  scopeCtx.stroke();
+
+  scopeCtx.strokeStyle = '#3cfde0';
+  scopeCtx.lineWidth = 1.5;
+  scopeCtx.shadowColor = '#3cfde0';
+  scopeCtx.shadowBlur = 6;
+  scopeCtx.beginPath();
+  const step = w / dataArray.length;
+  for (let i = 0; i < dataArray.length; i++) {
+    const v = dataArray[i] / 128.0;
+    const y = (v * h) / 2;
+    const x = i * step;
+    if (i === 0) scopeCtx.moveTo(x, y); else scopeCtx.lineTo(x, y);
+  }
+  scopeCtx.stroke();
+  scopeCtx.shadowBlur = 0;
+}
+
 function connectAnalysers() {
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   if (window.Tone && Tone.setContext) {
@@ -2212,6 +2269,7 @@ function updateFaders() {
       const segs = col.querySelectorAll('.meter-seg');
       segs.forEach((seg, i) => seg.classList.toggle('lit', i < lit));
     });
+    drawScope(masterDataArray);
   }
 
   updatePlayheadPosition();
@@ -3024,6 +3082,7 @@ function renderAllStemMarkers() {
 })();
 
 document.addEventListener('DOMContentLoaded', () => {
+  initScope();
   document.getElementById('playBtn')?.addEventListener('click', playPreview);
   document.getElementById('pauseBtn')?.addEventListener('click', pausePreview);
   document.getElementById('stopBtn')?.addEventListener('click', stopPreview);
@@ -3118,6 +3177,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const waveformRows = document.getElementById('waveformRows');
   const screenStemList = document.getElementById('screenStemList');
   const screenTitle = document.getElementById('screenTitle');
+  const scopeView = document.getElementById('scopeView');
   document.querySelectorAll('.screen-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       document.querySelectorAll('.screen-tab').forEach(t => t.classList.remove('active'));
@@ -3125,9 +3185,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const view = tab.dataset.view;
       if (waveformRows) waveformRows.style.display = view === 'waves' ? 'flex' : 'none';
       if (screenStemList) screenStemList.style.display = view === 'stems' ? 'block' : 'none';
+      if (scopeView) scopeView.style.display = view === 'scope' ? 'block' : 'none';
       const browseBar = document.getElementById('screenBrowse');
       if (browseBar) browseBar.style.display = view === 'stems' ? 'flex' : 'none';
-      if (screenTitle) screenTitle.textContent = view === 'waves' ? 'STEM WAVEFORMS' : 'MY STEMS';
+      if (screenTitle) screenTitle.textContent = view === 'waves' ? 'STEM WAVEFORMS' : view === 'scope' ? 'OSCILLOSCOPE' : 'MY STEMS';
     });
   });
 
