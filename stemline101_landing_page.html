@@ -225,18 +225,29 @@
   }
   @keyframes saveHintFade { 0%,80% { opacity: 1; } 100% { opacity: 0; } }
   .waveform-rows { display: flex; flex-direction: column; gap: 0.28rem; position: relative; }
-  .scope-square-wrap {
-    max-width: 1600px; margin: 0 auto; padding: 0 2.5rem 2rem;
-    display: flex; justify-content: center;
-  }
   .scope-square {
-    width: 260px; height: 260px;
     background: #06070a; border-radius: 50%;
     box-shadow: inset 0 0 16px rgba(0,0,0,0.85), 0 0 0 1px #000, 0 0 22px rgba(60,253,224,0.08);
     display: block;
   }
-  @media (max-width: 760px) {
-    .scope-square { width: 190px; height: 190px; }
+  /* Two scopes flanking the hero headline, in place of the old single
+     scope below the mixer. Straight flat-line idle look at rest, real
+     master-signal trace once audio plays (see drawScope). */
+  .hero-headline-row {
+    display: flex; align-items: center; justify-content: center;
+    gap: 1.6rem;
+  }
+  .scope-square-inline {
+    width: 110px; height: 110px; flex-shrink: 0;
+  }
+  @media (max-width: 900px) {
+    .hero-headline-row { gap: 0.8rem; }
+    .scope-square-inline { width: 64px; height: 64px; }
+  }
+  @media (max-width: 620px) {
+    /* Too tight for side-by-side scopes at small sizes — hide them rather
+       than crushing the headline. */
+    .scope-square-inline { display: none; }
   }
   .wave-canvas-wrap {
     flex: 1; width: 100%; height: 24px; overflow: hidden; position: relative;
@@ -1387,7 +1398,11 @@
 <section class="hero">
   <div>
     <div class="eyebrow"><span class="cat-no">STM-001</span> 6-CHANNEL DECONSTRUCTION UNIT</div>
-    <h1 class="stencil">Unmix any song<br>into its stems.<br><span class="accent">Mix them with any other.</span></h1>
+    <div class="hero-headline-row">
+      <canvas id="scopeCanvasL" class="scope-square scope-square-inline"></canvas>
+      <h1 class="stencil">Unmix any song<br>into its stems.<br><span class="accent">Mix them with any other.</span></h1>
+      <canvas id="scopeCanvasR" class="scope-square scope-square-inline"></canvas>
+    </div>
     <p class="sub">Split any track into clean vocals, drums, bass, and more — then pull in stems from other songs and blend them together on one mixer. Great for DJing.</p>
     <div class="drop-zone" id="dropZone">
       <span id="dropZoneLabel">Drop an MP3 or WAV here, or <strong>click to browse</strong></span>
@@ -1805,15 +1820,6 @@
   </div>
 </div>
 
-<!-- ===== SCOPE: real-time circular oscilloscope of the master output ===== -->
-<div class="scope-square-wrap">
-  <canvas id="scopeCanvas" class="scope-square"></canvas>
-</div>
-
-<!-- ===== AD SLOT: MID-PAGE BANNER (below mixer) ===== -->
-<div class="ad-slot ad-slot-mid" id="adSlotMid" data-ad-slot="mid-banner">
-</div>
-
 <section class="section" id="how">
   <div class="section-head">
     <div class="eyebrow">THE PROCESS</div>
@@ -2061,76 +2067,83 @@ function crossGainFor(name, pos) {
 // Real oscilloscope trace of the master output, drawn from the same
 // masterAnalyser byte-time-domain buffer already read each frame for the
 // master meter — no synthetic/decorative data, this is the actual signal.
-let scopeCanvas = null, scopeCtx = null;
+// Two scopes now flank the hero headline (left/right of "Unmix any song").
+// Both read the same masterAnalyser data and animate together — this is
+// just two canvases sharing one draw call per frame, not two signals.
+let scopeCanvases = [];
+let scopeCtxs = [];
 function initScope() {
-  scopeCanvas = document.getElementById('scopeCanvas');
-  if (!scopeCanvas) return;
-  scopeCtx = scopeCanvas.getContext('2d');
+  scopeCanvases = ['scopeCanvasL', 'scopeCanvasR']
+    .map(id => document.getElementById(id))
+    .filter(Boolean);
+  if (!scopeCanvases.length) return;
+  scopeCtxs = scopeCanvases.map(c => c.getContext('2d'));
   const resize = () => {
-    const rect = scopeCanvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
-    scopeCanvas.width = rect.width * dpr;
-    scopeCanvas.height = rect.height * dpr;
-    scopeCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    scopeCanvases.forEach((canvas, i) => {
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      scopeCtxs[i].setTransform(dpr, 0, 0, dpr, 0, 0);
+    });
   };
   resize();
   window.addEventListener('resize', resize);
 }
-// Circular scope: maps the same real time-domain samples used for the
-// meters around a ring, radius modulated by the live signal, so it
-// pulses/warps with the actual master audio instead of a straight trace.
-function drawScope(dataArray) {
-  if (!scopeCtx || !scopeCanvas) return;
-  const w = scopeCanvas.clientWidth, h = scopeCanvas.clientHeight;
+// Flat line at rest (per Kelly's spec), circular/warping trace once audio
+// plays — draws the same real time-domain samples used for the meters,
+// mapped around a ring so it pulses/warps with the actual master audio.
+function drawScope(ctx, canvas, dataArray, flat) {
+  if (!ctx || !canvas) return;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
   if (!w || !h) return;
   const cx = w / 2, cy = h / 2;
   const baseR = Math.min(w, h) * 0.32;
   const ampR = Math.min(w, h) * 0.14;
 
-  scopeCtx.clearRect(0, 0, w, h);
+  ctx.clearRect(0, 0, w, h);
 
-  scopeCtx.strokeStyle = 'rgba(60,253,224,0.10)';
-  scopeCtx.lineWidth = 1;
-  scopeCtx.beginPath();
-  scopeCtx.arc(cx, cy, baseR, 0, Math.PI * 2);
-  scopeCtx.stroke();
+  ctx.strokeStyle = 'rgba(60,253,224,0.10)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(cx, cy, baseR, 0, Math.PI * 2);
+  ctx.stroke();
 
-  scopeCtx.strokeStyle = '#3cfde0';
-  scopeCtx.lineWidth = 1.5;
-  scopeCtx.shadowColor = '#3cfde0';
-  scopeCtx.shadowBlur = 8;
-  scopeCtx.beginPath();
-  const n = dataArray.length;
-  for (let i = 0; i <= n; i++) {
-    const v = (dataArray[i % n] - 128) / 128; // -1..1 real sample
-    const angle = (i / n) * Math.PI * 2;
-    const r = baseR + v * ampR;
-    const x = cx + Math.cos(angle) * r;
-    const y = cy + Math.sin(angle) * r;
-    if (i === 0) scopeCtx.moveTo(x, y); else scopeCtx.lineTo(x, y);
+  ctx.strokeStyle = '#3cfde0';
+  ctx.lineWidth = 1.5;
+  ctx.shadowColor = '#3cfde0';
+  ctx.shadowBlur = 8;
+  ctx.beginPath();
+  if (flat) {
+    // Idle state: a straight flat line across the circle, not a ring trace.
+    ctx.moveTo(cx - baseR, cy);
+    ctx.lineTo(cx + baseR, cy);
+  } else {
+    const n = dataArray.length;
+    for (let i = 0; i <= n; i++) {
+      const v = (dataArray[i % n] - 128) / 128; // -1..1 real sample
+      const angle = (i / n) * Math.PI * 2;
+      const r = baseR + v * ampR;
+      const x = cx + Math.cos(angle) * r;
+      const y = cy + Math.sin(angle) * r;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
   }
-  scopeCtx.closePath();
-  scopeCtx.stroke();
-  scopeCtx.shadowBlur = 0;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
 }
 
-// Runs continuously regardless of transport state — so the scope is never
-// a dead black circle. Uses real analyser data while audio is playing;
-// otherwise falls back to a slow idle pulse purely for visual presence.
-let scopeIdleT = 0;
-const scopeIdleArray = new Uint8Array(128);
+// Runs continuously regardless of transport state — so the scopes are
+// never dead. Flat line at rest; both switch to real masterAnalyser data
+// together once playback starts.
 function scopeLoop() {
-  if (masterAnalyser && transportState === 'playing') {
-    masterAnalyser.getByteTimeDomainData(masterDataArray);
-    drawScope(masterDataArray);
-  } else {
-    scopeIdleT += 0.02;
-    for (let i = 0; i < scopeIdleArray.length; i++) {
-      const wobble = Math.sin(scopeIdleT + i * 0.35) * 6;
-      scopeIdleArray[i] = 128 + wobble;
-    }
-    drawScope(scopeIdleArray);
-  }
+  if (!scopeCanvases.length) { requestAnimationFrame(scopeLoop); return; }
+  const playing = masterAnalyser && transportState === 'playing';
+  if (playing) masterAnalyser.getByteTimeDomainData(masterDataArray);
+  scopeCanvases.forEach((canvas, i) => {
+    drawScope(scopeCtxs[i], canvas, playing ? masterDataArray : null, !playing);
+  });
   requestAnimationFrame(scopeLoop);
 }
 
