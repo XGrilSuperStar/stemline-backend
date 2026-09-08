@@ -566,7 +566,7 @@
       0 0 9px -1px color-mix(in srgb, var(--ch-accent, #3ab6ff) 70%, transparent),
       0 4px 6px -2px rgba(0,0,0,0.4);
     position: relative;
-    cursor: ns-resize; touch-action: pan-y pinch-zoom;
+    cursor: ns-resize; touch-action: none;
   }
   .knob::before {
     content: ''; position: absolute; inset: 4px; border-radius: 50%;
@@ -600,7 +600,7 @@
       0 0 7px -1px color-mix(in srgb, var(--ch-accent, #3ab6ff) 65%, transparent),
       inset 0 0 0 4px rgba(20,21,23,0.55);
     position: relative;
-    cursor: ns-resize; touch-action: pan-y pinch-zoom;
+    cursor: ns-resize; touch-action: none;
   }
   .eq-row .knob-xs::before {
     content: ''; position: absolute; top: -3px; left: 50%; width: 1.5px; height: 3px;
@@ -639,7 +639,7 @@
     border-radius: 2px; position: relative;
     box-shadow: inset 0 0 4px rgba(0,0,0,0.9);
     border: 1px solid #000;
-    cursor: ns-resize; touch-action: pan-y pinch-zoom;
+    cursor: ns-resize; touch-action: none;
   }
   .fader-slot::before {
     content: ''; position: absolute; left: 50%; top: 4px; bottom: 4px;
@@ -956,7 +956,7 @@
     background:
       repeating-conic-gradient(from 0deg, rgba(0,0,0,0.4) 0deg 2deg, rgba(255,255,255,0.05) 2deg 4deg),
       radial-gradient(circle at 38% 30%, #66696e, #1a1b1d 78%);
-    border: 1px solid #000; cursor: ns-resize; touch-action: pan-y pinch-zoom;
+    border: 1px solid #000; cursor: ns-resize; touch-action: none;
     box-shadow: 0 3px 5px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.15), 0 5px 8px -3px rgba(0,0,0,0.45);
     position: relative;
   }
@@ -1090,6 +1090,13 @@
     border-color: rgba(231,163,62,0.6);
   }
   .tp-play.active { color: var(--vu-green); box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 0 10px rgba(111,169,126,0.55), 0 0 22px rgba(111,169,126,0.25); border-color: rgba(111,169,126,0.6); }
+  .tp-play {
+    width: 46px; height: 46px;
+    color: var(--vu-green);
+    border-color: rgba(111,169,126,0.6);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 0 8px rgba(111,169,126,0.4), 0 0 16px rgba(111,169,126,0.18);
+  }
+  .tp-play:hover { color: var(--vu-green); box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 0 12px rgba(111,169,126,0.6), 0 0 24px rgba(111,169,126,0.3); }
   .tp-source {
     font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase;
     color: rgba(216,220,226,0.5); margin-left: auto; padding-right: 0.4rem;
@@ -1392,6 +1399,18 @@
               <button type="button" class="screen-tab active" data-view="waves">WAVES</button>
               <button type="button" class="screen-tab" data-view="stems" id="screenStemsTab">MY STEMS <span id="screenCount">(0)</span></button>
             </span>
+          </div>
+          <div class="transport" role="group" aria-label="Playback transport">
+            <button type="button" class="tp-btn tp-play" id="playBtn" title="Play" aria-label="Play">
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><polygon points="7,5 20,12 7,19" fill="currentColor"/></svg>
+            </button>
+            <button type="button" class="tp-btn tp-pause" id="pauseBtn" title="Pause" aria-label="Pause">
+              <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="6" y="5" width="4" height="14" fill="currentColor"/><rect x="14" y="5" width="4" height="14" fill="currentColor"/></svg>
+            </button>
+            <button type="button" class="tp-btn tp-stop" id="stopBtn" title="Stop" aria-label="Stop">
+              <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><rect x="5" y="5" width="14" height="14" fill="currentColor"/></svg>
+            </button>
+            <span class="tp-source mono" id="previewLabel">no track loaded</span>
           </div>
           <div class="waveform-rows" id="waveformRows">
             <div class="wave-row" data-stem="vocals"><span class="wave-row-label">VOCALS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="add-marker-btn" data-stem="vocals" title="Add a cue marker here">+</button></div>
@@ -1722,19 +1741,6 @@
       </div>
 
       <div class="wood-trim"></div>
-
-      <div class="transport" role="group" aria-label="Playback transport">
-        <button type="button" class="tp-btn tp-play" id="playBtn" title="Play" aria-label="Play">
-          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><polygon points="7,5 20,12 7,19" fill="currentColor"/></svg>
-        </button>
-        <button type="button" class="tp-btn tp-pause" id="pauseBtn" title="Pause" aria-label="Pause">
-          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="6" y="5" width="4" height="14" fill="currentColor"/><rect x="14" y="5" width="4" height="14" fill="currentColor"/></svg>
-        </button>
-        <button type="button" class="tp-btn tp-stop" id="stopBtn" title="Stop" aria-label="Stop">
-          <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><rect x="5" y="5" width="14" height="14" fill="currentColor"/></svg>
-        </button>
-        <span class="tp-source mono" id="previewLabel">no track loaded</span>
-      </div>
 
       <div class="drop-zone" id="dropZone">
         <span id="dropZoneLabel">Drop an MP3 or WAV here, or <strong>click to browse</strong></span>
