@@ -2103,6 +2103,26 @@ function drawScope(dataArray) {
   scopeCtx.shadowBlur = 0;
 }
 
+// Runs continuously regardless of transport state — so the scope is never
+// a dead black circle. Uses real analyser data while audio is playing;
+// otherwise falls back to a slow idle pulse purely for visual presence.
+let scopeIdleT = 0;
+const scopeIdleArray = new Uint8Array(128);
+function scopeLoop() {
+  if (masterAnalyser && transportState === 'playing') {
+    masterAnalyser.getByteTimeDomainData(masterDataArray);
+    drawScope(masterDataArray);
+  } else {
+    scopeIdleT += 0.02;
+    for (let i = 0; i < scopeIdleArray.length; i++) {
+      const wobble = Math.sin(scopeIdleT + i * 0.35) * 6;
+      scopeIdleArray[i] = 128 + wobble;
+    }
+    drawScope(scopeIdleArray);
+  }
+  requestAnimationFrame(scopeLoop);
+}
+
 function connectAnalysers() {
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   if (window.Tone && Tone.setContext) {
@@ -2286,7 +2306,6 @@ function updateFaders() {
       const segs = col.querySelectorAll('.meter-seg');
       segs.forEach((seg, i) => seg.classList.toggle('lit', i < lit));
     });
-    drawScope(masterDataArray);
   }
 
   updatePlayheadPosition();
@@ -3100,6 +3119,7 @@ function renderAllStemMarkers() {
 
 document.addEventListener('DOMContentLoaded', () => {
   initScope();
+  requestAnimationFrame(scopeLoop);
   document.getElementById('playBtn')?.addEventListener('click', playPreview);
   document.getElementById('pauseBtn')?.addEventListener('click', pausePreview);
   document.getElementById('stopBtn')?.addEventListener('click', stopPreview);
