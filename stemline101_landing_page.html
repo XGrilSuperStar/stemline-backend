@@ -1389,10 +1389,11 @@
     <div class="eyebrow"><span class="cat-no">STM-001</span> 6-CHANNEL DECONSTRUCTION UNIT</div>
     <h1 class="stencil">Unmix any song<br>into its stems.<br><span class="accent">Mix them with any other.</span></h1>
     <p class="sub">Split any track into clean vocals, drums, bass, and more — then pull in stems from other songs and blend them together on one mixer. Great for DJing.</p>
-    <div class="hero-ctas">
-      <a class="btn-primary" href="#drop">Split a song free</a>
-      <a class="btn-ghost" href="#how">See how it works</a>
+    <div class="drop-zone" id="dropZone">
+      <span id="dropZoneLabel">Drop an MP3 or WAV here, or <strong>click to browse</strong></span>
+      <input type="file" id="fileInput" accept=".mp3,.wav,.m4a,.flac" style="display:none;">
     </div>
+    <div id="uploadStatus" class="mono" style="margin-top:0.6rem;font-size:0.72rem;color:#6B7078;display:none;"></div>
   </div>
 
   <div class="studio-room" id="drop">
@@ -1754,12 +1755,6 @@
       </div>
 
       <div class="wood-trim"></div>
-
-      <div class="drop-zone" id="dropZone">
-        <span id="dropZoneLabel">Drop an MP3 or WAV here, or <strong>click to browse</strong></span>
-        <input type="file" id="fileInput" accept=".mp3,.wav,.m4a,.flac" style="display:none;">
-      </div>
-      <div id="uploadStatus" class="mono" style="margin-top:0.6rem;font-size:0.72rem;color:#6B7078;display:none;"></div>
     </div>
   </div>
 </section>
