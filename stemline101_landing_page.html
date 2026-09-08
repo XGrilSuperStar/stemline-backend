@@ -1944,9 +1944,25 @@ function tempoInducedSemitonesFor(name) {
 }
 function applyKeyShift() {
   Object.entries(stemNodes).forEach(([name, node]) => {
-    if (!node.pitchShift) return;
+    if (!node.pitchShift || !node.gainNode) return;
     const compensate = keyLockOn ? -tempoInducedSemitonesFor(name) : 0;
-    node.pitchShift.pitch = keySemitones + compensate;
+    const totalShift = keySemitones + compensate;
+    node.pitchShift.pitch = totalShift;
+
+    // Only route audio through the (expensive) pitch node when a real
+    // shift is requested. At zero shift, use the direct bypass connection
+    // instead — this is what fixes channels going silent when multiple
+    // PitchShift nodes were all active simultaneously.
+    const needsPitch = Math.abs(totalShift) > 0.001;
+    if (needsPitch && !node._pitchConnectedToGain) {
+      try { node.eqHigh.disconnect(node.gainNode); } catch (e) {}
+      Tone.connect(node.pitchShift, node.gainNode);
+      node._pitchConnectedToGain = true;
+    } else if (!needsPitch && node._pitchConnectedToGain) {
+      try { node.pitchShift.disconnect(node.gainNode); } catch (e) {}
+      node.eqHigh.connect(node.gainNode);
+      node._pitchConnectedToGain = false;
+    }
   });
 }
 
@@ -2166,27 +2182,34 @@ function connectAnalysers() {
     const analyser = audioCtx.createAnalyser();
     analyser.fftSize = 256;
 
+    // PitchShift nodes are CPU-heavy (continuous grain processing even at
+    // zero shift). Running 6 at once was overloading the audio graph and
+    // causing one or more channels to silently stop passing audio. Fix:
+    // create the node but bypass it with a direct connection by default;
+    // only route through it when a real key shift is active.
     let pitchShift = null;
     let pitchAvailable = false;
     if (window.Tone && Tone.PitchShift) {
       try {
-        pitchShift = new Tone.PitchShift({ pitch: keySemitones, windowSize: 0.1 });
+        pitchShift = new Tone.PitchShift({ pitch: 0, windowSize: 0.1 });
         pitchAvailable = true;
       } catch (e) {
         console.warn('PitchShift unavailable, falling back to direct connection', e);
       }
     }
 
-    // Chain: (source attached at play time) → trimNode → EQ → [pitch?] → gain → analyser → cross → master
+    // Chain: (source attached at play time) → trimNode → EQ → gain (direct,
+    // always audible) → analyser → cross → master. Pitch path is wired in
+    // parallel and only connected to gainNode by applyKeyShift() when a
+    // real shift is requested, to keep idle channels cheap and reliable.
     trimNode.connect(eqLow);
     eqLow.connect(eqMid);
     eqMid.connect(eqHigh);
+    eqHigh.connect(gainNode);
     if (pitchAvailable) {
       Tone.connect(eqHigh, pitchShift);
-      Tone.connect(pitchShift, gainNode);
-    } else {
-      eqHigh.connect(gainNode);
     }
+    node._pitchConnectedToGain = false;
     gainNode.connect(analyser);
     analyser.connect(crossNode);
     crossNode.connect(masterGain);
