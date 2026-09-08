@@ -1068,20 +1068,24 @@
 
   .drop-zone {
     margin-top: 1.3rem;
-    background: linear-gradient(180deg, rgba(184,86,46,0.16) 0%, #101113 100%);
-    border: 1px solid var(--ember);
+    background: linear-gradient(180deg, rgba(60,253,224,0.16) 0%, #17191c 100%);
+    border: 1.5px solid var(--vu-teal, #3CFDE0);
     border-radius: 3px;
     padding: 1.2rem;
     text-align: center;
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.78rem;
-    color: rgba(237,227,206,0.7);
-    transition: border-color 0.2s, background 0.2s;
+    color: rgba(237,227,206,0.92);
+    transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
     cursor: pointer;
-    box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.5), 0 0 16px rgba(60,253,224,0.18);
   }
-  .drop-zone:hover { border-color: var(--chrome); }
-  .drop-zone strong { color: var(--chrome); font-weight: 700; }
+  .drop-zone:hover {
+    border-color: #fff;
+    background: linear-gradient(180deg, rgba(60,253,224,0.26) 0%, #17191c 100%);
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.5), 0 0 22px rgba(60,253,224,0.3);
+  }
+  .drop-zone strong { color: #fff; font-weight: 700; }
 
   /* ===== Transport bar: hardware-style Play / Pause / Stop ===== */
   .transport {
