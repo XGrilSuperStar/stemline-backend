@@ -253,13 +253,19 @@
     flex: 1; width: 100%; height: 24px; overflow: hidden; position: relative;
   }
   .add-marker-btn {
-    flex-shrink: 0; width: 16px; height: 16px; line-height: 14px; padding: 0;
-    font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; font-weight: 700;
+    flex-shrink: 0; width: auto; height: 16px; line-height: 14px; padding: 0 5px;
+    font-family: 'JetBrains Mono', monospace; font-size: 0.55rem; font-weight: 700;
+    letter-spacing: 0.02em;
     color: var(--vu-teal, #3CFDE0); background: rgba(60,253,224,0.08);
     border: 1px solid rgba(60,253,224,0.4); border-radius: 3px; cursor: pointer;
+    white-space: nowrap;
   }
   .add-marker-btn:hover { background: rgba(60,253,224,0.25); }
   .add-marker-btn:active { background: rgba(60,253,224,0.4); }
+  .wave-hint {
+    font-size: 0.58rem; color: var(--chrome-dim); text-transform: uppercase;
+    letter-spacing: 0.02em; margin-bottom: 0.35rem; opacity: 0.75;
+  }
   .wave-canvas {
     width: 100%; height: 24px; display: block;
     cursor: grab;
@@ -1444,13 +1450,14 @@
             </button>
             <span class="tp-source mono" id="previewLabel">no track loaded</span>
           </div>
+          <div class="wave-hint mono" id="waveHint">click waveform to seek &middot; drag to nudge that stem &middot; <span style="color:var(--vu-teal,#3CFDE0);">+CUE</span> drops a start marker</div>
           <div class="waveform-rows" id="waveformRows">
-            <div class="wave-row" data-stem="vocals"><span class="wave-row-label">VOCALS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="add-marker-btn" data-stem="vocals" title="Add a cue marker here">+</button></div>
-            <div class="wave-row" data-stem="drums"><span class="wave-row-label">DRUMS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="add-marker-btn" data-stem="drums" title="Add a cue marker here">+</button></div>
-            <div class="wave-row" data-stem="bass"><span class="wave-row-label">BASS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="add-marker-btn" data-stem="bass" title="Add a cue marker here">+</button></div>
-            <div class="wave-row" data-stem="guitar"><span class="wave-row-label">GUITAR</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="add-marker-btn" data-stem="guitar" title="Add a cue marker here">+</button></div>
-            <div class="wave-row" data-stem="piano"><span class="wave-row-label">SYNTH</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="add-marker-btn" data-stem="piano" title="Add a cue marker here">+</button></div>
-            <div class="wave-row" data-stem="other"><span class="wave-row-label">OTHER</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="add-marker-btn" data-stem="other" title="Add a cue marker here">+</button></div>
+            <div class="wave-row" data-stem="vocals"><span class="wave-row-label">VOCALS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="add-marker-btn" data-stem="vocals" title="Add a cue marker here">+CUE</button></div>
+            <div class="wave-row" data-stem="drums"><span class="wave-row-label">DRUMS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="add-marker-btn" data-stem="drums" title="Add a cue marker here">+CUE</button></div>
+            <div class="wave-row" data-stem="bass"><span class="wave-row-label">BASS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="add-marker-btn" data-stem="bass" title="Add a cue marker here">+CUE</button></div>
+            <div class="wave-row" data-stem="guitar"><span class="wave-row-label">GUITAR</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="add-marker-btn" data-stem="guitar" title="Add a cue marker here">+CUE</button></div>
+            <div class="wave-row" data-stem="piano"><span class="wave-row-label">SYNTH</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="add-marker-btn" data-stem="piano" title="Add a cue marker here">+CUE</button></div>
+            <div class="wave-row" data-stem="other"><span class="wave-row-label">OTHER</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="add-marker-btn" data-stem="other" title="Add a cue marker here">+CUE</button></div>
             <div class="wave-playhead" id="wavePlayhead"></div>
           </div>
           <div class="screen-browse" id="screenBrowse" style="display:none;">
