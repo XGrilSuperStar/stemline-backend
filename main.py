@@ -885,6 +885,72 @@ This document is a general template and not a substitute for legal advice.
 @app.get("/terms", response_class=HTMLResponse)
 async def terms_of_service():
     return TERMS_HTML
+
+PRIVACY_HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Privacy Policy — Stemline101</title>
+<style>
+  body { background:#111; color:#eee; font-family: system-ui, sans-serif;
+         max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem 4rem; line-height: 1.6; }
+  h1 { color: #f0a500; }
+  h2 { color: #f0a500; margin-top: 2rem; }
+  a { color: #f0a500; }
+</style>
+</head>
+<body>
+<h1>Stemline101 Privacy Policy</h1>
+<p><em>Last Updated: [Date]</em></p>
+
+<h2>1. Information We Collect</h2>
+<p>When you use Stemline101, we may collect:</p>
+<ul>
+  <li>Account information (email, username) if you create an account</li>
+  <li>Audio files you upload for stem separation</li>
+  <li>Basic usage data (pages visited, features used) for improving the Service</li>
+</ul>
+
+<h2>2. How We Use Your Information</h2>
+<p>We use the information above to operate the Service: processing your audio uploads, storing stems you choose to save, authenticating your account, and maintaining and improving the Service.</p>
+
+<h2>3. Uploaded Audio</h2>
+<p>Audio you upload is processed to generate separated stems. Files you explicitly save are stored under your account; files you do not save may be removed automatically after processing. We do not claim ownership of your uploaded audio, and you remain responsible for having the rights to any audio you upload (see our Terms of Service).</p>
+
+<h2>4. Advertising</h2>
+<p>Stemline101 may display ads served by third-party providers, such as Google AdSense. These providers may use cookies or similar technologies to serve relevant ads. You can learn more about Google's use of data at <a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener">policies.google.com/technologies/partner-sites</a>.</p>
+
+<h2>5. Data Sharing</h2>
+<p>We do not sell your personal information. We may share data with service providers who help us operate Stemline101 (such as hosting and analytics providers), and as required by law.</p>
+
+<h2>6. Data Retention</h2>
+<p>We retain account information and saved stems for as long as your account is active. You may request deletion of your account and associated data at any time.</p>
+
+<h2>7. Your Choices</h2>
+<p>You may delete saved stems or your account through the Service, or by contacting us directly.</p>
+
+<h2>8. Children's Privacy</h2>
+<p>Stemline101 is not directed at children under 13, and we do not knowingly collect personal information from children under 13.</p>
+
+<h2>9. Changes to This Policy</h2>
+<p>Stemline101 may update this Privacy Policy at any time. Continued use of the Service after changes constitutes acceptance of the updated policy.</p>
+
+<h2>10. Contact</h2>
+<p>Questions about this Privacy Policy can be directed to: [contact email]</p>
+
+<p style="margin-top:3rem; opacity:0.6; font-size:0.9rem;">
+This document is a general template and not a substitute for legal advice.
+</p>
+</body>
+</html>
+"""
+
+
+@app.get("/privacy", response_class=HTMLResponse)
+async def privacy_policy():
+    return PRIVACY_HTML
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8080)))
 
