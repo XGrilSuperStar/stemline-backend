@@ -712,47 +712,6 @@
     box-shadow: 0 0 7px var(--vu-amber);
   }
 
-  /* ===== CROSSFADER ===== */
-  .crossfader-row {
-    margin-top: 0.9rem; display: flex; flex-direction: column; align-items: center; gap: 0.4rem;
-  }
-  .crossfader-labels {
-    display: flex; justify-content: space-between; width: 200px;
-    font-family: 'JetBrains Mono', monospace; font-size: 0.58rem;
-    color: rgba(226,230,236,0.5); letter-spacing: 0.08em;
-  }
-  .crossfader-track {
-    position: relative; width: 200px; height: 18px;
-    background: #101113; border-radius: 3px; border: 1px solid #000;
-    box-shadow: inset 0 0 5px rgba(0,0,0,0.9);
-    cursor: ew-resize; touch-action: pan-y pinch-zoom;
-  }
-  .crossfader-track::before {
-    content: ''; position: absolute; top: 50%; left: 6px; right: 6px; height: 1px;
-    background: rgba(255,255,255,0.06); transform: translateY(-50%);
-  }
-  .crossfader-cap {
-    position: absolute; top: 50%; left: 50%; width: 13px; height: 24px;
-    pointer-events: none; /* let drags land on the track underneath */
-    background:
-      linear-gradient(90deg, rgba(255,255,255,0.5) 0%, transparent 12%, transparent 88%, rgba(0,0,0,0.35) 100%),
-      repeating-linear-gradient(90deg, rgba(0,0,0,0.06) 0px, transparent 1px, transparent 2px),
-      linear-gradient(90deg, #ececec, #b7b9bc 45%, #8b8e93 100%);
-    border-radius: 2px; transform: translate(-50%, -50%);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.25);
-    transition: left 0.06s linear;
-  }
-  .crossfader-cap::before {
-    content: ''; position: absolute; top: 3px; bottom: 3px; left: 50%;
-    width: 1px; background: rgba(0,0,0,0.4); transform: translateX(-50%);
-    box-shadow: 1px 0 0 rgba(255,255,255,0.3);
-  }
-  .crossfader-cap::after {
-    content: ''; position: absolute; left: 50%; top: 2.5px; width: 2px; height: 2px;
-    border-radius: 50%; background: rgba(0,0,0,0.45); transform: translateX(-50%);
-    box-shadow: 0 18.5px 0 rgba(0,0,0,0.45);
-  }
-
   /* ===== MASTER STRIP ===== */
   .mixer-row { display: flex; gap: 7px; align-items: stretch; overflow-x: auto; }
   .channels { flex: 1; }
@@ -1013,7 +972,6 @@
     .ch-save { padding: 0 3px; }
     .master-strip { width: 100%; flex-direction: row; flex-wrap: wrap; justify-content: center; align-items: center; gap: 1rem 1.5rem; order: 99; }
     .master-strip .name { width: 100%; text-align: center; }
-    .crossfader-track, .crossfader-labels { width: 100%; max-width: 320px; }
   }
 
   /* ===== AD SLOTS ===== */
@@ -1733,7 +1691,7 @@ const STEM_SAMPLES = {};
 
 
 let audioCtx = null;
-let stemNodes = {}; // { vocals: {gainNode, trimNode, eqLow, eqMid, eqHigh, crossNode, analyser, volPct, trimDb, muted}, ... }
+let stemNodes = {}; // { vocals: {gainNode, trimNode, eqLow, eqMid, eqHigh, analyser, volPct, trimDb, muted}, ... }
 let stemBuffers = {}; // AudioBuffer per stem — created once when audioCtx is ready
 let activeSources = {}; // currently-playing AudioBufferSourceNode per stem (or null)
 let masterGain = null;
@@ -1754,7 +1712,6 @@ let tempoRatio = 1;
 let stemAutoStretch = { vocals: 1, drums: 1, bass: 1, guitar: 1, piano: 1, other: 1 };
 const detectedBpmByStemId = {};
 let masterVolPct = 80;
-let crossPos = 50; // 0 = full A, 100 = full B
 let keySemitones = 0; // -12 .. +12, manual key shift
 let keyLockOn = true; // when true, Tempo changes speed without changing pitch
 
@@ -1879,7 +1836,6 @@ function updateAllChannelGains() {
     n.gainNode.gain.value = silent ? 0 : (n.volPct / 100);
   });
 }
-const GROUP_A = ['vocals', 'drums', 'bass'];
 const dbToGain = db => Math.pow(10, db / 20);
 
 function initEngine() {
@@ -1892,12 +1848,6 @@ function initEngine() {
       existing
     );
   });
-}
-
-function crossGainFor(name, pos) {
-  const inA = GROUP_A.includes(name);
-  if (inA) return pos <= 50 ? 1 : Math.max(0, (100 - pos) / 50);
-  return pos >= 50 ? 1 : Math.max(0, pos / 50);
 }
 
 // Real oscilloscope trace of the master output, drawn from the same
@@ -2025,9 +1975,6 @@ function connectAnalysers() {
     const gainNode = audioCtx.createGain();
     gainNode.gain.value = node.muted ? 0 : node.volPct / 100;
 
-    const crossNode = audioCtx.createGain();
-    crossNode.gain.value = crossGainFor(name, crossPos);
-
     const analyser = audioCtx.createAnalyser();
     analyser.fftSize = 256;
 
@@ -2048,7 +1995,7 @@ function connectAnalysers() {
     }
 
     // Chain: (source attached at play time) → trimNode → EQ → gain (direct,
-    // always audible) → analyser → cross → master. Pitch path is wired in
+    // always audible) → analyser → master. Pitch path is wired in
     // parallel and only connected to gainNode by applyKeyShift() when a
     // real shift is requested, to keep idle channels cheap and reliable.
     trimNode.connect(eqLow);
@@ -2060,15 +2007,13 @@ function connectAnalysers() {
     }
     node._pitchConnectedToGain = false;
     gainNode.connect(analyser);
-    analyser.connect(crossNode);
-    crossNode.connect(masterGain);
+    analyser.connect(masterGain);
 
     node.trimNode = trimNode;
     node.eqLow = eqLow;
     node.eqMid = eqMid;
     node.eqHigh = eqHigh;
     node.gainNode = gainNode;
-    node.crossNode = crossNode;
     node.analyser = analyser;
     node.pitchShift = pitchShift;
     node.dataArray = new Uint8Array(analyser.frequencyBinCount);
@@ -2709,30 +2654,6 @@ function setupFader(slotEl, capEl, { initial, onChange }) {
   return { set: apply, get: () => pct };
 }
 
-/* ===== Draggable horizontal crossfader: 0 (A) - 100 (B) ===== */
-function setupCrossfader(trackEl, capEl, { initial, onChange }) {
-  let pos = initial;
-  const apply = p => {
-    pos = Math.min(100, Math.max(0, p));
-    capEl.style.left = pos + '%';
-    onChange(pos);
-  };
-  apply(initial);
-
-  const posToPct = clientX => {
-    const r = trackEl.getBoundingClientRect();
-    return ((clientX - r.left) / r.width) * 100;
-  };
-  let dragging = false;
-  onDrag(trackEl, {
-    onStart: e => { dragging = true; apply(posToPct(e.clientX)); },
-    onMove:  e => { if (dragging) apply(posToPct(e.clientX)); },
-    onEnd:   () => { dragging = false; }
-  });
-
-  return { set: apply, get: () => pos };
-}
-
 const WAVE_COLORS = { vocals: '#ff5540', drums: '#ffa022', bass: '#2fe08a', guitar: '#9b6dff', piano: '#ff5cb0', other: '#3ab6ff' };
 
 function drawWaveform(canvas, audioBuffer, color) {
@@ -3344,22 +3265,6 @@ document.addEventListener('DOMContentLoaded', () => {
         masterVolReadout.textContent = rounded + '%';
         masterVolPct = rounded;
         if (masterGain) masterGain.gain.value = rounded / 100;
-      }
-    });
-  }
-
-  // Crossfader: blends A (vocals/drums/bass) against B (guitar/piano/other)
-  const crossTrack = document.getElementById('crossfaderTrack');
-  const crossCap = document.getElementById('crossfaderCap');
-  if (crossTrack) {
-    setupCrossfader(crossTrack, crossCap, {
-      initial: 50,
-      onChange: pos => {
-        crossPos = pos;
-        Object.keys(stemNodes).forEach(name => {
-          const n = stemNodes[name];
-          if (n.crossNode) n.crossNode.gain.value = crossGainFor(name, pos);
-        });
       }
     });
   }
