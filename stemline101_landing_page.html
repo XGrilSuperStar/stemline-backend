@@ -1959,7 +1959,12 @@ function applyKeyShift() {
     // shift is requested. At zero shift, use the direct bypass connection
     // instead — this is what fixes channels going silent when multiple
     // PitchShift nodes were all active simultaneously.
-    const needsPitch = Math.abs(totalShift) > 0.001;
+    // Auto-tempo-match on loaded real stems means near-every channel gets a
+    // tiny nonzero compensation — engaging PitchShift (CPU-heavy) on most/all
+    // channels at once, which is what was silently dropping audio. A quarter-
+    // semitone is below what's audible, so skip the pitch node for anything
+    // under that instead of any nonzero shift.
+    const needsPitch = Math.abs(totalShift) > 0.25;
     if (needsPitch && !node._pitchConnectedToGain) {
       try { node.eqHigh.disconnect(node.gainNode); } catch (e) {}
       Tone.connect(node.pitchShift, node.gainNode);
@@ -2204,7 +2209,7 @@ function connectAnalysers() {
     let pitchAvailable = false;
     if (window.Tone && Tone.PitchShift) {
       try {
-        pitchShift = new Tone.PitchShift({ pitch: 0, windowSize: 0.1 });
+        pitchShift = new Tone.PitchShift({ pitch: 0, windowSize: 0.18 });
         pitchAvailable = true;
       } catch (e) {
         console.warn('PitchShift unavailable, falling back to direct connection', e);
