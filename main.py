@@ -408,12 +408,21 @@ def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_db)):
     logger.info(f"Password reset successfully for user {user.id}")
     return {"message": "Password updated. You can now log in with your new password."}
 
+# Which separation engine to run. "demucs" (default, current production
+# engine) or "bsroformer" (BS-RoFormer SW — better SDR, especially bass,
+# but untested for real-world timing on Railway's CPU-only dyno). Set via
+# Railway env var SEPARATION_ENGINE once BS-RoFormer's actual speed here
+# has been measured — don't flip the default blind.
+SEPARATION_ENGINE = os.getenv("SEPARATION_ENGINE", "demucs")
+
+
 def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str, filename: str, stem_count: str = "6"):
     """
-    Runs Demucs and finishes the split for an already-created Stem row.
+    Runs the separation engine (Demucs or BS-RoFormer, see SEPARATION_ENGINE)
+    and finishes the split for an already-created Stem row.
     Runs in a background thread so the HTTP request that kicked it off can
     return immediately instead of holding the connection open for the
-    full 3+ minutes Demucs takes — that long open connection was getting
+    full 3+ minutes separation takes — that long open connection was getting
     killed by a proxy/browser network timeout before the response came
     back, even though the split itself succeeded on the backend every time.
     Opens its own DB session since the request-scoped one is gone by now.
@@ -423,57 +432,85 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
         output_dir = os.path.join(upload_dir, "output")
         os.makedirs(output_dir, exist_ok=True)
 
-        # -j splits the track into chunks and processes them across CPU cores
-        # in parallel instead of one long single-threaded pass. More jobs
-        # multiplies memory use, and os.cpu_count() in a container often
-        # reports the host's full core count rather than what Railway
-        # actually allocates to this service — so default conservatively to
-        # 2 and let DEMUCS_JOBS override once you've confirmed how much
-        # headroom the Hobby plan actually gives this service.
-        jobs = int(os.getenv("DEMUCS_JOBS", "2"))
+        if SEPARATION_ENGINE == "bsroformer":
+            # BS-RoFormer SW: transformer-based 6-stem model (vocals, drums,
+            # bass, guitar, piano, other), better SDR than Demucs — biggest
+            # gain is on bass. Auto-downloads its checkpoint (~700MB) into
+            # the container's cache on first run, which will make the very
+            # first split after a deploy noticeably slower than the rest.
+            cmd = [
+                "bs-roformer-infer",
+                "--input_folder", os.path.dirname(file_path),
+                "--store_dir", output_dir,
+            ]
+            logger.info(f"[job {request_id}] Running: {' '.join(cmd)}")
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=900
+            )
+            logger.info(f"[job {request_id}] bs-roformer-infer stdout: {result.stdout}")
+            logger.info(f"[job {request_id}] bs-roformer-infer stderr: {result.stderr}")
+            logger.info(f"[job {request_id}] bs-roformer-infer return code: {result.returncode}")
+            if result.returncode != 0:
+                raise Exception(f"BS-RoFormer processing failed: {result.stderr}")
+        else:
+            # -j splits the track into chunks and processes them across CPU
+            # cores in parallel instead of one long single-threaded pass.
+            # More jobs multiplies memory use, and os.cpu_count() in a
+            # container often reports the host's full core count rather
+            # than what Railway actually allocates to this service — so
+            # default conservatively to 2 and let DEMUCS_JOBS override once
+            # you've confirmed how much headroom the Hobby plan gives this
+            # service.
+            jobs = int(os.getenv("DEMUCS_JOBS", "2"))
 
-        # --shifts runs the model N times on randomly time-shifted copies of
-        # the input and averages the results. This is the main quality/bleed
-        # lever Demucs exposes: more shifts = less bleed between stems and
-        # cleaner isolation, at the cost of N times the processing time.
-        # Default 1 = no shifting (what was running before). 2 roughly
-        # doubles split time but is the standard quality tradeoff people use
-        # to cut down bleed without it getting too slow to be usable.
-        shifts = int(os.getenv("DEMUCS_SHIFTS", "2"))
+            # --shifts runs the model N times on randomly time-shifted
+            # copies of the input and averages the results. This is the
+            # main quality/bleed lever Demucs exposes: more shifts = less
+            # bleed between stems and cleaner isolation, at the cost of N
+            # times the processing time. Default 1 = no shifting (what was
+            # running before). 2 roughly doubles split time but is the
+            # standard quality tradeoff people use to cut down bleed
+            # without it getting too slow to be usable.
+            shifts = int(os.getenv("DEMUCS_SHIFTS", "2"))
 
-        # --overlap controls how much adjacent processing chunks overlap.
-        # Higher overlap smooths the seams between chunks (less "stitching"
-        # artifacts contributing to bleed) at a smaller speed cost than
-        # shifts. Demucs' own default is 0.25; bumping to 0.5 trades a bit
-        # more compute for real reduction in edge artifacts.
-        overlap = os.getenv("DEMUCS_OVERLAP", "0.75")
+            # --overlap controls how much adjacent processing chunks
+            # overlap. Higher overlap smooths the seams between chunks
+            # (less "stitching" artifacts contributing to bleed) at a
+            # smaller speed cost than shifts. Demucs' own default is 0.25;
+            # bumping to 0.5 trades a bit more compute for real reduction
+            # in edge artifacts.
+            overlap = os.getenv("DEMUCS_OVERLAP", "0.75")
 
-        # Mobile uploads request the 4-stem model (vocals/drums/bass/other) —
-        # faster and lighter than the 6-stem model, which also splits out
-        # guitar/piano. Any value other than "4" falls back to 6-stem.
-        model_name = "htdemucs_ft" if stem_count == "4" else "htdemucs_6s"
+            # Mobile uploads request the 4-stem model (vocals/drums/bass/
+            # other) — faster and lighter than the 6-stem model, which also
+            # splits out guitar/piano. Any value other than "4" falls back
+            # to 6-stem.
+            model_name = "htdemucs_ft" if stem_count == "4" else "htdemucs_6s"
 
-        cmd = [
-            "demucs", "-n", model_name,
-            "-j", str(jobs),
-            "--shifts", str(shifts),
-            "--overlap", overlap,
-            "-o", output_dir, file_path,
-        ]
-        logger.info(f"[job {request_id}] Running: {' '.join(cmd)}")
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=600
-        )
+            cmd = [
+                "demucs", "-n", model_name,
+                "-j", str(jobs),
+                "--shifts", str(shifts),
+                "--overlap", overlap,
+                "-o", output_dir, file_path,
+            ]
+            logger.info(f"[job {request_id}] Running: {' '.join(cmd)}")
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=600
+            )
 
-        logger.info(f"[job {request_id}] Demucs stdout: {result.stdout}")
-        logger.info(f"[job {request_id}] Demucs stderr: {result.stderr}")
-        logger.info(f"[job {request_id}] Demucs return code: {result.returncode}")
+            logger.info(f"[job {request_id}] Demucs stdout: {result.stdout}")
+            logger.info(f"[job {request_id}] Demucs stderr: {result.stderr}")
+            logger.info(f"[job {request_id}] Demucs return code: {result.returncode}")
 
-        if result.returncode != 0:
-            raise Exception(f"Demucs processing failed: {result.stderr}")
+            if result.returncode != 0:
+                raise Exception(f"Demucs processing failed: {result.stderr}")
 
         # Find output stems
         stem_dir = None

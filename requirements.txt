@@ -3,6 +3,7 @@ uvicorn
 python-multipart
 demucs
 torchcodec
+bs-roformer-infer
 sqlalchemy
 psycopg2-binary
 bcrypt==4.2.0
