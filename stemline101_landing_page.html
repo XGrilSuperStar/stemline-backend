@@ -1645,6 +1645,10 @@
         <input type="password" id="authPassword" placeholder="Password" required minlength="8" autocomplete="new-password" style="width:100%;box-sizing:border-box;padding:0.65rem;padding-right:2.6rem;background:var(--void);border:1px solid var(--concrete-line);color:var(--chrome);font-family:inherit;font-size:0.8rem;">
         <button type="button" id="authPasswordToggle" aria-label="Show password" style="position:absolute;right:0.5rem;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--chrome-dim);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.65rem;letter-spacing:0.04em;">SHOW</button>
       </div>
+      <label id="authTermsWrap" style="display:none;align-items:flex-start;gap:0.5rem;margin-bottom:1.1rem;font-size:0.72rem;color:var(--chrome-dim);line-height:1.4;cursor:pointer;">
+        <input type="checkbox" id="authTermsCheck" style="margin-top:0.15rem;">
+        <span>I agree to the <a href="/terms" target="_blank" style="color:var(--ember);">Terms of Service</a> and confirm I have the rights to any content I upload.</span>
+      </label>
       <button type="submit" id="authSubmitBtn" class="btn-primary" style="width:100%;border:none;cursor:pointer;font-family:inherit;">Log in</button>
     </form>
     <div style="text-align:center;margin-top:1.1rem;font-size:0.75rem;color:var(--chrome-dim);">
@@ -3304,6 +3308,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const authForm = document.getElementById('authForm');
   const authEmail = document.getElementById('authEmail');
   const authUsername = document.getElementById('authUsername');
+  const authTermsWrap = document.getElementById('authTermsWrap');
+  const authTermsCheck = document.getElementById('authTermsCheck');
   const authPassword = document.getElementById('authPassword');
   const authPasswordToggle = document.getElementById('authPasswordToggle');
   const authSubmitBtn = document.getElementById('authSubmitBtn');
@@ -3371,6 +3377,8 @@ document.addEventListener('DOMContentLoaded', () => {
       authToggleLink.textContent = 'Log in';
       authUsername.style.display = 'block';
       authUsername.required = true;
+      authTermsWrap.style.display = 'flex';
+      authTermsCheck.required = true;
     } else {
       authModalTitle.textContent = 'Log in';
       authSubmitBtn.textContent = 'Log in';
@@ -3378,6 +3386,8 @@ document.addEventListener('DOMContentLoaded', () => {
       authToggleLink.textContent = 'Sign up';
       authUsername.style.display = 'none';
       authUsername.required = false;
+      authTermsWrap.style.display = 'none';
+      authTermsCheck.required = false;
     }
     authModal.style.display = 'flex';
   }
@@ -3513,6 +3523,11 @@ document.addEventListener('DOMContentLoaded', () => {
   authForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     authError.style.display = 'none';
+    if (authMode === 'signup' && !authTermsCheck.checked) {
+      authError.textContent = 'Please agree to the Terms of Service to continue.';
+      authError.style.display = 'block';
+      return;
+    }
     authSubmitBtn.disabled = true;
     authSubmitBtn.textContent = authMode === 'signup' ? 'Signing up…' : 'Logging in…';
     try {
