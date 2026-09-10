@@ -1178,15 +1178,12 @@
   </div>
     <div class="logo-text stencil">STEMLINE 101</div>
   </div>
-  <div class="links">
-    <a href="#how">How it works</a>
-  </div>
   <div id="navAuthButtons" style="display:flex;gap:0.75rem;align-items:center;">
     <button id="navLoginBtn" style="background:none;border:none;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.8rem;letter-spacing:0.02em;color:var(--chrome-dim);text-transform:uppercase;">Log in</button>
     <button id="navSignupBtn" class="nav-cta" style="border:none;cursor:pointer;">Sign up free</button>
   </div>
   <div id="navAccountGroup" style="display:none;gap:0.75rem;align-items:center;">
-    <button id="navMyStemsBtn" style="background:none;border:1px solid var(--concrete-line);border-radius:2px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.78rem;letter-spacing:0.02em;color:var(--chrome);text-transform:uppercase;padding:0.5rem 0.9rem;">Save stems</button>
+    <button id="navMyStemsBtn" style="display:none;">Save stems</button>
     <button id="navAccountBtn" class="nav-cta" style="border:none;cursor:pointer;">Log out</button>
   </div>
 </nav>
@@ -1206,6 +1203,41 @@
     <div style="color:var(--chrome-dim);font-size:0.8rem;">Loading…</div>
   </div>
 </div>
+
+<section class="section" id="how" style="padding-top:1.6rem;padding-bottom:1.6rem;">
+  <p style="color:var(--chrome);font-size:0.85rem;line-height:1.6;max-width:720px;margin:0 0 1rem;">
+    A stem is one isolated part of a song — just the vocals, just the drums, just the bass.
+    Stemline splits any song into its stems so you can mix like a DJ, or blend parts from
+    different songs into something new.
+  </p>
+  <div class="steps" style="grid-template-columns:repeat(5,1fr);gap:0.9rem;">
+    <div class="step">
+      <span class="num mono" style="font-size:0.7rem;">01 —</span>
+      <h3 style="font-size:0.85rem;margin-bottom:0.25rem;">Upload</h3>
+      <p style="font-size:0.75rem;">Any MP3 or WAV.</p>
+    </div>
+    <div class="step">
+      <span class="num mono" style="font-size:0.7rem;">02 —</span>
+      <h3 style="font-size:0.85rem;margin-bottom:0.25rem;">Splits into stems</h3>
+      <p style="font-size:0.75rem;">Vocals, drums, bass, and more.</p>
+    </div>
+    <div class="step">
+      <span class="num mono" style="font-size:0.7rem;">03 —</span>
+      <h3 style="font-size:0.85rem;margin-bottom:0.25rem;">Pick your parts</h3>
+      <p style="font-size:0.75rem;">Slider picks which part you want.</p>
+    </div>
+    <div class="step">
+      <span class="num mono" style="font-size:0.7rem;">04 —</span>
+      <h3 style="font-size:0.85rem;margin-bottom:0.25rem;">Mix on the board</h3>
+      <p style="font-size:0.75rem;">Blend parts from different songs, live.</p>
+    </div>
+    <div class="step">
+      <span class="num mono" style="font-size:0.7rem;">05 —</span>
+      <h3 style="font-size:0.85rem;margin-bottom:0.25rem;">Saved to library</h3>
+      <p style="font-size:0.75rem;">Reuse any stem anytime.</p>
+    </div>
+  </div>
+</section>
 
 <section class="hero">
   <div>
@@ -1632,45 +1664,6 @@
     </div>
   </div>
 </div>
-
-<section class="section" id="how">
-  <div class="section-head">
-    <div class="eyebrow">THE PROCESS</div>
-    <h2>Your Personal DJ Mixing Board</h2>
-    <p style="color:var(--chrome);font-size:1rem;line-height:1.7;max-width:640px;margin-top:1.2rem;">
-      A stem is one isolated part of a song — like just the vocals, just the drums, or just the bass.
-      Stemline splits any song into its stems so you can mix each part like a DJ: turning pieces up,
-      down, or off, or blending parts from different songs into something new.
-    </p>
-  </div>
-  <div class="steps" style="grid-template-columns:repeat(5,1fr);">
-    <div class="step">
-      <span class="num mono">01 —</span>
-      <h3>Upload your song</h3>
-      <p>Drop in one track or several. Any MP3 or WAV.</p>
-    </div>
-    <div class="step">
-      <span class="num mono">02 —</span>
-      <h3>It splits into stems</h3>
-      <p>The engine pulls out clean vocals, drums, bass, and more.</p>
-    </div>
-    <div class="step">
-      <span class="num mono">03 —</span>
-      <h3>Pick your parts</h3>
-      <p>Use the slider to choose exactly which part of the song you want.</p>
-    </div>
-    <div class="step">
-      <span class="num mono">04 —</span>
-      <h3>Mix on the board</h3>
-      <p>Blend the vocals from one track over the drums from another, live.</p>
-    </div>
-    <div class="step">
-      <span class="num mono">05 —</span>
-      <h3>Saved to your library</h3>
-      <p>Every stem is stored in My Stems, ready to reuse anytime.</p>
-    </div>
-  </div>
-</section>
 
 <footer>
   STEMLINE 101 — SPLIT THE MIX
