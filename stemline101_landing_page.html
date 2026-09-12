@@ -3705,19 +3705,24 @@ document.addEventListener('DOMContentLoaded', () => {
       if (typeof window.__reloadLibraries === 'function') window.__reloadLibraries();
       if (typeof loadScreenStems === 'function') loadScreenStems();
 
-      // Auto-load: drop all six split stems straight into their matching
-      // mixer channels so the person doesn't have to load each one by hand.
+      // Auto-load: drop split stems into their matching mixer channels so
+      // the person doesn't have to load each one by hand. Only fill
+      // channels that aren't already holding a stem from an earlier
+      // upload — otherwise a second song would silently overwrite a
+      // channel the person already picked from the first one.
       if (typeof window.__loadBackendStemToChannel === 'function') {
         const trackLabel = data.track_name || file.name;
+        const emptyChannels = CHANNEL_LIST.filter(chan => !currentStemMeta[chan]);
+        const channelsToLoad = emptyChannels.length > 0 ? emptyChannels : CHANNEL_LIST;
         const results = await Promise.all(
-          CHANNEL_LIST.map(chan => window.__loadBackendStemToChannel(chan, data.stem_id, trackLabel))
+          channelsToLoad.map(chan => window.__loadBackendStemToChannel(chan, data.stem_id, trackLabel))
         );
         const loadedCount = results.filter(Boolean).length;
         const previewLabelEl = document.getElementById('previewLabel');
         if (previewLabelEl && loadedCount > 0) previewLabelEl.textContent = trackLabel;
-        uploadStatus.innerHTML = loadedCount === 6
+        uploadStatus.innerHTML = loadedCount === channelsToLoad.length
           ? 'Done! Stems loaded into the mixer. <a href="' + dlUrl + '" style="color:var(--vu-amber);">Download</a>'
-          : 'Done, but only ' + loadedCount + '/6 stems loaded. <a href="' + dlUrl + '" style="color:var(--vu-amber);">Download</a>';
+          : 'Done, but only ' + loadedCount + '/' + channelsToLoad.length + ' stems loaded. <a href="' + dlUrl + '" style="color:var(--vu-amber);">Download</a>';
       } else {
         uploadStatus.innerHTML = 'Done! <a href="' + dlUrl + '" style="color:var(--vu-amber);">Download your stems</a>';
       }
