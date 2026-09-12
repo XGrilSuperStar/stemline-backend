@@ -2048,6 +2048,17 @@ function wrapOffset(offset, dur) {
   return ((offset % dur) + dur) % dur;
 }
 
+// The master timeline used to run on a fixed 6s window (LOOP_DUR) so stems
+// pulled from different songs would stay locked together. That also meant
+// every stem — including a normal single-song split — got cut off after 6
+// seconds instead of playing the whole track. This restores full-length
+// playback: the master runs as long as the longest loaded stem, falling
+// back to LOOP_DUR only when nothing real is loaded yet (e.g. demo tones).
+function getMasterDuration() {
+  const durs = Object.values(stemBuffers).filter(Boolean).map(b => b.duration);
+  return durs.length ? Math.max(...durs) : LOOP_DUR;
+}
+
 function startStem(name, masterPos) {
   // Stop any existing source for this stem first.
   stopStem(name);
@@ -2057,19 +2068,17 @@ function startStem(name, masterPos) {
   src.buffer = buffer;
   src.loop = true;
   src.playbackRate.value = tempoRatio * (stemAutoStretch[name] || 1);
-  // Loop every stem on the SAME 6s master window, not its own buffer.duration.
-  // Real backend stems are full-length songs (minutes long) — without this,
-  // each one loops at its own natural length instead of the shared window,
-  // so stems fall out of phase with each other a few seconds after starting.
+  // Loop each stem at its own actual length so a normal single-song split
+  // plays the whole track instead of cutting off after a few seconds.
   src.loopStart = 0;
-  src.loopEnd = Math.min(LOOP_DUR, buffer.duration);
+  src.loopEnd = buffer.duration;
   src.connect(stemNodes[name].trimNode);
   // A stem with an active cue marker starts from that marker instead of the
   // shared master position — lets different stems kick in from different
   // parts of the song. Nudge still layers on top as a fine-alignment offset.
   const activeMarker = (stemMarkers[name] || []).find(m => m.active);
   const base = activeMarker ? activeMarker.time : masterPos;
-  const eff = wrapOffset(base + stemNudge[name], LOOP_DUR);
+  const eff = wrapOffset(base + stemNudge[name], buffer.duration);
   src.start(0, eff);
   activeSources[name] = src;
 }
@@ -2093,10 +2102,10 @@ function stopAllStems() {
   Object.keys(activeSources).forEach(stopStem);
 }
 
-// Current position in the master timeline (0..LOOP_DUR), respecting tempo.
+// Current position in the master timeline (0..getMasterDuration()), respecting tempo.
 function currentPlaybackTime() {
   if (transportState === 'playing' && audioCtx) {
-    return wrapOffset(masterOffset + (audioCtx.currentTime - playStartCtxTime) * tempoRatio, LOOP_DUR);
+    return wrapOffset(masterOffset + (audioCtx.currentTime - playStartCtxTime) * tempoRatio, getMasterDuration());
   }
   return masterOffset;
 }
@@ -2409,7 +2418,7 @@ window.__saveChannelAsStem = saveChannelAsStem;
 function updatePlayheadPosition() {
   const playhead = document.getElementById('wavePlayhead');
   if (!playhead) return;
-  const progress = Math.max(0, Math.min(1, currentPlaybackTime() / LOOP_DUR));
+  const progress = Math.max(0, Math.min(1, currentPlaybackTime() / getMasterDuration()));
 
   const firstCanvas = document.querySelector('.wave-row .wave-canvas');
   if (!firstCanvas) return;
@@ -2493,7 +2502,7 @@ function stopPreview() {
 // and future scrub interactions). Restarts all active sources at the new
 // offset if we're currently playing.
 function seekTo(pos) {
-  masterOffset = wrapOffset(pos, LOOP_DUR);
+  masterOffset = wrapOffset(pos, getMasterDuration());
   if (transportState === 'playing') {
     startAllStems(masterOffset);
   }
