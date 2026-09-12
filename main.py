@@ -279,26 +279,6 @@ def is_admin_user(db: Session, user_id: int) -> bool:
     user = db.query(User).filter(User.id == user_id).first()
     return bool(user and user.email and user.email.lower() == admin_email.lower())
 
-# Free tier: 2 splits per calendar month, per the pricing page. Admin
-# account (see is_admin_user) always bypasses this.
-FREE_SPLITS_PER_MONTH = 2
-
-def check_split_allowance(db: Session, user_id: int):
-    if is_admin_user(db, user_id):
-        return
-    now = datetime.utcnow()
-    month_start = datetime(now.year, now.month, 1)
-    count = db.query(Stem).filter(
-        Stem.user_id == user_id,
-        Stem.instrument.is_(None),  # only full splits count, not per-channel saves
-        Stem.created_at >= month_start,
-    ).count()
-    if count >= FREE_SPLITS_PER_MONTH:
-        raise HTTPException(
-            status_code=402,
-            detail=f"Free plan is {FREE_SPLITS_PER_MONTH} songs a month. Upgrade to Pro for unlimited splits."
-        )
-
 # Helper: get DB session
 def get_db():
     db = SessionLocal()
@@ -679,7 +659,6 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
 def split_stem(file: UploadFile = File(...), token: str = None, stems: str = Form("6"), db: Session = Depends(get_db)):
     logger.info(f"Split request received: {file.filename} (stems={stems})")
     user_id = get_current_user(token)
-    check_split_allowance(db, user_id)
 
     # Each split gets its own uuid-keyed work directory so concurrent or
     # repeated splits never share a folder or filename. Before this,
