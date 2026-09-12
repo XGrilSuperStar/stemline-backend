@@ -950,8 +950,8 @@
   }
   .keylock-btn:hover { background: #1c3a25; }
   .keylock-btn.active {
-    background: #FD3C3C; color: #2A0606; border-color: #FD3C3C;
-    box-shadow: 0 0 7px rgba(253,60,60,0.7);
+    background: var(--sci-glow); color: #06201C; border-color: var(--sci-glow);
+    box-shadow: 0 0 7px rgba(60,253,224,0.6);
   }
 
   /* ===== MOBILE MIXER (stacked, larger touch targets) ===== */
@@ -1582,7 +1582,7 @@
           <div class="knob-group">
             <button class="keylock-btn" id="cueOutBtn" type="button" title="Route muted-channel cue audio to a headphone output device">&#127911; CUE OUT</button>
             <div class="knob-readout mono" id="cueOutStatus" style="max-width:110px;">Main out only</div>
-            <div class="knob-label" style="font-size:0.65rem; max-width:110px; text-align:center; color:#ffffff;">Requires a separate headphone/audio output device</div>
+            <div class="knob-label" style="font-size:0.65rem; max-width:110px; text-align:center; color:rgba(231,163,62,0.8);">Requires a separate headphone/audio output device</div>
           </div>
         </div>
         <audio id="cueMonitorAudio" autoplay></audio>
