@@ -14,6 +14,7 @@ import jwt
 import bcrypt
 import secrets
 import hashlib
+import re
 import smtplib
 from email.mime.text import MIMEText
 import requests
@@ -75,6 +76,14 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str
+
+def is_strong_password(password: str) -> bool:
+    return (
+        len(password) >= 8
+        and re.search(r"[A-Z]", password) is not None
+        and re.search(r"[0-9]", password) is not None
+        and re.search(r"[^A-Za-z0-9]", password) is not None
+    )
 
 class Stem(Base):
     __tablename__ = "stems"
@@ -397,7 +406,10 @@ def signup(body: SignupRequest, db: Session = Depends(get_db)):
         existing = db.query(User).filter(User.email == email).first()
         if existing:
             raise HTTPException(status_code=400, detail="Email already registered")
-        
+
+        if not is_strong_password(password):
+            raise HTTPException(status_code=400, detail="Password must be at least 8 characters, with 1 capital letter, 1 number, and 1 symbol.")
+
         password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
         new_user = User(email=email, username=username, password_hash=password_hash)
         db.add(new_user)
@@ -478,6 +490,8 @@ def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.reset_token_hash == token_hash).first()
     if not user or not user.reset_token_expires or user.reset_token_expires < datetime.utcnow():
         raise HTTPException(status_code=400, detail="Invalid or expired reset link")
+    if not is_strong_password(body.new_password):
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters, with 1 capital letter, 1 number, and 1 symbol.")
     user.password_hash = bcrypt.hashpw(body.new_password.encode(), bcrypt.gensalt()).decode()
     user.reset_token_hash = None
     user.reset_token_expires = None

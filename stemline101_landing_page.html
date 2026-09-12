@@ -1650,6 +1650,7 @@
         <input type="password" id="authPassword" placeholder="Password" required minlength="8" autocomplete="new-password" style="width:100%;box-sizing:border-box;padding:0.65rem;padding-right:2.6rem;background:var(--void);border:1px solid var(--concrete-line);color:var(--chrome);font-family:inherit;font-size:0.8rem;">
         <button type="button" id="authPasswordToggle" aria-label="Show password" style="position:absolute;right:0.5rem;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--chrome-dim);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.65rem;letter-spacing:0.04em;">SHOW</button>
       </div>
+      <p id="authPasswordHint" style="display:none;color:var(--chrome-dim);font-size:0.68rem;margin:-0.85rem 0 1.1rem;">At least 8 characters, with 1 capital letter, 1 number, and 1 symbol.</p>
       <label id="authTermsWrap" style="display:none;align-items:flex-start;gap:0.5rem;margin-bottom:1.1rem;font-size:0.72rem;color:var(--chrome-dim);line-height:1.4;cursor:pointer;">
         <input type="checkbox" id="authTermsCheck" style="margin-top:0.15rem;">
         <span>I agree to the <a href="/terms" target="_blank" style="color:var(--ember);">Terms of Service</a> and confirm I have the rights to any content I upload.</span>
@@ -1673,9 +1674,10 @@
     </div>
     <div id="resetPasswordForm" style="display:none;">
       <p style="color:var(--chrome-dim);font-size:0.75rem;margin:0 0 0.9rem;">Choose a new password.</p>
-      <div style="position:relative;margin-bottom:1.1rem;">
+      <div style="position:relative;margin-bottom:0.4rem;">
         <input type="password" id="resetNewPassword" placeholder="New password" minlength="8" autocomplete="new-password" style="width:100%;box-sizing:border-box;padding:0.65rem;background:var(--void);border:1px solid var(--concrete-line);color:var(--chrome);font-family:inherit;font-size:0.8rem;">
       </div>
+      <p style="color:var(--chrome-dim);font-size:0.68rem;margin:0 0 0.9rem;">At least 8 characters, with 1 capital letter, 1 number, and 1 symbol.</p>
       <button type="button" id="resetSubmitBtn" class="btn-primary" style="width:100%;border:none;cursor:pointer;font-family:inherit;">Set new password</button>
     </div>
   </div>
@@ -3424,6 +3426,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const authEmail = document.getElementById('authEmail');
   const authUsername = document.getElementById('authUsername');
   const authTermsWrap = document.getElementById('authTermsWrap');
+  const authPasswordHint = document.getElementById('authPasswordHint');
   const authTermsCheck = document.getElementById('authTermsCheck');
   const authPassword = document.getElementById('authPassword');
   const authPasswordToggle = document.getElementById('authPasswordToggle');
@@ -3494,6 +3497,7 @@ document.addEventListener('DOMContentLoaded', () => {
       authUsername.required = true;
       authTermsWrap.style.display = 'flex';
       authTermsCheck.required = true;
+      authPasswordHint.style.display = 'block';
     } else {
       authModalTitle.textContent = 'Log in';
       authSubmitBtn.textContent = 'Log in';
@@ -3503,6 +3507,7 @@ document.addEventListener('DOMContentLoaded', () => {
       authUsername.required = false;
       authTermsWrap.style.display = 'none';
       authTermsCheck.required = false;
+      authPasswordHint.style.display = 'none';
     }
     authModal.style.display = 'flex';
   }
@@ -3586,10 +3591,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
     const newPassword = resetNewPassword.value;
-    if (!newPassword || newPassword.length < 8) {
+    const pwOk = newPassword.length >= 8 && /[A-Z]/.test(newPassword) && /[0-9]/.test(newPassword) && /[^A-Za-z0-9]/.test(newPassword);
+    if (!pwOk) {
       authError.style.display = 'block';
       authError.style.color = 'var(--clip-red)';
-      authError.textContent = 'Password must be at least 8 characters.';
+      authError.textContent = 'Password must be at least 8 characters, with 1 capital letter, 1 number, and 1 symbol.';
       return;
     }
     resetSubmitBtn.disabled = true;
@@ -3638,6 +3644,15 @@ document.addEventListener('DOMContentLoaded', () => {
   authForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     authError.style.display = 'none';
+    if (authMode === 'signup') {
+      const pw = authPassword.value;
+      const pwOk = pw.length >= 8 && /[A-Z]/.test(pw) && /[0-9]/.test(pw) && /[^A-Za-z0-9]/.test(pw);
+      if (!pwOk) {
+        authError.textContent = 'Password must be at least 8 characters, with 1 capital letter, 1 number, and 1 symbol.';
+        authError.style.display = 'block';
+        return;
+      }
+    }
     if (authMode === 'signup' && !authTermsCheck.checked) {
       authError.textContent = 'Please agree to the Terms of Service to continue.';
       authError.style.display = 'block';
