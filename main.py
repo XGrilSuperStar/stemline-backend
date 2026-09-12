@@ -17,7 +17,7 @@ import hashlib
 import smtplib
 from email.mime.text import MIMEText
 import requests
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, text
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Text, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 import logging
@@ -99,6 +99,16 @@ class Stem(Base):
     # full split it was saved out of. Lets My Stems group saved instruments
     # back under the song they came from instead of listing them flat.
     parent_stem_id = Column(Integer, nullable=True)
+
+class Review(Base):
+    __tablename__ = "reviews"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer)
+    display_name = Column(String)
+    stars = Column(Integer)
+    comment = Column(Text)
+    approved = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 Base.metadata.create_all(bind=engine)
 
@@ -283,6 +293,93 @@ def check_split_allowance(db: Session, user_id: int):
         Stem.instrument.is_(None),  # only full splits count, not per-channel saves
         Stem.created_at >= month_start,
     ).count()
+
+class ReviewRequest(BaseModel):
+    display_name: str
+    stars: int
+    comment: str
+
+@app.post("/api/v1/reviews")
+def submit_review(body: ReviewRequest, token: str = None, db: Session = Depends(get_db)):
+    # Anyone logged in can submit one; it's held as unapproved until the
+    # admin account approves it via the admin endpoints below. Nothing here
+    # is publicly visible until that happens.
+    user_id = get_current_user(token)
+    name = body.display_name.strip()
+    comment = body.comment.strip()
+    if not name or len(name) > 80:
+        raise HTTPException(status_code=400, detail="Name must be 1-80 characters.")
+    if not comment or len(comment) > 2000:
+        raise HTTPException(status_code=400, detail="Review must be 1-2000 characters.")
+    if body.stars < 1 or body.stars > 5:
+        raise HTTPException(status_code=400, detail="Stars must be between 1 and 5.")
+    review = Review(
+        user_id=user_id,
+        display_name=name,
+        stars=body.stars,
+        comment=comment,
+        approved=False,
+    )
+    db.add(review)
+    db.commit()
+    db.refresh(review)
+    return {"id": review.id, "status": "pending"}
+
+@app.get("/api/v1/reviews")
+def list_public_reviews(db: Session = Depends(get_db)):
+    # Public endpoint — only ever returns approved reviews, newest first.
+    reviews = db.query(Review).filter(Review.approved == True).order_by(Review.created_at.desc()).all()
+    return [
+        {
+            "id": r.id,
+            "display_name": r.display_name,
+            "stars": r.stars,
+            "comment": r.comment,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in reviews
+    ]
+
+@app.get("/api/v1/admin/reviews/pending")
+def list_pending_reviews(token: str = None, db: Session = Depends(get_db)):
+    user_id = get_current_user(token)
+    if not is_admin_user(db, user_id):
+        raise HTTPException(status_code=403, detail="Admin only.")
+    reviews = db.query(Review).filter(Review.approved == False).order_by(Review.created_at.asc()).all()
+    return [
+        {
+            "id": r.id,
+            "display_name": r.display_name,
+            "stars": r.stars,
+            "comment": r.comment,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in reviews
+    ]
+
+@app.post("/api/v1/admin/reviews/{review_id}/approve")
+def approve_review(review_id: int, token: str = None, db: Session = Depends(get_db)):
+    user_id = get_current_user(token)
+    if not is_admin_user(db, user_id):
+        raise HTTPException(status_code=403, detail="Admin only.")
+    review = db.query(Review).filter(Review.id == review_id).first()
+    if not review:
+        raise HTTPException(status_code=404, detail="Review not found.")
+    review.approved = True
+    db.commit()
+    return {"id": review.id, "status": "approved"}
+
+@app.delete("/api/v1/admin/reviews/{review_id}")
+def reject_review(review_id: int, token: str = None, db: Session = Depends(get_db)):
+    user_id = get_current_user(token)
+    if not is_admin_user(db, user_id):
+        raise HTTPException(status_code=403, detail="Admin only.")
+    review = db.query(Review).filter(Review.id == review_id).first()
+    if not review:
+        raise HTTPException(status_code=404, detail="Review not found.")
+    db.delete(review)
+    db.commit()
+    return {"id": review_id, "status": "rejected"}
     if count >= FREE_SPLITS_PER_MONTH:
         raise HTTPException(
             status_code=402,
@@ -987,6 +1084,10 @@ This document is a general template and not a substitute for legal advice.
 @app.get("/privacy", response_class=HTMLResponse)
 async def privacy_policy():
     return PRIVACY_HTML
+
+@app.get("/reviews", response_class=HTMLResponse)
+async def reviews_page():
+    return FileResponse("reviews_page.html", media_type="text/html")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8080)))
