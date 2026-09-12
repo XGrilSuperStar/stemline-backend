@@ -944,8 +944,8 @@
     margin-top: 0.15rem;
     font-family: 'JetBrains Mono', monospace; font-size: 0.42rem; font-weight: 700;
     letter-spacing: 0.03em; text-transform: uppercase;
-    background: #101113; color: rgba(216,220,226,0.45);
-    border: 1px solid #000; border-radius: 2px; padding: 0.2rem 0.35rem;
+    background: #101113; color: #ffffff;
+    border: 1px solid #3a3d42; border-radius: 2px; padding: 0.2rem 0.35rem;
     cursor: pointer;
   }
   .keylock-btn:hover { background: #1c1e21; }
@@ -1580,9 +1580,9 @@
             <div class="knob-readout mono" id="masterVolReadout">80%</div>
           </div>
           <div class="knob-group">
-            <button class="keylock-btn" id="cueOutBtn" type="button" title="Route muted-channel cue audio to a headphone output device">&#127911; CUE OUT</button>
+            <button class="keylock-btn" id="cueOutBtn" type="button" title="Route muted-channel cue audio to a headphone output device" style="background:var(--vu-amber);color:#1c1e21;border-color:var(--vu-amber);">&#127911; CUE OUT</button>
             <div class="knob-readout mono" id="cueOutStatus" style="max-width:110px;">Main out only</div>
-            <div class="knob-label" style="font-size:0.65rem; max-width:110px; text-align:center; color:#ffffff;">Requires a separate headphone/audio output device</div>
+            <div class="knob-label" style="font-size:0.65rem; max-width:110px; text-align:center; color:var(--vu-amber);">Requires a separate headphone/audio output device</div>
           </div>
         </div>
         <audio id="cueMonitorAudio" autoplay></audio>
