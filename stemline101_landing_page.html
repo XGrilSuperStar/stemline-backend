@@ -1254,7 +1254,7 @@
             </button>
             <span class="tp-source mono" id="previewLabel">no track loaded</span>
           </div>
-          <div class="wave-hint mono" id="waveHint">click waveform to seek &middot; drag to nudge that stem &middot; <span style="color:var(--vu-teal,#3CFDE0);">+CUE</span> drops a start marker</div>
+          <div class="wave-hint mono" id="waveHint">click waveform to seek &middot; drag to nudge that stem &middot; <span style="color:var(--vu-teal,#3CFDE0);">+CUE</span> sets where this stem starts playing from</div>
           <div class="waveform-rows" id="waveformRows">
             <div class="wave-row" data-stem="vocals"><span class="wave-row-label">VOCALS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="add-marker-btn" data-stem="vocals" title="Add a cue marker here">+CUE</button></div>
             <div class="wave-row" data-stem="drums"><span class="wave-row-label">DRUMS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="add-marker-btn" data-stem="drums" title="Add a cue marker here">+CUE</button></div>
@@ -2831,7 +2831,8 @@ function renderStemMarkers(stem) {
   const rowRect = row.getBoundingClientRect();
   const canvasLeftInRow = canvasRect.left - rowRect.left;
   (stemMarkers[stem] || []).forEach(marker => {
-    const x = canvasLeftInRow + (marker.time / LOOP_DUR) * canvasRect.width;
+    const stemDur = (stemBuffers[stem] && stemBuffers[stem].duration) || LOOP_DUR;
+    const x = canvasLeftInRow + (marker.time / stemDur) * canvasRect.width;
     const el = document.createElement('div');
     el.className = 'wave-marker' + (marker.active ? ' active' : '');
     el.style.left = x + 'px';
@@ -2852,9 +2853,9 @@ function renderStemMarkers(stem) {
       if (!dragging) return;
       const dx = e.clientX - startClientX;
       if (Math.abs(dx) > 2) moved = true;
-      const secPerPx = LOOP_DUR / canvasRect.width;
-      marker.time = Math.max(0, Math.min(LOOP_DUR, startTime + dx * secPerPx));
-      el.style.left = (canvasLeftInRow + (marker.time / LOOP_DUR) * canvasRect.width) + 'px';
+      const secPerPx = stemDur / canvasRect.width;
+      marker.time = Math.max(0, Math.min(stemDur, startTime + dx * secPerPx));
+      el.style.left = (canvasLeftInRow + (marker.time / stemDur) * canvasRect.width) + 'px';
       el.title = marker.label + ' — ' + formatMarkerTime(marker.time);
     });
     const endDrag = (e) => {
@@ -2954,7 +2955,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (canvas._suppressClick) { canvas._suppressClick = false; return; }
       const rect = canvas.getBoundingClientRect();
       const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-      seekTo(fraction * LOOP_DUR);
+      seekTo(fraction * getMasterDuration());
     });
     canvas.addEventListener('dblclick', (e) => {
       const row = canvas.closest('.wave-row');
@@ -2962,7 +2963,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!stem) return;
       const rect = canvas.getBoundingClientRect();
       const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-      addStemMarkerAt(stem, fraction * LOOP_DUR);
+      const dur = (stemBuffers[stem] && stemBuffers[stem].duration) || LOOP_DUR;
+      addStemMarkerAt(stem, fraction * dur);
     });
   });
 
