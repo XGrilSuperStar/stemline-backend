@@ -1579,7 +1579,13 @@
             <div class="knob-label">Volume</div>
             <div class="knob-readout mono" id="masterVolReadout">80%</div>
           </div>
+          <div class="knob-group">
+            <button class="keylock-btn" id="cueOutBtn" type="button" title="Route muted-channel cue audio to a headphone output device">&#127911; CUE OUT</button>
+            <div class="knob-readout mono" id="cueOutStatus" style="max-width:110px;">Main out only</div>
+          </div>
         </div>
+        <audio id="cueMonitorAudio" autoplay></audio>
+
       </div>
 
       <div class="wood-trim"></div>
@@ -1713,6 +1719,8 @@ let stemNodes = {}; // { vocals: {gainNode, trimNode, eqLow, eqMid, eqHigh, anal
 let stemBuffers = {}; // AudioBuffer per stem — created once when audioCtx is ready
 let activeSources = {}; // currently-playing AudioBufferSourceNode per stem (or null)
 let masterGain = null;
+let cueBus = null;
+let cueStreamDest = null;
 let masterAnalyser = null;
 let masterDataArray = null;
 let isPlaying = false;
@@ -1847,12 +1855,23 @@ function detectBpm(audioBuffer) {
 
 // Real Solo/Mute logic: if any channel is soloed, only soloed (and unmuted)
 // channels are audible. Otherwise every unmuted channel plays normally.
+// Muting a channel NEVER stops the master/main mix — it only removes that
+// one channel from the main output. Muted channels are simultaneously sent
+// to the separate cue/headphone bus (cueSendGain) so they stay audible for
+// pre-listening without affecting what's playing on the main output.
 function updateAllChannelGains() {
   const anySolo = Object.values(stemNodes).some(n => n.solo);
   Object.values(stemNodes).forEach(n => {
-    if (!n.gainNode) return;
-    const silent = n.muted || (anySolo && !n.solo);
-    n.gainNode.gain.value = silent ? 0 : (n.volPct / 100);
+    if (n.gainNode) {
+      const silent = n.muted || (anySolo && !n.solo);
+      n.gainNode.gain.value = silent ? 0 : (n.volPct / 100);
+    }
+    if (n.cueSendGain) {
+      // Cue bus only ever carries muted channels, at their fader level,
+      // regardless of solo state — so several muted channels can all be
+      // heard together in the headphones at once.
+      n.cueSendGain.gain.value = n.muted ? (n.volPct / 100) : 0;
+    }
   });
 }
 const dbToGain = db => Math.pow(10, db / 20);
@@ -1966,6 +1985,22 @@ function connectAnalysers() {
   masterDataArray = new Uint8Array(masterAnalyser.frequencyBinCount);
   masterGain.connect(masterAnalyser);
 
+  // Independent cue/headphone bus. Carries ONLY muted channels (see
+  // updateAllChannelGains) so you can pre-listen to whatever's muted while
+  // the main output keeps playing everything else untouched. Feeds a
+  // MediaStreamDestination -> the hidden <audio id="cueMonitorAudio">
+  // element, whose sink can be pointed at a real headphone device via
+  // setSinkId (see pickCueOutputDevice()).
+  cueBus = audioCtx.createGain();
+  cueBus.gain.value = 1;
+  cueStreamDest = audioCtx.createMediaStreamDestination();
+  cueBus.connect(cueStreamDest);
+  const cueEl = document.getElementById('cueMonitorAudio');
+  if (cueEl) {
+    cueEl.srcObject = cueStreamDest.stream;
+    cueEl.play().catch(() => {});
+  }
+
   const sr = STEM_SAMPLES._sr || 22050;
 
   Object.keys(stemNodes).forEach(name => {
@@ -1994,6 +2029,9 @@ function connectAnalysers() {
     const gainNode = audioCtx.createGain();
     gainNode.gain.value = node.muted ? 0 : node.volPct / 100;
 
+    const cueSendGain = audioCtx.createGain();
+    cueSendGain.gain.value = node.muted ? node.volPct / 100 : 0;
+
     const analyser = audioCtx.createAnalyser();
     analyser.fftSize = 256;
 
@@ -2021,6 +2059,8 @@ function connectAnalysers() {
     eqLow.connect(eqMid);
     eqMid.connect(eqHigh);
     eqHigh.connect(gainNode);
+    eqHigh.connect(cueSendGain);
+    cueSendGain.connect(cueBus);
     if (pitchAvailable) {
       Tone.connect(eqHigh, pitchShift);
     }
@@ -2033,6 +2073,7 @@ function connectAnalysers() {
     node.eqMid = eqMid;
     node.eqHigh = eqHigh;
     node.gainNode = gainNode;
+    node.cueSendGain = cueSendGain;
     node.analyser = analyser;
     node.pitchShift = pitchShift;
     node.dataArray = new Uint8Array(analyser.frequencyBinCount);
@@ -3326,6 +3367,40 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  // Headphone/cue output routing: lets you pick a real output device (e.g.
+  // your headphones) to receive the cue bus, which only carries muted
+  // channels. Main output is untouched either way.
+  const cueOutBtn = document.getElementById('cueOutBtn');
+  const cueOutStatus = document.getElementById('cueOutStatus');
+  async function pickCueOutputDevice() {
+    const cueEl = document.getElementById('cueMonitorAudio');
+    if (!cueEl || !('setSinkId' in HTMLMediaElement.prototype)) {
+      if (cueOutStatus) cueOutStatus.textContent = 'Not supported here';
+      return;
+    }
+    try {
+      await ensureEngineReady();
+      let deviceId = null;
+      if (navigator.mediaDevices && navigator.mediaDevices.selectAudioOutput) {
+        const device = await navigator.mediaDevices.selectAudioOutput();
+        deviceId = device.deviceId;
+      } else {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const outputs = devices.filter(d => d.kind === 'audiooutput');
+        if (!outputs.length) throw new Error('no output devices found');
+        deviceId = outputs[0].deviceId;
+      }
+      await cueEl.setSinkId(deviceId);
+      if (cueOutStatus) cueOutStatus.textContent = 'Cue \u2192 headphones';
+      if (cueOutBtn) cueOutBtn.classList.add('active');
+    } catch (e) {
+      console.error('Cue output device selection failed', e);
+      if (cueOutStatus) cueOutStatus.textContent = 'Selection failed';
+    }
+  }
+  if (cueOutBtn) cueOutBtn.addEventListener('click', pickCueOutputDevice);
 });
 
 </script>
