@@ -1730,6 +1730,7 @@ let tempoRatio = 1;
 // loaded from a DIFFERENT song get re-stretched to match.
 let stemAutoStretch = { vocals: 1, drums: 1, bass: 1, guitar: 1, piano: 1, other: 1 };
 const detectedBpmByStemId = {};
+const detectedBpmPromiseByStemId = {}; // stemId -> in-flight detection promise, avoids duplicate drum fetches
 let masterVolPct = 80;
 let keySemitones = 0; // -12 .. +12, manual key shift
 let keyLockOn = true; // when true, Tempo changes speed without changing pitch
@@ -2162,6 +2163,38 @@ function updateFaders() {
 const originalStemBuffers = {};   // channelKey -> the pre-load synth buffer
 const currentStemMeta = {};       // channelKey -> { stemId, trackName }
 
+// Detect a song's BPM once per split, always from its DRUMS channel —
+// drums have the clear rhythmic hits the detector needs. Previously each
+// channel detected BPM from its own audio, and since all 6 channels load
+// in parallel, whichever happened to finish first "won" — often vocals,
+// which have weak/no percussive onsets and threw the detection way off.
+// That's why two channels from the same song could end up stretched to
+// wildly different speeds. Now every channel of a split shares one
+// drums-derived BPM, cached by stemId so it's only fetched/analyzed once.
+async function ensureBpmForStemId(stemId) {
+  if (detectedBpmByStemId[stemId] !== undefined) return detectedBpmByStemId[stemId];
+  if (!detectedBpmPromiseByStemId[stemId]) {
+    detectedBpmPromiseByStemId[stemId] = (async () => {
+      try {
+        const url = window.API_BASE + '/api/v1/my-stems/' + encodeURIComponent(stemId)
+                  + '/download/drums?token=' + encodeURIComponent(getToken());
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('drums fetch failed: ' + res.status);
+        const arrayBuf = await res.arrayBuffer();
+        const drumsBuffer = await audioCtx.decodeAudioData(arrayBuf);
+        const bpm = detectBpm(drumsBuffer);
+        detectedBpmByStemId[stemId] = bpm;
+        return bpm;
+      } catch (e) {
+        console.warn('Drums-based BPM detection failed, no auto-stretch applied for this song', e);
+        detectedBpmByStemId[stemId] = null;
+        return null;
+      }
+    })();
+  }
+  return detectedBpmPromiseByStemId[stemId];
+}
+
 async function loadBackendStemToChannel(channelKey, stemId, trackName) {
   const status = document.getElementById('uploadStatus');
   const showErr = (msg) => {
@@ -2188,15 +2221,11 @@ async function loadBackendStemToChannel(channelKey, stemId, trackName) {
     const arrayBuf = await res.arrayBuffer();
     const audioBuffer = await audioCtx.decodeAudioData(arrayBuf);
 
-    // Auto tempo-match: detect this song's BPM once per split (stemId) and
-    // reuse it for all 6 of that split's channels, so stems from the SAME
-    // song stay perfectly in sync while stems from a DIFFERENT song still
-    // get stretched to the same common tempo (BASE_BPM) as everything else.
-    let nativeBpm = detectedBpmByStemId[stemId];
-    if (nativeBpm === undefined) {
-      nativeBpm = detectBpm(audioBuffer);
-      detectedBpmByStemId[stemId] = nativeBpm;
-    }
+    // Auto tempo-match: every channel of the SAME song shares one BPM
+    // (detected from that song's drums, see ensureBpmForStemId) so they
+    // all get the identical stretch and stay in sync with each other;
+    // stems loaded from a DIFFERENT song get re-stretched to match.
+    const nativeBpm = await ensureBpmForStemId(stemId);
     const rawStretch = nativeBpm ? (BASE_BPM / nativeBpm) : 1;
     // Clamp — a bad detection shouldn't be able to mangle the audio.
     stemAutoStretch[channelKey] = Math.min(1.5, Math.max(0.7, rawStretch));
