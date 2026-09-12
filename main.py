@@ -293,6 +293,19 @@ def check_split_allowance(db: Session, user_id: int):
         Stem.instrument.is_(None),  # only full splits count, not per-channel saves
         Stem.created_at >= month_start,
     ).count()
+    if count >= FREE_SPLITS_PER_MONTH:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Free plan is {FREE_SPLITS_PER_MONTH} songs a month. Upgrade to Pro for unlimited splits."
+        )
+
+# Helper: get DB session
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 class ReviewRequest(BaseModel):
     display_name: str
@@ -380,19 +393,6 @@ def reject_review(review_id: int, token: str = None, db: Session = Depends(get_d
     db.delete(review)
     db.commit()
     return {"id": review_id, "status": "rejected"}
-    if count >= FREE_SPLITS_PER_MONTH:
-        raise HTTPException(
-            status_code=402,
-            detail=f"Free plan is {FREE_SPLITS_PER_MONTH} songs a month. Upgrade to Pro for unlimited splits."
-        )
-
-# Helper: get DB session
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 @app.get("/")
 def root():
