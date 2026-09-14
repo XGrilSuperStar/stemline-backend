@@ -4761,6 +4761,32 @@ document.addEventListener('DOMContentLoaded', () => {
     window.__reloadLibraries = loadLibraries;
   })();
 })();
+</script><!-- Paste this block right before the closing </body> tag in stemline101_landing_page.html -->
+<div id="cookie-banner" style="position:fixed; bottom:0; left:0; right:0; background:#1a1a1a; color:#eee; padding:1rem 1.5rem; border-top:1px solid #333; font-family: system-ui, sans-serif; font-size:0.9rem; z-index:9999; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:1rem;">
+  <span>We use cookies for essential site function and, with your consent, for advertising. See our <a href="/privacy" style="color:#f0a500;">Privacy Policy</a>.</span>
+  <span>
+    <button onclick="document.cookie='stemline_consent=accepted; max-age=31536000; path=/'; document.getElementById('cookie-banner').style.display='none';" style="background:#f0a500; color:#111; border:none; padding:0.5rem 1.2rem; border-radius:4px; font-weight:600; cursor:pointer; margin-right:0.5rem;">Accept</button>
+    <button onclick="document.cookie='stemline_consent=denied; max-age=31536000; path=/'; document.getElementById('cookie-banner').style.display='none';" style="background:transparent; color:#eee; border:1px solid #555; padding:0.5rem 1.2rem; border-radius:4px; cursor:pointer;">Deny Non-Essential</button>
+  </span>
+</div>
+<script>
+  if (document.cookie.indexOf('stemline_consent=') !== -1) {
+    var b = document.getElementById('cookie-banner');
+    if (b) b.style.display = 'none';
+  }
+</script><!-- Paste this block right before the closing </body> tag in stemline101_landing_page.html -->
+<div id="cookie-banner" style="position:fixed; bottom:0; left:0; right:0; background:#1a1a1a; color:#eee; padding:1rem 1.5rem; border-top:1px solid #333; font-family: system-ui, sans-serif; font-size:0.9rem; z-index:9999; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:1rem;">
+  <span>We use cookies for essential site function and, with your consent, for advertising. See our <a href="/privacy" style="color:#f0a500;">Privacy Policy</a>.</span>
+  <span>
+    <button onclick="document.cookie='stemline_consent=accepted; max-age=31536000; path=/'; document.getElementById('cookie-banner').style.display='none';" style="background:#f0a500; color:#111; border:none; padding:0.5rem 1.2rem; border-radius:4px; font-weight:600; cursor:pointer; margin-right:0.5rem;">Accept</button>
+    <button onclick="document.cookie='stemline_consent=denied; max-age=31536000; path=/'; document.getElementById('cookie-banner').style.display='none';" style="background:transparent; color:#eee; border:1px solid #555; padding:0.5rem 1.2rem; border-radius:4px; cursor:pointer;">Deny Non-Essential</button>
+  </span>
+</div>
+<script>
+  if (document.cookie.indexOf('stemline_consent=') !== -1) {
+    var b = document.getElementById('cookie-banner');
+    if (b) b.style.display = 'none';
+  }
 </script>
 </body>
 </html>
