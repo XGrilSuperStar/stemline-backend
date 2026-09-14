@@ -499,6 +499,9 @@ def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_db)):
     logger.info(f"Password reset successfully for user {user.id}")
     return {"message": "Password updated. You can now log in with your new password."}
 
+# Demucs (https://github.com/facebookresearch/demucs) — Copyright (c) Meta
+# Platforms, Inc. Used under the MIT License. See LICENSE/NOTICE for full text.
+#
 # Which separation engine to run. "demucs" (default, current production
 # engine) or "bsroformer" (BS-RoFormer SW — better SDR, especially bass,
 # but untested for real-world timing on Railway's CPU-only dyno). Set via
@@ -1004,6 +1007,20 @@ TERMS_HTML = """
 <p style="margin-top:3rem; opacity:0.6; font-size:0.9rem;">
 This document is a general template and not a substitute for legal advice.
 </p>
+
+<div id="cookie-banner" style="position:fixed; bottom:0; left:0; right:0; background:#1a1a1a; color:#eee; padding:1rem 1.5rem; border-top:1px solid #333; font-family: system-ui, sans-serif; font-size:0.9rem; z-index:9999; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:1rem;">
+  <span>We use cookies for essential site function and, with your consent, for advertising. See our <a href="/privacy" style="color:#f0a500;">Privacy Policy</a>.</span>
+  <span>
+    <button onclick="document.cookie='stemline_consent=accepted; max-age=31536000; path=/'; document.getElementById('cookie-banner').style.display='none';" style="background:#f0a500; color:#111; border:none; padding:0.5rem 1.2rem; border-radius:4px; font-weight:600; cursor:pointer; margin-right:0.5rem;">Accept</button>
+    <button onclick="document.cookie='stemline_consent=denied; max-age=31536000; path=/'; document.getElementById('cookie-banner').style.display='none';" style="background:transparent; color:#eee; border:1px solid #555; padding:0.5rem 1.2rem; border-radius:4px; cursor:pointer;">Deny Non-Essential</button>
+  </span>
+</div>
+<script>
+  if (document.cookie.indexOf('stemline_consent=') !== -1) {
+    var b = document.getElementById('cookie-banner');
+    if (b) b.style.display = 'none';
+  }
+</script>
 </body>
 </html>
 """
@@ -1069,6 +1086,20 @@ PRIVACY_HTML = """
 <p style="margin-top:3rem; opacity:0.6; font-size:0.9rem;">
 This document is a general template and not a substitute for legal advice.
 </p>
+
+<div id="cookie-banner" style="position:fixed; bottom:0; left:0; right:0; background:#1a1a1a; color:#eee; padding:1rem 1.5rem; border-top:1px solid #333; font-family: system-ui, sans-serif; font-size:0.9rem; z-index:9999; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:1rem;">
+  <span>We use cookies for essential site function and, with your consent, for advertising. See our <a href="/privacy" style="color:#f0a500;">Privacy Policy</a>.</span>
+  <span>
+    <button onclick="document.cookie='stemline_consent=accepted; max-age=31536000; path=/'; document.getElementById('cookie-banner').style.display='none';" style="background:#f0a500; color:#111; border:none; padding:0.5rem 1.2rem; border-radius:4px; font-weight:600; cursor:pointer; margin-right:0.5rem;">Accept</button>
+    <button onclick="document.cookie='stemline_consent=denied; max-age=31536000; path=/'; document.getElementById('cookie-banner').style.display='none';" style="background:transparent; color:#eee; border:1px solid #555; padding:0.5rem 1.2rem; border-radius:4px; cursor:pointer;">Deny Non-Essential</button>
+  </span>
+</div>
+<script>
+  if (document.cookie.indexOf('stemline_consent=') !== -1) {
+    var b = document.getElementById('cookie-banner');
+    if (b) b.style.display = 'none';
+  }
+</script>
 </body>
 </html>
 """
@@ -1077,6 +1108,59 @@ This document is a general template and not a substitute for legal advice.
 @app.get("/privacy", response_class=HTMLResponse)
 async def privacy_policy():
     return PRIVACY_HTML
+
+ABOUT_HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>About — Stemline101</title>
+<style>
+  body { background:#111; color:#eee; font-family: system-ui, sans-serif;
+         max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem 4rem; line-height: 1.6; }
+  h1 { color: #f0a500; }
+  h2 { color: #f0a500; margin-top: 2rem; }
+  a { color: #f0a500; }
+</style>
+</head>
+<body>
+<h1>About Stemline101</h1>
+<p>Stemline101 splits any song into isolated stems — vocals, drums, bass, and more — then lets you remix and mix multiple tracks together right in your browser.</p>
+
+<h2>What You Can Do</h2>
+<ul>
+  <li>Upload a track and separate it into individual stems</li>
+  <li>Download stems for use in your own projects</li>
+  <li>Mix and blend stems from multiple songs on our built-in DJ-style board</li>
+</ul>
+
+<h2>Why Stemline101</h2>
+<p>Most stem-splitting tools stop at separation. Stemline101 goes further, giving you a live mixing board so you can actually play with the results — blend a vocal from one track over the instrumental of another, right in the browser.</p>
+
+<h2>Contact</h2>
+<p>Questions or feedback: [contact email]</p>
+
+<div id="cookie-banner" style="position:fixed; bottom:0; left:0; right:0; background:#1a1a1a; color:#eee; padding:1rem 1.5rem; border-top:1px solid #333; font-family: system-ui, sans-serif; font-size:0.9rem; z-index:9999; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:1rem;">
+  <span>We use cookies for essential site function and, with your consent, for advertising. See our <a href="/privacy" style="color:#f0a500;">Privacy Policy</a>.</span>
+  <span>
+    <button onclick="document.cookie='stemline_consent=accepted; max-age=31536000; path=/'; document.getElementById('cookie-banner').style.display='none';" style="background:#f0a500; color:#111; border:none; padding:0.5rem 1.2rem; border-radius:4px; font-weight:600; cursor:pointer; margin-right:0.5rem;">Accept</button>
+    <button onclick="document.cookie='stemline_consent=denied; max-age=31536000; path=/'; document.getElementById('cookie-banner').style.display='none';" style="background:transparent; color:#eee; border:1px solid #555; padding:0.5rem 1.2rem; border-radius:4px; cursor:pointer;">Deny Non-Essential</button>
+  </span>
+</div>
+<script>
+  if (document.cookie.indexOf('stemline_consent=') !== -1) {
+    var b = document.getElementById('cookie-banner');
+    if (b) b.style.display = 'none';
+  }
+</script>
+</body>
+</html>
+"""
+
+
+@app.get("/about", response_class=HTMLResponse)
+async def about_page():
+    return ABOUT_HTML
 
 @app.get("/reviews", response_class=HTMLResponse)
 async def reviews_page():
