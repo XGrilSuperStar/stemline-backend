@@ -220,6 +220,29 @@ try:
 except Exception as e:
     logger.warning(f"orig_path column migration skipped or already applied: {e}")
 
+# One-time cleanup: originals used to be kept permanently alongside each
+# song's stems zip (see split_stem_task), which is what filled up the disk.
+# Delete any of those leftover "_original.*" files and clear orig_path so
+# the "Download song" link stops being offered for them.
+try:
+    saved_splits_dir = "/data/stemline_uploads/saved_splits"
+    if os.path.isdir(saved_splits_dir):
+        removed = 0
+        for fname in os.listdir(saved_splits_dir):
+            if "_original." in fname:
+                try:
+                    os.remove(os.path.join(saved_splits_dir, fname))
+                    removed += 1
+                except Exception as rm_err:
+                    logger.warning(f"Could not remove leftover original {fname}: {rm_err}")
+        if removed:
+            logger.info(f"Removed {removed} leftover original-song files to reclaim disk space")
+    with engine.connect() as conn:
+        conn.execute(text("UPDATE stems SET orig_path = NULL WHERE orig_path IS NOT NULL"))
+        conn.commit()
+except Exception as e:
+    logger.warning(f"Original-file cleanup skipped or already applied: {e}")
+
 # One-time migration: add password-reset columns to users table if missing
 try:
     with engine.connect() as conn:
@@ -630,16 +653,16 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
                     arcname = os.path.relpath(file_full_path, stem_dir)
                     zf.write(file_full_path, arcname)
 
-        # Keep the original, un-split upload too, so the user can still get
-        # the whole song back — not just the separated stems. Move it (not
-        # copy) into the same permanent folder as the zip.
-        orig_ext = filename.rsplit('.', 1)[-1] if '.' in filename else 'audio'
-        orig_path = os.path.join(stems_dir, f"{request_id}_{filename.rsplit('.', 1)[0]}_original.{orig_ext}")
+        # The original upload used to be kept permanently alongside the zip
+        # so users could re-download the whole song — but keeping a full
+        # copy of every original on top of its 6-stem zip was the main
+        # thing filling up the disk. Customers need the stems, not the
+        # source file, so just delete it once the split is done.
         try:
-            shutil.move(file_path, orig_path)
+            os.remove(file_path)
         except Exception as orig_err:
-            logger.warning(f"[job {request_id}] Could not preserve original upload: {orig_err}")
-            orig_path = None
+            logger.warning(f"[job {request_id}] Could not remove original upload: {orig_err}")
+        orig_path = None
 
         # The Demucs output dir is no longer needed now that the zip (and
         # original) are safely saved elsewhere — clean up this request's
