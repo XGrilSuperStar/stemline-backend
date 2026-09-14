@@ -612,6 +612,7 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
                 "-j", str(jobs),
                 "--shifts", str(shifts),
                 "--overlap", overlap,
+                "--mp3", "--mp3-bitrate", "192",
                 "-o", output_dir, file_path,
             ]
             logger.info(f"[job {request_id}] Running: {' '.join(cmd)}")
@@ -629,10 +630,12 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
             if result.returncode != 0:
                 raise Exception(f"Demucs processing failed: {result.stderr}")
 
-        # Find output stems
+        # Find output stems. Demucs with --mp3 outputs .mp3; the bsroformer
+        # path (currently unused by default) still writes .wav, so check
+        # for either.
         stem_dir = None
         for root, dirs, files in os.walk(output_dir):
-            if any(f.endswith(".wav") for f in files):
+            if any(f.endswith(".mp3") or f.endswith(".wav") for f in files):
                 stem_dir = root
                 break
 
@@ -790,11 +793,15 @@ def download_stem(stem_id: int, token: str = None, db: Session = Depends(get_db)
         if not stem_row:
             raise HTTPException(status_code=404, detail="Saved stem not found.")
         if stem_row.instrument:
-            # Single-channel save — zip_path points at a lone wav, not a zip.
+            # Single-channel save — zip_path points at a lone audio file,
+            # not a zip. Older saves are .wav, newer ones .mp3 — serve
+            # whichever this row actually is.
+            ext = stem_row.zip_path.rsplit('.', 1)[-1].lower()
+            media_type = "audio/mpeg" if ext == "mp3" else "audio/wav"
             return FileResponse(
                 stem_row.zip_path,
-                media_type="audio/wav",
-                filename=f"{stem_row.track_name}.wav"
+                media_type=media_type,
+                filename=f"{stem_row.track_name}.{ext}"
             )
         return FileResponse(
             stem_row.zip_path,
@@ -838,23 +845,32 @@ def download_stem_instrument(stem_id: int, instrument: str, token: str = None, d
         if not stem_row:
             raise HTTPException(status_code=404, detail="Saved stem not found.")
         if stem_row.instrument:
-            # Single-channel save -- zip_path already points at a lone wav,
-            # not a zip. Only serve it if it actually matches the
-            # instrument being asked for.
+            # Single-channel save -- zip_path already points at a lone
+            # audio file, not a zip. Only serve it if it actually matches
+            # the instrument being asked for.
             if stem_row.instrument != instrument:
                 raise HTTPException(status_code=404, detail=f"This saved stem is {stem_row.instrument}, not {instrument}.")
+            ext = stem_row.zip_path.rsplit('.', 1)[-1].lower()
             with open(stem_row.zip_path, "rb") as f:
-                wav_bytes = f.read()
+                audio_bytes = f.read()
         else:
+            # Newer splits store .mp3 inside the zip, older ones .wav —
+            # check both so old saved splits still work.
             with zipfile.ZipFile(stem_row.zip_path) as zf:
-                match = next((n for n in zf.namelist() if n.lower().endswith(instrument + ".wav")), None)
+                names = zf.namelist()
+                match = next((n for n in names if n.lower().endswith(instrument + ".mp3")), None)
+                ext = "mp3"
+                if not match:
+                    match = next((n for n in names if n.lower().endswith(instrument + ".wav")), None)
+                    ext = "wav"
                 if not match:
                     raise HTTPException(status_code=404, detail=f"No {instrument} track in this split.")
-                wav_bytes = zf.read(match)
+                audio_bytes = zf.read(match)
+        media_type = "audio/mpeg" if ext == "mp3" else "audio/wav"
         return Response(
-            content=wav_bytes,
-            media_type="audio/wav",
-            headers={"Content-Disposition": f'attachment; filename="{stem_row.track_name}_{instrument}.wav"'}
+            content=audio_bytes,
+            media_type=media_type,
+            headers={"Content-Disposition": f'attachment; filename="{stem_row.track_name}_{instrument}.{ext}"'}
         )
     except HTTPException:
         raise
@@ -878,16 +894,21 @@ def save_stem_instrument(stem_id: int, instrument: str, token: str = None, db: S
             raise HTTPException(status_code=400, detail="That save is already a single instrument.")
 
         with zipfile.ZipFile(stem_row.zip_path) as zf:
-            match = next((n for n in zf.namelist() if n.lower().endswith(instrument + ".wav")), None)
+            names = zf.namelist()
+            match = next((n for n in names if n.lower().endswith(instrument + ".mp3")), None)
+            ext = "mp3"
+            if not match:
+                match = next((n for n in names if n.lower().endswith(instrument + ".wav")), None)
+                ext = "wav"
             if not match:
                 raise HTTPException(status_code=404, detail=f"No {instrument} track in this split.")
-            wav_bytes = zf.read(match)
+            audio_bytes = zf.read(match)
 
         save_dir = "/data/stemline_uploads/saved"
         os.makedirs(save_dir, exist_ok=True)
-        wav_path = os.path.join(save_dir, f"{stem_id}_{instrument}_{secrets.token_hex(4)}.wav")
+        wav_path = os.path.join(save_dir, f"{stem_id}_{instrument}_{secrets.token_hex(4)}.{ext}")
         with open(wav_path, "wb") as f:
-            f.write(wav_bytes)
+            f.write(audio_bytes)
 
         new_row = Stem(
             user_id=user_id,
