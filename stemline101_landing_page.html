@@ -4343,8 +4343,18 @@ document.addEventListener('DOMContentLoaded', () => {
       myStemsList.querySelectorAll('.preview-wave-canvas').forEach(canvas => {
         let buffer = null;
         let loading = false;
+        // Tracks whether the pointer is still over THIS canvas. The fetch +
+        // decode below is async, so by the time it resolves the mouse may
+        // already be over a different row (or several rows, if the mouse
+        // swept across the list). Without this check, every row that was
+        // ever hovered eventually finishes its own fetch and calls
+        // audio.play() regardless of whether it's still being hovered --
+        // that's what was causing every saved song to start playing at once.
+        let hovering = false;
+        let liveAudio = null; // this canvas's own in-flight/playing audio, if any
         canvas.addEventListener('mouseenter', async () => {
           stopPreview();
+          hovering = true;
           const url = canvas.dataset.previewUrl;
           if (!previewAudioCtx) previewAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
           if (!buffer) {
@@ -4361,7 +4371,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             loading = false;
           }
+          if (!hovering) return; // mouse moved on before decode finished
           const audio = new Audio(url);
+          liveAudio = audio;
           audio.play().catch(() => {});
           previewActive = { canvas, audio, buffer };
           const tick = () => {
@@ -4370,13 +4382,18 @@ document.addEventListener('DOMContentLoaded', () => {
             previewActive.raf = requestAnimationFrame(tick);
           };
           tick();
-          audio.addEventListener('ended', () => { if (previewActive && previewActive.audio === audio) { drawWave(canvas, buffer, 0); stopPreview(); } });
+          audio.addEventListener('ended', () => { if (previewActive && previewActive.audio === audio) { drawWave(canvas, buffer, 0); stopPreview(); } liveAudio = null; });
         });
         canvas.addEventListener('mouseleave', () => {
+          hovering = false;
+          // Stop this canvas's own audio even if a later hover already made
+          // some other row the tracked previewActive -- otherwise this one
+          // keeps playing in the background, orphaned.
+          if (liveAudio) { try { liveAudio.pause(); } catch (e) {} liveAudio = null; }
           if (previewActive && previewActive.canvas === canvas) {
             stopPreview();
-            if (buffer) drawWave(canvas, buffer, 0);
           }
+          if (buffer) drawWave(canvas, buffer, 0);
         });
       });
 
