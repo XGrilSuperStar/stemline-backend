@@ -3825,14 +3825,13 @@ document.addEventListener('DOMContentLoaded', () => {
       if (typeof loadScreenStems === 'function') loadScreenStems();
 
       // Auto-load: drop split stems into their matching mixer channels so
-      // the person doesn't have to load each one by hand. Only fill
-      // channels that aren't already holding a stem from an earlier
-      // upload — otherwise a second song would silently overwrite a
-      // channel the person already picked from the first one.
+      // the person doesn't have to load each one by hand. A fresh upload
+      // is a new song, so it always replaces whatever's currently in every
+      // channel — leaving old channels holding the previous song's stems
+      // meant the mixer played a mix of two different songs.
       if (typeof window.__loadBackendStemToChannel === 'function') {
         const trackLabel = data.track_name || file.name;
-        const emptyChannels = CHANNEL_LIST.filter(chan => !currentStemMeta[chan]);
-        const channelsToLoad = emptyChannels.length > 0 ? emptyChannels : CHANNEL_LIST;
+        const channelsToLoad = CHANNEL_LIST;
         const results = await Promise.all(
           channelsToLoad.map(chan => window.__loadBackendStemToChannel(chan, data.stem_id, trackLabel))
         );
