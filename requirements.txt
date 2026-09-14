@@ -11,3 +11,4 @@ PyJWT==2.9.0
 email-validator
 numpy<2
 requests
+boto3

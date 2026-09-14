@@ -18,6 +18,9 @@ import re
 import smtplib
 from email.mime.text import MIMEText
 import requests
+import io
+import boto3
+from botocore.config import Config as BotoConfig
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Text, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
@@ -46,6 +49,49 @@ if not DATABASE_URL:
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
+# Cloudflare R2 (S3-compatible object storage) — stem zips and saved
+# single-instrument files live here instead of Railway's local disk volume.
+# A fixed-size disk volume doesn't scale once real users are splitting
+# thousands of songs; R2 is billed per byte stored with no egress fee, so
+# storage cost tracks actual usage instead of a flat monthly cap.
+R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID")
+R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID")
+R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY")
+R2_BUCKET_NAME = os.getenv("R2_BUCKET_NAME")
+R2_ENDPOINT_URL = os.getenv("R2_ENDPOINT_URL")
+
+r2_client = None
+if R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY and R2_ENDPOINT_URL and R2_BUCKET_NAME:
+    r2_client = boto3.client(
+        "s3",
+        endpoint_url=R2_ENDPOINT_URL,
+        aws_access_key_id=R2_ACCESS_KEY_ID,
+        aws_secret_access_key=R2_SECRET_ACCESS_KEY,
+        config=BotoConfig(signature_version="s3v4"),
+        region_name="auto",
+    )
+    logger.info("R2 storage configured — new stem saves will go to R2 instead of local disk.")
+else:
+    logger.warning("R2 credentials not fully set — stem storage will fail until R2_ACCOUNT_ID/R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY/R2_BUCKET_NAME/R2_ENDPOINT_URL are set.")
+
+def r2_upload_bytes(key: str, data: bytes):
+    r2_client.put_object(Bucket=R2_BUCKET_NAME, Key=key, Body=data)
+
+def r2_download_bytes(key: str) -> bytes:
+    obj = r2_client.get_object(Bucket=R2_BUCKET_NAME, Key=key)
+    return obj["Body"].read()
+
+def r2_delete(key: str):
+    r2_client.delete_object(Bucket=R2_BUCKET_NAME, Key=key)
+
+def is_r2_key(path_or_key: str) -> bool:
+    # Splits made before this migration have zip_path set to an absolute
+    # local filesystem path (starts with "/"), e.g. "/data/stemline_uploads/...".
+    # Splits made after it store a plain R2 object key with no leading
+    # slash, e.g. "splits/abc123_stems.zip". This lets old rows keep
+    # reading from local disk while everything new goes through R2.
+    return bool(path_or_key) and not path_or_key.startswith("/")
 
 # Models
 class User(Base):
@@ -642,19 +688,21 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
         if not stem_dir:
             raise Exception("No stem files generated")
 
-        # Create zip in a permanent stems folder, keyed by this request's
-        # uuid so it can never collide with any other split's zip — past or
-        # future, same filename or not.
-        stems_dir = "/data/stemline_uploads/saved_splits"
-        os.makedirs(stems_dir, exist_ok=True)
-        zip_path = os.path.join(stems_dir, f"{request_id}_{filename.rsplit('.', 1)[0]}_stems.zip")
-        logger.info(f"[job {request_id}] Creating zip file: {zip_path}")
-        with zipfile.ZipFile(zip_path, "w") as zf:
+        # Build the zip in memory and upload straight to R2, keyed by this
+        # request's uuid so it can never collide with any other split's zip
+        # — past or future, same filename or not.
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w") as zf:
             for root, dirs, files in os.walk(stem_dir):
                 for f in files:
                     file_full_path = os.path.join(root, f)
                     arcname = os.path.relpath(file_full_path, stem_dir)
                     zf.write(file_full_path, arcname)
+        zip_bytes = zip_buffer.getvalue()
+
+        zip_path = f"splits/{request_id}_{filename.rsplit('.', 1)[0]}_stems.zip"
+        logger.info(f"[job {request_id}] Uploading zip to R2: {zip_path} ({len(zip_bytes)} bytes)")
+        r2_upload_bytes(zip_path, zip_bytes)
 
         # The original upload used to be kept permanently alongside the zip
         # so users could re-download the whole song — but keeping a full
@@ -792,22 +840,24 @@ def download_stem(stem_id: int, token: str = None, db: Session = Depends(get_db)
         stem_row = db.query(Stem).filter(Stem.id == stem_id, Stem.user_id == user_id).first()
         if not stem_row:
             raise HTTPException(status_code=404, detail="Saved stem not found.")
+        from_r2 = is_r2_key(stem_row.zip_path)
         if stem_row.instrument:
             # Single-channel save — zip_path points at a lone audio file,
             # not a zip. Older saves are .wav, newer ones .mp3 — serve
-            # whichever this row actually is.
+            # whichever this row actually is. Older rows live on local
+            # disk (path starts with "/"), newer ones in R2.
             ext = stem_row.zip_path.rsplit('.', 1)[-1].lower()
             media_type = "audio/mpeg" if ext == "mp3" else "audio/wav"
-            return FileResponse(
-                stem_row.zip_path,
-                media_type=media_type,
-                filename=f"{stem_row.track_name}.{ext}"
-            )
-        return FileResponse(
-            stem_row.zip_path,
-            media_type="application/zip",
-            filename=f"{stem_row.track_name}_stems.zip"
-        )
+            filename = f"{stem_row.track_name}.{ext}"
+            if from_r2:
+                return Response(content=r2_download_bytes(stem_row.zip_path), media_type=media_type,
+                                 headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+            return FileResponse(stem_row.zip_path, media_type=media_type, filename=filename)
+        zip_filename = f"{stem_row.track_name}_stems.zip"
+        if from_r2:
+            return Response(content=r2_download_bytes(stem_row.zip_path), media_type="application/zip",
+                             headers={"Content-Disposition": f'attachment; filename="{zip_filename}"'})
+        return FileResponse(stem_row.zip_path, media_type="application/zip", filename=zip_filename)
     except Exception as e:
         logger.error(f"Download error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -847,16 +897,26 @@ def download_stem_instrument(stem_id: int, instrument: str, token: str = None, d
         if stem_row.instrument:
             # Single-channel save -- zip_path already points at a lone
             # audio file, not a zip. Only serve it if it actually matches
-            # the instrument being asked for.
+            # the instrument being asked for. Could be a legacy local path
+            # or a newer R2 key.
             if stem_row.instrument != instrument:
                 raise HTTPException(status_code=404, detail=f"This saved stem is {stem_row.instrument}, not {instrument}.")
             ext = stem_row.zip_path.rsplit('.', 1)[-1].lower()
-            with open(stem_row.zip_path, "rb") as f:
-                audio_bytes = f.read()
+            if is_r2_key(stem_row.zip_path):
+                audio_bytes = r2_download_bytes(stem_row.zip_path)
+            else:
+                with open(stem_row.zip_path, "rb") as f:
+                    audio_bytes = f.read()
         else:
             # Newer splits store .mp3 inside the zip, older ones .wav —
-            # check both so old saved splits still work.
-            with zipfile.ZipFile(stem_row.zip_path) as zf:
+            # check both so old saved splits still work. The zip itself
+            # may live locally (legacy) or in R2 (newer splits).
+            if is_r2_key(stem_row.zip_path):
+                zip_bytes = r2_download_bytes(stem_row.zip_path)
+            else:
+                with open(stem_row.zip_path, "rb") as f:
+                    zip_bytes = f.read()
+            with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
                 names = zf.namelist()
                 match = next((n for n in names if n.lower().endswith(instrument + ".mp3")), None)
                 ext = "mp3"
@@ -893,7 +953,12 @@ def save_stem_instrument(stem_id: int, instrument: str, token: str = None, db: S
         if stem_row.instrument:
             raise HTTPException(status_code=400, detail="That save is already a single instrument.")
 
-        with zipfile.ZipFile(stem_row.zip_path) as zf:
+        if is_r2_key(stem_row.zip_path):
+            zip_bytes = r2_download_bytes(stem_row.zip_path)
+        else:
+            with open(stem_row.zip_path, "rb") as f:
+                zip_bytes = f.read()
+        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
             names = zf.namelist()
             match = next((n for n in names if n.lower().endswith(instrument + ".mp3")), None)
             ext = "mp3"
@@ -904,16 +969,13 @@ def save_stem_instrument(stem_id: int, instrument: str, token: str = None, db: S
                 raise HTTPException(status_code=404, detail=f"No {instrument} track in this split.")
             audio_bytes = zf.read(match)
 
-        save_dir = "/data/stemline_uploads/saved"
-        os.makedirs(save_dir, exist_ok=True)
-        wav_path = os.path.join(save_dir, f"{stem_id}_{instrument}_{secrets.token_hex(4)}.{ext}")
-        with open(wav_path, "wb") as f:
-            f.write(audio_bytes)
+        r2_key = f"instruments/{stem_id}_{instrument}_{secrets.token_hex(4)}.{ext}"
+        r2_upload_bytes(r2_key, audio_bytes)
 
         new_row = Stem(
             user_id=user_id,
             track_name=f"{stem_row.track_name} ({instrument.capitalize()})",
-            zip_path=wav_path,
+            zip_path=r2_key,
             instrument=instrument,
             parent_stem_id=stem_row.id
         )
@@ -960,12 +1022,16 @@ def delete_stem(stem_id: int, token: str = None, db: Session = Depends(get_db)):
         stem_row = db.query(Stem).filter(Stem.id == stem_id, Stem.user_id == user_id).first()
         if not stem_row:
             raise HTTPException(status_code=404, detail="Saved stem not found.")
-        # Remove the file on disk first — if this fails we still don't want
-        # a dangling DB row pointing at nothing, but we also don't want to
-        # silently leak files, so log any cleanup failure rather than hide it.
+        # Remove the file first — if this fails we still don't want a
+        # dangling DB row pointing at nothing, but we also don't want to
+        # silently leak files, so log any cleanup failure rather than hide
+        # it. Could be an R2 object (new rows) or a local file (legacy).
         try:
-            if stem_row.zip_path and os.path.exists(stem_row.zip_path):
-                os.remove(stem_row.zip_path)
+            if stem_row.zip_path:
+                if is_r2_key(stem_row.zip_path):
+                    r2_delete(stem_row.zip_path)
+                elif os.path.exists(stem_row.zip_path):
+                    os.remove(stem_row.zip_path)
         except Exception as file_err:
             logger.warning(f"Could not remove file for stem {stem_id}: {file_err}")
         db.delete(stem_row)
