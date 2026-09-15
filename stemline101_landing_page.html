@@ -93,9 +93,9 @@
 
   /* ===== HERO ===== */
   .hero {
-    padding: 1.1rem 2.5rem 1.4rem;
+    padding: 0.6rem 2.5rem 0.8rem;
     max-width: 1600px; margin: 0 auto;
-    display: flex; flex-direction: column; gap: 0.9rem;
+    display: flex; flex-direction: column; gap: 0.5rem;
     align-items: center;
     background: var(--void);
     position: relative;
@@ -1205,11 +1205,6 @@
 <section class="hero">
   <div>
     <h1 class="stencil">Unmix any song<br>into its stems.<br><span class="accent">Mix them with any other.</span></h1>
-    <p style="color:var(--chrome);font-size:0.85rem;line-height:1.6;max-width:720px;margin:0.8rem 0 1rem;">
-      A stem is one isolated part of a song — just the vocals, just the drums, just the bass.
-      Stemline splits any song into its stems so you can mix like a DJ, or blend parts from
-      different songs into something new.
-    </p>
     <div class="eyebrow"><span class="cat-no">STM-001</span> 6-CHANNEL DECONSTRUCTION UNIT</div>
     <p class="sub">Split any track into clean vocals, drums, bass, and more — then pull in stems from other songs and blend them together on one mixer. Great for DJing.</p>
     <div style="display:flex;align-items:center;gap:1rem;">
@@ -4811,7 +4806,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
       var scale = available / contentHeight;
       if (scale > 1) scale = 1;
-      if (scale < 0.5) scale = 0.5;
+      // Never shrink past 0.82 — below that, knobs/faders/text get too
+      // small to see or click. If it still doesn't fit at 0.82, the page
+      // scrolls a bit rather than becoming unusable.
+      if (scale < 0.82) scale = 0.82;
 
       hero.style.transform = 'scale(' + scale + ')';
       // Collapse the extra space the unscaled layout box would otherwise
