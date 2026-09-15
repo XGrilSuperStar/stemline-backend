@@ -4791,5 +4791,39 @@ document.addEventListener('DOMContentLoaded', () => {
     if (b) b.style.display = 'none';
   }
 </script>
+<script>
+  // Scale the hero + mixer board down so the whole thing fits in one
+  // screen (below the nav bar) with no scrolling needed to reach any
+  // control. Only ever scales DOWN, never up, and never below 0.5 so
+  // it stays usable on very short viewports.
+  (function () {
+    var hero = document.querySelector('.hero');
+    var nav = document.querySelector('nav');
+    if (!hero) return;
+
+    function fitHero() {
+      hero.style.transform = 'none';
+      hero.style.transformOrigin = 'top center';
+
+      var navHeight = nav ? nav.getBoundingClientRect().height : 0;
+      var available = window.innerHeight - navHeight;
+      var contentHeight = hero.scrollHeight;
+
+      var scale = available / contentHeight;
+      if (scale > 1) scale = 1;
+      if (scale < 0.5) scale = 0.5;
+
+      hero.style.transform = 'scale(' + scale + ')';
+      // Collapse the extra space the unscaled layout box would otherwise
+      // leave behind, so content after the hero moves up to meet it.
+      hero.style.marginBottom = (contentHeight * (scale - 1)) + 'px';
+    }
+
+    window.addEventListener('load', fitHero);
+    window.addEventListener('resize', fitHero);
+    // Re-fit after fonts/images settle, since scrollHeight can change.
+    setTimeout(fitHero, 300);
+  })();
+</script>
 </body>
 </html>
