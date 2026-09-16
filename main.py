@@ -464,6 +464,24 @@ def admin_disk_usage(token: str = None, db: Session = Depends(get_db)):
     breakdown.sort(key=lambda x: -x["bytes"])
     return {"root": root, "total_bytes": total_bytes, "total_file_count": file_count, "breakdown": breakdown}
 
+@app.get("/api/v1/admin/db-size")
+def admin_db_size(token: str = None, db: Session = Depends(get_db)):
+    user_id = get_current_user(token)
+    if not is_admin_user(db, user_id):
+        raise HTTPException(status_code=403, detail="Admin only.")
+    total = db.execute(text("SELECT pg_database_size(current_database())")).scalar()
+    rows = db.execute(text("""
+        SELECT relname AS table_name,
+               pg_total_relation_size(relid) AS bytes
+        FROM pg_catalog.pg_statio_user_tables
+        ORDER BY bytes DESC
+        LIMIT 15
+    """)).fetchall()
+    return {
+        "total_bytes": total,
+        "tables": [{"table": r[0], "bytes": r[1]} for r in rows],
+    }
+
 @app.delete("/api/v1/admin/wipe-legacy-uploads")
 def admin_wipe_legacy_uploads(token: str = None, db: Session = Depends(get_db)):
     # /data/stemline_uploads is entirely deprecated — every current split
