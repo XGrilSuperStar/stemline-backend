@@ -407,6 +407,33 @@ def admin_delete_my_stems(token: str = None, db: Session = Depends(get_db)):
     db.commit()
     return {"deleted": deleted}
 
+@app.delete("/api/v1/admin/local-disk-stems")
+def admin_delete_local_disk_stems(token: str = None, db: Session = Depends(get_db)):
+    # One-off cleanup: stems saved before the R2 migration have zip_path
+    # (and sometimes orig_path) set to an absolute local path on the
+    # Railway volume instead of an R2 key. Deletes those files off disk
+    # and removes the now-dead rows, freeing up the volume.
+    user_id = get_current_user(token)
+    if not is_admin_user(db, user_id):
+        raise HTTPException(status_code=403, detail="Admin only.")
+    old_rows = db.query(Stem).filter(Stem.zip_path.like("/%")).all()
+    files_deleted = 0
+    bytes_freed = 0
+    for row in old_rows:
+        for path in (row.zip_path, row.orig_path):
+            if path and os.path.exists(path):
+                try:
+                    bytes_freed += os.path.getsize(path)
+                    os.remove(path)
+                    files_deleted += 1
+                except Exception as e:
+                    logger.warning(f"Could not remove local stem file {path}: {e}")
+    rows_deleted = len(old_rows)
+    for row in old_rows:
+        db.delete(row)
+    db.commit()
+    return {"rows_deleted": rows_deleted, "files_deleted": files_deleted, "bytes_freed": bytes_freed}
+
 # ─── STRIPE SUBSCRIPTIONS ────────────────────────────────────────────────
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
