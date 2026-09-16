@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, Request
 from fastapi.responses import FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -21,6 +21,7 @@ import requests
 import io
 import boto3
 from botocore.config import Config as BotoConfig
+import stripe
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean, Text, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
@@ -103,6 +104,9 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     reset_token_hash = Column(String, nullable=True)
     reset_token_expires = Column(DateTime, nullable=True)
+    is_premium = Column(Boolean, default=False)
+    stripe_customer_id = Column(String, nullable=True)
+    premium_expires_at = Column(DateTime, nullable=True)
 
 class SignupRequest(BaseModel):
     email: str
@@ -298,6 +302,16 @@ try:
 except Exception as e:
     logger.warning(f"Reset token column migration skipped or already applied: {e}")
 
+# One-time migration: add premium/subscription columns to users table
+try:
+    with engine.connect() as conn:
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT FALSE"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_expires_at TIMESTAMP"))
+        conn.commit()
+except Exception as e:
+    logger.warning(f"Premium column migration skipped or already applied: {e}")
+
 # Email config (set these in Railway env vars to enable real email delivery)
 # Railway blocks outbound SMTP ports, so we send email over HTTPS via Resend
 # instead of raw SMTP. Sign up at resend.com, verify a sending domain (or use
@@ -381,6 +395,67 @@ def admin_delete_my_stems(token: str = None, db: Session = Depends(get_db)):
     deleted = db.query(Stem).filter(Stem.user_id == user_id).delete()
     db.commit()
     return {"deleted": deleted}
+
+# ─── STRIPE SUBSCRIPTIONS ────────────────────────────────────────────────
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
+STRIPE_PRICE_MONTHLY = os.getenv("STRIPE_PRICE_MONTHLY")
+STRIPE_PRICE_ANNUAL = os.getenv("STRIPE_PRICE_ANNUAL")
+
+class CheckoutRequest(BaseModel):
+    plan: str  # "monthly" or "annual"
+
+@app.post("/api/v1/payments/create-checkout")
+def create_checkout(body: CheckoutRequest, token: str = None, db: Session = Depends(get_db)):
+    user_id = get_current_user(token)
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    price_id = STRIPE_PRICE_MONTHLY if body.plan == "monthly" else STRIPE_PRICE_ANNUAL
+    if body.plan not in ("monthly", "annual") or not price_id:
+        raise HTTPException(status_code=400, detail="Invalid plan.")
+
+    session = stripe.checkout.Session.create(
+        payment_method_types=["card"],
+        line_items=[{"price": price_id, "quantity": 1}],
+        mode="subscription",
+        customer_email=user.email,
+        success_url=f"{FRONTEND_URL}?subscribed=success",
+        cancel_url=f"{FRONTEND_URL}?subscribed=cancelled",
+        metadata={"user_id": str(user.id)},
+    )
+    return {"checkout_url": session.url}
+
+@app.post("/api/v1/payments/webhook")
+async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature")
+    try:
+        event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
+    except (ValueError, stripe.error.SignatureVerificationError):
+        raise HTTPException(status_code=400, detail="Webhook signature verification failed.")
+
+    event_type = event["type"]
+    data = event["data"]["object"]
+
+    if event_type == "checkout.session.completed":
+        user_id = data.get("metadata", {}).get("user_id")
+        customer_id = data.get("customer")
+        if user_id:
+            user = db.query(User).filter(User.id == int(user_id)).first()
+            if user:
+                user.is_premium = True
+                user.stripe_customer_id = customer_id
+                db.commit()
+    elif event_type in ("customer.subscription.deleted",):
+        customer_id = data.get("customer")
+        user = db.query(User).filter(User.stripe_customer_id == customer_id).first()
+        if user:
+            user.is_premium = False
+            db.commit()
+
+    return {"status": "ok"}
 
 class ReviewRequest(BaseModel):
     display_name: str
@@ -619,7 +694,8 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
         output_dir = os.path.join(upload_dir, "output")
         os.makedirs(output_dir, exist_ok=True)
 
-        if SEPARATION_ENGINE == "bsroformer":
+        engine_for_this_job = "bsroformer" if stem_count == "premium" else SEPARATION_ENGINE
+        if engine_for_this_job == "bsroformer":
             # BS-RoFormer SW: transformer-based 6-stem model (vocals, drums,
             # bass, guitar, piano, other), better SDR than Demucs — biggest
             # gain is on bass. Auto-downloads its checkpoint (~700MB) into
@@ -774,6 +850,15 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
 def split_stem(file: UploadFile = File(...), token: str = None, stems: str = Form("6"), db: Session = Depends(get_db)):
     logger.info(f"Split request received: {file.filename} (stems={stems})")
     user_id = get_current_user(token)
+
+    # Premium gate: the high-quality engine is a paid feature. Free users
+    # are silently kept on the default engine regardless of what the
+    # frontend requests.
+    requesting_premium_engine = stems == "premium"
+    if requesting_premium_engine:
+        requesting_user = db.query(User).filter(User.id == user_id).first()
+        if not (requesting_user and requesting_user.is_premium):
+            raise HTTPException(status_code=402, detail="Premium subscription required for the high-quality engine.")
 
     # Each split gets its own uuid-keyed work directory so concurrent or
     # repeated splits never share a folder or filename. Before this,
