@@ -425,6 +425,45 @@ def admin_user_count(token: str = None, db: Session = Depends(get_db)):
     count = db.query(User).count()
     return {"user_count": count}
 
+@app.get("/api/v1/admin/disk-usage")
+def admin_disk_usage(token: str = None, db: Session = Depends(get_db)):
+    # Diagnostic: breaks down what's actually consuming space on the
+    # /data Railway volume, since the local-disk-stems cleanup (which
+    # only removes files tied to known DB rows) may not account for
+    # everything sitting there — orphaned files, old cache dirs, etc.
+    user_id = get_current_user(token)
+    if not is_admin_user(db, user_id):
+        raise HTTPException(status_code=403, detail="Admin only.")
+    root = "/data"
+    breakdown = []
+    total_bytes = 0
+    file_count = 0
+    if os.path.exists(root):
+        for entry in os.listdir(root):
+            full_path = os.path.join(root, entry)
+            size = 0
+            count = 0
+            if os.path.isdir(full_path):
+                for dirpath, _, filenames in os.walk(full_path):
+                    for fn in filenames:
+                        fp = os.path.join(dirpath, fn)
+                        try:
+                            size += os.path.getsize(fp)
+                            count += 1
+                        except OSError:
+                            pass
+            else:
+                try:
+                    size = os.path.getsize(full_path)
+                    count = 1
+                except OSError:
+                    pass
+            breakdown.append({"path": full_path, "bytes": size, "file_count": count})
+            total_bytes += size
+            file_count += count
+    breakdown.sort(key=lambda x: -x["bytes"])
+    return {"root": root, "total_bytes": total_bytes, "total_file_count": file_count, "breakdown": breakdown}
+
 @app.delete("/api/v1/admin/my-stems")
 def admin_delete_my_stems(token: str = None, db: Session = Depends(get_db)):
     user_id = get_current_user(token)
