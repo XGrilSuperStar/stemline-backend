@@ -390,6 +390,25 @@ def get_db():
     finally:
         db.close()
 
+@app.get("/api/v1/me")
+def get_me(token: str = None, db: Session = Depends(get_db)):
+    user_id = get_current_user(token)
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    FREE_SPLITS_PER_PERIOD = 5
+    splits_used = user.splits_this_period or 0
+    period_start = user.splits_period_start
+    if period_start and (datetime.utcnow() - period_start).days >= 30:
+        splits_used = 0
+    return {
+        "email": user.email,
+        "is_premium": bool(user.is_premium),
+        "show_ads": not bool(user.is_premium),
+        "splits_used_this_period": splits_used,
+        "splits_limit": None if user.is_premium else FREE_SPLITS_PER_PERIOD,
+    }
+
 @app.get("/api/v1/admin/user-count")
 def admin_user_count(token: str = None, db: Session = Depends(get_db)):
     user_id = get_current_user(token)
