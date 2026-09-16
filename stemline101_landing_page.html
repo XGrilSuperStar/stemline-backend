@@ -1186,9 +1186,35 @@
   </div>
   <div id="navAccountGroup" style="display:none;gap:0.75rem;align-items:center;">
     <button id="navMyStemsBtn" style="display:none;">Save stems</button>
+    <button id="navUpgradeBtn" class="nav-cta" style="border:none;cursor:pointer;background:linear-gradient(90deg,#FFB020,#3CFDE0);color:#0E1013;font-weight:700;">Upgrade</button>
     <button id="navAccountBtn" class="nav-cta" style="border:none;cursor:pointer;">Log out</button>
   </div>
 </nav>
+
+<!-- ===== PRICING MODAL ===== -->
+<div id="pricingOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:1200;"></div>
+<div id="pricingModal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:90%;max-width:480px;background:var(--concrete);border:1px solid var(--concrete-line);z-index:1201;font-family:'JetBrains Mono',monospace;padding:2rem;border-radius:4px;">
+  <button id="pricingCloseBtn" style="position:absolute;top:0.75rem;right:0.75rem;background:none;border:none;color:var(--chrome-dim);font-size:1.2rem;cursor:pointer;">✕</button>
+  <div style="text-align:center;margin-bottom:1.5rem;">
+    <div class="logo-text stencil" style="font-size:1.1rem;">GO PREMIUM</div>
+    <div style="color:var(--chrome-dim);font-size:0.8rem;margin-top:0.4rem;">Free plan: 5 splits / month. Premium: unlimited.</div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:0.85rem;">
+    <button id="pricingMonthlyBtn" style="padding:0.9rem;border:1px solid var(--concrete-line);background:none;color:inherit;cursor:pointer;text-align:left;font-family:inherit;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="text-transform:uppercase;letter-spacing:0.02em;">Monthly</span>
+        <span style="font-weight:700;">$5.99/mo</span>
+      </div>
+    </button>
+    <button id="pricingAnnualBtn" style="padding:0.9rem;border:1px solid var(--chrome-dim);background:none;color:inherit;cursor:pointer;text-align:left;font-family:inherit;position:relative;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="text-transform:uppercase;letter-spacing:0.02em;">Annual <span style="font-size:0.7rem;color:#3CFDE0;">save 44%</span></span>
+        <span style="font-weight:700;">$39.99/yr</span>
+      </div>
+    </button>
+  </div>
+  <div id="pricingError" style="display:none;color:#ff6b6b;font-size:0.8rem;margin-top:1rem;text-align:center;"></div>
+</div>
 
 <!-- ===== MY STEMS PANEL ===== -->
 <div id="myStemsOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:1100;"></div>
@@ -3414,6 +3440,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const navLoginBtn = document.getElementById('navLoginBtn');
   const navSignupBtn = document.getElementById('navSignupBtn');
   const navMyStemsBtn = document.getElementById('navMyStemsBtn');
+  const navUpgradeBtn = document.getElementById('navUpgradeBtn');
+  const pricingOverlay = document.getElementById('pricingOverlay');
+  const pricingModal = document.getElementById('pricingModal');
+  const pricingCloseBtn = document.getElementById('pricingCloseBtn');
+  const pricingMonthlyBtn = document.getElementById('pricingMonthlyBtn');
+  const pricingAnnualBtn = document.getElementById('pricingAnnualBtn');
+  const pricingError = document.getElementById('pricingError');
   const authModal = document.getElementById('authModal');
   const authModalClose = document.getElementById('authModalClose');
   const authModalTitle = document.getElementById('authModalTitle');
@@ -3474,6 +3507,57 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshAccountButton();
   loadScreenStems();
   });
+
+  function openPricingModal() {
+    pricingError.style.display = 'none';
+    pricingOverlay.style.display = 'block';
+    pricingModal.style.display = 'block';
+  }
+  function closePricingModal() {
+    pricingOverlay.style.display = 'none';
+    pricingModal.style.display = 'none';
+  }
+  navUpgradeBtn.addEventListener('click', () => {
+    if (!getToken()) { openAuthModal('signup'); return; }
+    openPricingModal();
+  });
+  pricingCloseBtn.addEventListener('click', closePricingModal);
+  pricingOverlay.addEventListener('click', closePricingModal);
+
+  async function startCheckout(plan) {
+    pricingError.style.display = 'none';
+    try {
+      const res = await fetch(API_BASE + '/api/v1/payments/create-checkout?token=' + encodeURIComponent(getToken()), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Checkout failed.');
+      window.location.href = data.checkout_url;
+    } catch (err) {
+      pricingError.textContent = err.message || 'Something went wrong.';
+      pricingError.style.display = 'block';
+    }
+  }
+  pricingMonthlyBtn.addEventListener('click', () => startCheckout('monthly'));
+  pricingAnnualBtn.addEventListener('click', () => startCheckout('annual'));
+
+  // Post-checkout redirect landing (?subscribed=success / cancelled)
+  (function handleSubscribedRedirect() {
+    const params = new URLSearchParams(window.location.search);
+    const sub = params.get('subscribed');
+    if (sub === 'success') {
+      alert('You\'re premium now — unlimited splits unlocked.');
+    } else if (sub === 'cancelled') {
+      alert('Checkout cancelled — no charge made.');
+    }
+    if (sub) {
+      params.delete('subscribed');
+      const newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+      window.history.replaceState({}, '', newUrl);
+    }
+  })();
 
   function openAuthModal(mode) {
     authMode = mode;
