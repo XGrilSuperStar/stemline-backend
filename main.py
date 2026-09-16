@@ -464,6 +464,32 @@ def admin_disk_usage(token: str = None, db: Session = Depends(get_db)):
     breakdown.sort(key=lambda x: -x["bytes"])
     return {"root": root, "total_bytes": total_bytes, "total_file_count": file_count, "breakdown": breakdown}
 
+@app.delete("/api/v1/admin/wipe-legacy-uploads")
+def admin_wipe_legacy_uploads(token: str = None, db: Session = Depends(get_db)):
+    # /data/stemline_uploads is entirely deprecated — every current split
+    # writes to /tmp then uploads to R2, so nothing on the app's write
+    # path touches this folder anymore. Any files here are orphaned
+    # leftovers (from before the R2 migration, or from DB rows already
+    # deleted while their files stayed behind). Safe to wipe entirely.
+    user_id = get_current_user(token)
+    if not is_admin_user(db, user_id):
+        raise HTTPException(status_code=403, detail="Admin only.")
+    target = "/data/stemline_uploads"
+    bytes_freed = 0
+    files_deleted = 0
+    if os.path.exists(target):
+        for dirpath, _, filenames in os.walk(target):
+            for fn in filenames:
+                fp = os.path.join(dirpath, fn)
+                try:
+                    bytes_freed += os.path.getsize(fp)
+                    os.remove(fp)
+                    files_deleted += 1
+                except OSError as e:
+                    logger.warning(f"Could not remove {fp}: {e}")
+        shutil.rmtree(target, ignore_errors=True)
+    return {"files_deleted": files_deleted, "bytes_freed": bytes_freed}
+
 @app.delete("/api/v1/admin/my-stems")
 def admin_delete_my_stems(token: str = None, db: Session = Depends(get_db)):
     user_id = get_current_user(token)
