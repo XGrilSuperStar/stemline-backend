@@ -3510,14 +3510,17 @@ document.addEventListener('DOMContentLoaded', () => {
   async function refreshAdSlot() {
     if (!getToken()) {
       adSlot.style.display = 'block'; // logged-out visitors see ads
+      navUpgradeBtn.style.display = '';
       return;
     }
     try {
       const res = await fetch(API_BASE + '/api/v1/me?token=' + encodeURIComponent(getToken()));
       const data = await res.json();
       adSlot.style.display = data.show_ads ? 'block' : 'none';
+      navUpgradeBtn.style.display = data.is_premium ? 'none' : '';
     } catch (err) {
       adSlot.style.display = 'block'; // fail open to showing ads
+      navUpgradeBtn.style.display = '';
     }
   }
   refreshAccountButton();
