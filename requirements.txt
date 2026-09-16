@@ -12,3 +12,4 @@ email-validator
 numpy<2
 requests
 boto3
+stripe
