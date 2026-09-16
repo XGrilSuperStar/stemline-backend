@@ -357,6 +357,14 @@ def is_admin_user(db: Session, user_id: int) -> bool:
     user = db.query(User).filter(User.id == user_id).first()
     return bool(user and user.email and user.email.lower() == admin_email.lower())
 
+# Helper: get DB session
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
 @app.get("/api/v1/admin/user-count")
 def admin_user_count(token: str = None, db: Session = Depends(get_db)):
     user_id = get_current_user(token)
@@ -373,14 +381,6 @@ def admin_delete_my_stems(token: str = None, db: Session = Depends(get_db)):
     deleted = db.query(Stem).filter(Stem.user_id == user_id).delete()
     db.commit()
     return {"deleted": deleted}
-
-# Helper: get DB session
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 class ReviewRequest(BaseModel):
     display_name: str
