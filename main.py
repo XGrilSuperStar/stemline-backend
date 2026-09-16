@@ -382,6 +382,13 @@ def is_admin_user(db: Session, user_id: int) -> bool:
     user = db.query(User).filter(User.id == user_id).first()
     return bool(user and user.email and user.email.lower() == admin_email.lower())
 
+def effective_is_premium(db: Session, user: "User") -> bool:
+    # Admin account gets full premium behavior (unlimited splits, no ads,
+    # no upgrade prompt) without needing an actual Stripe subscription.
+    if user and is_admin_user(db, user.id):
+        return True
+    return bool(user and user.is_premium)
+
 # Helper: get DB session
 def get_db():
     db = SessionLocal()
@@ -397,16 +404,17 @@ def get_me(token: str = None, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
     FREE_SPLITS_PER_PERIOD = 5
+    premium = effective_is_premium(db, user)
     splits_used = user.splits_this_period or 0
     period_start = user.splits_period_start
     if period_start and (datetime.utcnow() - period_start).days >= 30:
         splits_used = 0
     return {
         "email": user.email,
-        "is_premium": bool(user.is_premium),
-        "show_ads": not bool(user.is_premium),
+        "is_premium": premium,
+        "show_ads": not premium,
         "splits_used_this_period": splits_used,
-        "splits_limit": None if user.is_premium else FREE_SPLITS_PER_PERIOD,
+        "splits_limit": None if premium else FREE_SPLITS_PER_PERIOD,
     }
 
 @app.get("/api/v1/admin/user-count")
@@ -913,7 +921,7 @@ def split_stem(file: UploadFile = File(...), token: str = None, stems: str = For
     # unlimited. The separation engine itself is the same for everyone.
     FREE_SPLITS_PER_PERIOD = 5
     requesting_user = db.query(User).filter(User.id == user_id).first()
-    if requesting_user and not requesting_user.is_premium:
+    if requesting_user and not effective_is_premium(db, requesting_user):
         now = datetime.utcnow()
         period_start = requesting_user.splits_period_start
         if not period_start or (now - period_start).days >= 30:
