@@ -1154,6 +1154,14 @@
 </head>
 <body>
 
+<!-- ===== AD SLOT (free-tier only) =====
+     Placeholder — drop in the real Google AdSense <ins> tag + your
+     ca-pub-XXXXXXXXXX client ID here once you have your publisher ID.
+     Hidden automatically for premium users via #adSlot.style.display. -->
+<div id="adSlot" style="display:none;text-align:center;padding:0.5rem;background:var(--concrete);border-bottom:1px solid var(--concrete-line);font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:var(--chrome-dim);">
+  Ad space — upgrade to Premium to remove ads
+</div>
+
 <nav>
   <div class="logo">
     <div class="logo-mark">
@@ -1197,7 +1205,7 @@
   <button id="pricingCloseBtn" style="position:absolute;top:0.75rem;right:0.75rem;background:none;border:none;color:var(--chrome-dim);font-size:1.2rem;cursor:pointer;">✕</button>
   <div style="text-align:center;margin-bottom:1.5rem;">
     <div class="logo-text stencil" style="font-size:1.1rem;">GO PREMIUM</div>
-    <div style="color:var(--chrome-dim);font-size:0.8rem;margin-top:0.4rem;">Free plan: 5 splits / month. Premium: unlimited.</div>
+    <div style="color:var(--chrome-dim);font-size:0.8rem;margin-top:0.4rem;">Free plan: 5 splits / month, ads. Premium: unlimited splits, no ads.</div>
   </div>
   <div style="display:flex;flex-direction:column;gap:0.85rem;">
     <button id="pricingMonthlyBtn" style="padding:0.9rem;border:1px solid var(--concrete-line);background:none;color:inherit;cursor:pointer;text-align:left;font-family:inherit;">
@@ -3496,6 +3504,21 @@ document.addEventListener('DOMContentLoaded', () => {
       navAuthButtons.style.display = 'flex';
       navAccountGroup.style.display = 'none';
     }
+    refreshAdSlot();
+  }
+  const adSlot = document.getElementById('adSlot');
+  async function refreshAdSlot() {
+    if (!getToken()) {
+      adSlot.style.display = 'block'; // logged-out visitors see ads
+      return;
+    }
+    try {
+      const res = await fetch(API_BASE + '/api/v1/me?token=' + encodeURIComponent(getToken()));
+      const data = await res.json();
+      adSlot.style.display = data.show_ads ? 'block' : 'none';
+    } catch (err) {
+      adSlot.style.display = 'block'; // fail open to showing ads
+    }
   }
   refreshAccountButton();
   loadScreenStems();
@@ -3549,6 +3572,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sub = params.get('subscribed');
     if (sub === 'success') {
       alert('You\'re premium now — unlimited splits unlocked.');
+      refreshAdSlot();
     } else if (sub === 'cancelled') {
       alert('Checkout cancelled — no charge made.');
     }
