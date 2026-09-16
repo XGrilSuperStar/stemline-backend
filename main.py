@@ -571,6 +571,13 @@ def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_db)):
 # Demucs (https://github.com/facebookresearch/demucs) — Copyright (c) Meta
 # Platforms, Inc. Used under the MIT License. See LICENSE/NOTICE for full text.
 #
+# MDX23C (https://github.com/ZFTurbo/MVSEP-MDX23-music-separation-model) —
+# by Roman Solovyev, Alexander Stempkovskiy, and Tatiana Habruseva. Built on
+# code from kuielab (Sound Demixing Challenge 2023) and the Demucs4/MDX
+# architectures, with MDX vocal weights from the Ultimate Vocal Remover
+# project (credit: Kimberley Jensen). Cite: Solovyev et al., "Benchmarks and
+# leaderboards for sound demixing tasks," arXiv:2305.07489, 2023.
+#
 # Which separation engine to run. "demucs" (default, current production
 # engine) or "bsroformer" (BS-RoFormer SW — better SDR, especially bass,
 # but untested for real-world timing on Railway's CPU-only dyno). Set via
