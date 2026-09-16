@@ -107,6 +107,8 @@ class User(Base):
     is_premium = Column(Boolean, default=False)
     stripe_customer_id = Column(String, nullable=True)
     premium_expires_at = Column(DateTime, nullable=True)
+    splits_this_period = Column(Integer, default=0)
+    splits_period_start = Column(DateTime, nullable=True)
 
 class SignupRequest(BaseModel):
     email: str
@@ -311,6 +313,15 @@ try:
         conn.commit()
 except Exception as e:
     logger.warning(f"Premium column migration skipped or already applied: {e}")
+
+# One-time migration: add free-tier split usage columns to users table
+try:
+    with engine.connect() as conn:
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS splits_this_period INTEGER DEFAULT 0"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS splits_period_start TIMESTAMP"))
+        conn.commit()
+except Exception as e:
+    logger.warning(f"Split usage column migration skipped or already applied: {e}")
 
 # Email config (set these in Railway env vars to enable real email delivery)
 # Railway blocks outbound SMTP ports, so we send email over HTTPS via Resend
@@ -694,7 +705,7 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
         output_dir = os.path.join(upload_dir, "output")
         os.makedirs(output_dir, exist_ok=True)
 
-        engine_for_this_job = "bsroformer" if stem_count == "premium" else SEPARATION_ENGINE
+        engine_for_this_job = SEPARATION_ENGINE
         if engine_for_this_job == "bsroformer":
             # BS-RoFormer SW: transformer-based 6-stem model (vocals, drums,
             # bass, guitar, piano, other), better SDR than Demucs — biggest
@@ -851,14 +862,22 @@ def split_stem(file: UploadFile = File(...), token: str = None, stems: str = For
     logger.info(f"Split request received: {file.filename} (stems={stems})")
     user_id = get_current_user(token)
 
-    # Premium gate: the high-quality engine is a paid feature. Free users
-    # are silently kept on the default engine regardless of what the
-    # frontend requests.
-    requesting_premium_engine = stems == "premium"
-    if requesting_premium_engine:
-        requesting_user = db.query(User).filter(User.id == user_id).first()
-        if not (requesting_user and requesting_user.is_premium):
-            raise HTTPException(status_code=402, detail="Premium subscription required for the high-quality engine.")
+    # Free tier gate: free users get a limited number of splits per
+    # rolling 30-day period, matching Moises' model. Premium users are
+    # unlimited. The separation engine itself is the same for everyone.
+    FREE_SPLITS_PER_PERIOD = 5
+    requesting_user = db.query(User).filter(User.id == user_id).first()
+    if requesting_user and not requesting_user.is_premium:
+        now = datetime.utcnow()
+        period_start = requesting_user.splits_period_start
+        if not period_start or (now - period_start).days >= 30:
+            requesting_user.splits_period_start = now
+            requesting_user.splits_this_period = 0
+            period_start = now
+        if requesting_user.splits_this_period >= FREE_SPLITS_PER_PERIOD:
+            raise HTTPException(status_code=402, detail=f"Free plan allows {FREE_SPLITS_PER_PERIOD} splits per month. Upgrade for unlimited.")
+        requesting_user.splits_this_period += 1
+        db.commit()
 
     # Each split gets its own uuid-keyed work directory so concurrent or
     # repeated splits never share a folder or filename. Before this,
