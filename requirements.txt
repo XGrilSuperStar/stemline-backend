@@ -13,3 +13,8 @@ numpy<2
 requests
 boto3
 stripe
+soundfile
+scipy
+librosa
+onnxruntime
+torch<2.6

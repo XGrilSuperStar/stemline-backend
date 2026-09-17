@@ -819,10 +819,13 @@ def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_db)):
 # leaderboards for sound demixing tasks," arXiv:2305.07489, 2023.
 #
 # Which separation engine to run. "demucs" (default, current production
-# engine) or "bsroformer" (BS-RoFormer SW — better SDR, especially bass,
-# but untested for real-world timing on Railway's CPU-only dyno). Set via
-# Railway env var SEPARATION_ENGINE once BS-RoFormer's actual speed here
-# has been measured — don't flip the default blind.
+# engine), "bsroformer" (BS-RoFormer SW — better SDR, especially bass,
+# but only accepts .wav input, and untested for real-world timing on
+# Railway's CPU-only dyno), or "mdx23c" (ZFTurbo's MVSEP-MDX23 ensemble,
+# 4 stems only: vocals/drums/bass/other, vendored in vendor/mvsep_mdx23/,
+# also untested for real-world CPU timing on Railway). Set via Railway
+# env var SEPARATION_ENGINE — don't flip the default blind on any of
+# these until their actual speed/quality here has been measured.
 SEPARATION_ENGINE = os.getenv("SEPARATION_ENGINE", "demucs")
 
 
@@ -866,6 +869,42 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
             logger.info(f"[job {request_id}] bs-roformer-infer return code: {result.returncode}")
             if result.returncode != 0:
                 raise Exception(f"BS-RoFormer processing failed: {result.stderr}")
+        elif engine_for_this_job == "mdx23c":
+            # MDX23C (ZFTurbo's MVSEP-MDX23 ensemble): 4-stem model (vocals,
+            # drums, bass, other), Demucs4+MDX ensemble, 3rd place in the
+            # 2023 Sound Demixing Challenge. Vendored directly in
+            # vendor/mvsep_mdx23/ since it's not a pip package. Auto-downloads
+            # its checkpoints (~1GB combined: one Demucs .th + two Kim vocal
+            # ONNX models) into vendor/mvsep_mdx23/models/ on first run —
+            # that download isn't on the /data volume, so it re-happens on
+            # every fresh deploy. --cpu is required (Railway has no GPU).
+            # --single_onnx and a smaller --chunk_size trade a little
+            # quality for lower memory use, which matters on Railway's
+            # Hobby-plan RAM.
+            script_path = os.path.join(
+                os.path.dirname(os.path.realpath(__file__)),
+                "vendor", "mvsep_mdx23", "inference.py",
+            )
+            cmd = [
+                "python3", script_path,
+                "--input_audio", file_path,
+                "--output_folder", output_dir,
+                "--cpu",
+                "--single_onnx",
+                "--chunk_size", "200000",
+            ]
+            logger.info(f"[job {request_id}] Running: {' '.join(cmd)}")
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=1800  # first run downloads ~1GB of checkpoints too
+            )
+            logger.info(f"[job {request_id}] mdx23c stdout: {result.stdout}")
+            logger.info(f"[job {request_id}] mdx23c stderr: {result.stderr}")
+            logger.info(f"[job {request_id}] mdx23c return code: {result.returncode}")
+            if result.returncode != 0:
+                raise Exception(f"MDX23C processing failed: {result.stderr}")
         else:
             # -j splits the track into chunks and processes them across CPU
             # cores in parallel instead of one long single-threaded pass.
