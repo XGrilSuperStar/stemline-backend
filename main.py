@@ -975,15 +975,16 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
         if not stem_dir:
             raise Exception("No stem files generated")
 
-        # Post-separation EQ cleanup pass. Separation models leave bleed
-        # and imbalance on certain stems — this nudges the two worst
-        # offenders back toward clarity before the user ever hears them.
-        # ffmpeg's equalizer filter (peaking EQ, one band per stage) runs
-        # in place on each matched stem, decode+reencode via a temp file.
-        # Vocals: high-pass the low-end mud that leaks in from bass/drums,
-        # then a small presence lift so words don't get buried.
-        # Bass: cut the boxy low-mids where other stems bleed in most,
-        # small lift on the fundamental so it doesn't feel thinned out.
+        # Post-separation EQ + compression pass. Separation models leave
+        # bleed and imbalance on certain stems — this nudges each stem
+        # back toward clarity (EQ) and consistency (compression) before
+        # the user ever hears them. ffmpeg's equalizer/acompressor filters
+        # run in place on each matched stem, decode+reencode via a temp
+        # file. Vocals: high-pass the low-end mud that leaks in from
+        # bass/drums, then a small presence lift so words don't get
+        # buried. Bass: cut the boxy low-mids where other stems bleed in
+        # most, small lift on the fundamental so it doesn't feel thinned
+        # out.
         EQ_PROFILES = {
             "vocals": "highpass=f=100,equalizer=f=4000:t=q:w=1:g=3",
             "bass": "equalizer=f=350:t=q:w=1.5:g=-4,equalizer=f=70:t=q:w=1:g=2",
@@ -996,9 +997,26 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
             # Other/misc: general rumble cleanup, mild clarity lift.
             "other": "highpass=f=50,equalizer=f=1500:t=q:w=1:g=1",
         }
+        # Gentle per-stem compressor (ffmpeg acompressor; threshold is
+        # linear amplitude, not dB). Tames dynamic swings left over from
+        # separation (quiet verse -> loud chorus, uneven pick/strum
+        # levels) so each stem sits more evenly in the mix. Fast attack /
+        # short release for percussive stems, slower for sustained ones.
+        COMPRESSOR_PROFILES = {
+            "vocals": "acompressor=threshold=0.126:ratio=3:attack=5:release=100:makeup=2",
+            "bass": "acompressor=threshold=0.1:ratio=4:attack=10:release=150:makeup=2",
+            "drums": "acompressor=threshold=0.178:ratio=4:attack=5:release=80:makeup=2",
+            "guitar": "acompressor=threshold=0.126:ratio=3:attack=10:release=120:makeup=1.5",
+            "piano": "acompressor=threshold=0.1:ratio=2.5:attack=15:release=150:makeup=1.5",
+            "other": "acompressor=threshold=0.126:ratio=3:attack=10:release=120:makeup=1.5",
+        }
+        STEM_FILTER_CHAINS = {
+            key: f"{EQ_PROFILES[key]},{COMPRESSOR_PROFILES[key]}"
+            for key in EQ_PROFILES
+        }
         for f in os.listdir(stem_dir):
             lower_f = f.lower()
-            for key, filter_chain in EQ_PROFILES.items():
+            for key, filter_chain in STEM_FILTER_CHAINS.items():
                 if key in lower_f:
                     src_path = os.path.join(stem_dir, f)
                     tmp_path = src_path + ".eq_tmp" + os.path.splitext(f)[1]
@@ -1010,9 +1028,9 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
                     eq_result = subprocess.run(eq_cmd, capture_output=True, text=True, timeout=120)
                     if eq_result.returncode == 0 and os.path.exists(tmp_path):
                         os.replace(tmp_path, src_path)
-                        logger.info(f"[job {request_id}] Applied EQ ({key}) to {f}")
+                        logger.info(f"[job {request_id}] Applied EQ+compressor ({key}) to {f}")
                     else:
-                        logger.warning(f"[job {request_id}] EQ pass failed on {f}, keeping unprocessed: {eq_result.stderr}")
+                        logger.warning(f"[job {request_id}] EQ/compressor pass failed on {f}, keeping unprocessed: {eq_result.stderr}")
                         if os.path.exists(tmp_path):
                             os.remove(tmp_path)
                     break
