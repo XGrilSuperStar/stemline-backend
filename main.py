@@ -975,6 +975,40 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
         if not stem_dir:
             raise Exception("No stem files generated")
 
+        # Post-separation EQ cleanup pass. Separation models leave bleed
+        # and imbalance on certain stems — this nudges the two worst
+        # offenders back toward clarity before the user ever hears them.
+        # ffmpeg's equalizer filter (peaking EQ, one band per stage) runs
+        # in place on each matched stem, decode+reencode via a temp file.
+        # Vocals: high-pass the low-end mud that leaks in from bass/drums,
+        # then a small presence lift so words don't get buried.
+        # Bass: cut the boxy low-mids where other stems bleed in most,
+        # small lift on the fundamental so it doesn't feel thinned out.
+        EQ_PROFILES = {
+            "vocals": "highpass=f=100,equalizer=f=4000:t=q:w=1:g=3",
+            "bass": "equalizer=f=350:t=q:w=1.5:g=-4,equalizer=f=70:t=q:w=1:g=2",
+        }
+        for f in os.listdir(stem_dir):
+            lower_f = f.lower()
+            for key, filter_chain in EQ_PROFILES.items():
+                if key in lower_f:
+                    src_path = os.path.join(stem_dir, f)
+                    tmp_path = src_path + ".eq_tmp" + os.path.splitext(f)[1]
+                    eq_cmd = [
+                        "ffmpeg", "-y", "-i", src_path,
+                        "-af", filter_chain,
+                        tmp_path,
+                    ]
+                    eq_result = subprocess.run(eq_cmd, capture_output=True, text=True, timeout=120)
+                    if eq_result.returncode == 0 and os.path.exists(tmp_path):
+                        os.replace(tmp_path, src_path)
+                        logger.info(f"[job {request_id}] Applied EQ ({key}) to {f}")
+                    else:
+                        logger.warning(f"[job {request_id}] EQ pass failed on {f}, keeping unprocessed: {eq_result.stderr}")
+                        if os.path.exists(tmp_path):
+                            os.remove(tmp_path)
+                    break
+
         # Build the zip in memory and upload straight to R2, keyed by this
         # request's uuid so it can never collide with any other split's zip
         # — past or future, same filename or not.
