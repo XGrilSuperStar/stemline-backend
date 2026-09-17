@@ -1330,6 +1330,7 @@ TERMS_HTML = """
 </style>
 </head>
 <body>
+<a href="/" style="display:inline-block;margin-bottom:1.5rem;color:#f0a500;text-decoration:none;">&larr; Back to Stemline101</a>
 <h1>Stemline101 Terms of Service</h1>
 <p><em>Last Updated: [Date]</em></p>
 
@@ -1359,7 +1360,7 @@ TERMS_HTML = """
 
 <h2>5. DMCA / Copyright Complaints</h2>
 <p>Stemline101 will respond to valid copyright infringement notices in accordance with the Digital Millennium Copyright Act (DMCA) and will remove or disable access to infringing content upon receipt of a proper notice. Repeat infringers may have their accounts terminated.</p>
-<p><strong>Copyright agent contact:</strong> [email/address to be added]</p>
+<p><strong>Copyright agent contact:</strong> kellyschliewe@gmail.com</p>
 
 <h2>6. No Warranty</h2>
 <p>The Service is provided "as is" without warranties of any kind. Stemline101 does not guarantee the accuracy, quality, or legality of separated stems.</p>
@@ -1377,7 +1378,7 @@ TERMS_HTML = """
 <p>Stemline101 may update these Terms at any time. Continued use of the Service after changes constitutes acceptance of the new Terms.</p>
 
 <h2>11. Contact</h2>
-<p>Questions about these Terms can be directed to: [contact email]</p>
+<p>Questions about these Terms can be directed to: kellyschliewe@gmail.com</p>
 
 <p style="margin-top:3rem; opacity:0.6; font-size:0.9rem;">
 This document is a general template and not a substitute for legal advice.
@@ -1420,6 +1421,7 @@ PRIVACY_HTML = """
 </style>
 </head>
 <body>
+<a href="/" style="display:inline-block;margin-bottom:1.5rem;color:#f0a500;text-decoration:none;">&larr; Back to Stemline101</a>
 <h1>Stemline101 Privacy Policy</h1>
 <p><em>Last Updated: [Date]</em></p>
 
@@ -1456,7 +1458,7 @@ PRIVACY_HTML = """
 <p>Stemline101 may update this Privacy Policy at any time. Continued use of the Service after changes constitutes acceptance of the updated policy.</p>
 
 <h2>10. Contact</h2>
-<p>Questions about this Privacy Policy can be directed to: [contact email]</p>
+<p>Questions about this Privacy Policy can be directed to: kellyschliewe@gmail.com</p>
 
 <p style="margin-top:3rem; opacity:0.6; font-size:0.9rem;">
 This document is a general template and not a substitute for legal advice.
@@ -1499,6 +1501,7 @@ ABOUT_HTML = """
 </style>
 </head>
 <body>
+<a href="/" style="display:inline-block;margin-bottom:1.5rem;color:#f0a500;text-decoration:none;">&larr; Back to Stemline101</a>
 <h1>About Stemline101</h1>
 <p>Stemline101 splits any song into isolated stems — vocals, drums, bass, and more — then lets you remix and mix multiple tracks together right in your browser.</p>
 
@@ -1513,7 +1516,7 @@ ABOUT_HTML = """
 <p>Most stem-splitting tools stop at separation. Stemline101 goes further, giving you a live mixing board so you can actually play with the results — blend a vocal from one track over the instrumental of another, right in the browser.</p>
 
 <h2>Contact</h2>
-<p>Questions or feedback: [contact email]</p>
+<p>Questions or feedback: kellyschliewe@gmail.com</p>
 
 <div id="cookie-banner" style="position:fixed; bottom:0; left:0; right:0; background:#1a1a1a; color:#eee; padding:1rem 1.5rem; border-top:1px solid #333; font-family: system-ui, sans-serif; font-size:0.9rem; z-index:9999; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:1rem;">
   <span>We use cookies for essential site function and, with your consent, for advertising. See our <a href="/privacy" style="color:#f0a500;">Privacy Policy</a>.</span>
