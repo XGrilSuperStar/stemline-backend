@@ -987,6 +987,14 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
         EQ_PROFILES = {
             "vocals": "highpass=f=100,equalizer=f=4000:t=q:w=1:g=3",
             "bass": "equalizer=f=350:t=q:w=1.5:g=-4,equalizer=f=70:t=q:w=1:g=2",
+            # Drums: strip sub-rumble bleed from bass, add snap/presence.
+            "drums": "highpass=f=30,equalizer=f=3000:t=q:w=1:g=2",
+            # Guitar: cut boxy low-mid bleed from bass/drums, lift presence.
+            "guitar": "equalizer=f=300:t=q:w=1.5:g=-3,equalizer=f=2500:t=q:w=1:g=2",
+            # Synth (stem key "piano"): clear low-mid mud, add air/sparkle.
+            "piano": "equalizer=f=200:t=q:w=1.5:g=-2,equalizer=f=8000:t=q:w=1:g=2",
+            # Other/misc: general rumble cleanup, mild clarity lift.
+            "other": "highpass=f=50,equalizer=f=1500:t=q:w=1:g=1",
         }
         for f in os.listdir(stem_dir):
             lower_f = f.lower()
