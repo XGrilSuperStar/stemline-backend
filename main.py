@@ -1010,8 +1010,20 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
             "piano": "acompressor=threshold=0.1:ratio=2.5:attack=15:release=150:makeup=1.5",
             "other": "acompressor=threshold=0.126:ratio=3:attack=10:release=120:makeup=1.5",
         }
+        # Harmonic exciter for bass and other. Adds audible upper
+        # harmonics above the fundamental (ffmpeg's aexciter) so low,
+        # fundamental-heavy content still reads as present and clear on
+        # small speakers/earbuds that can't reproduce the fundamental
+        # itself. freq sets the crossover above which harmonics are
+        # generated — lower for bass to catch more of its harmonic
+        # series, higher/lighter for the mixed "other" stem.
+        EXCITER_PROFILES = {
+            "bass": "aexciter=amount=2:drive=8.5:blend=0.5:freq=2000",
+            "other": "aexciter=amount=1.5:drive=6:blend=0.3:freq=3000",
+        }
         STEM_FILTER_CHAINS = {
             key: f"{EQ_PROFILES[key]},{COMPRESSOR_PROFILES[key]}"
+            + (f",{EXCITER_PROFILES[key]}" if key in EXCITER_PROFILES else "")
             for key in EQ_PROFILES
         }
         for f in os.listdir(stem_dir):
