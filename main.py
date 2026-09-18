@@ -1018,7 +1018,7 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
         # generated — lower for bass to catch more of its harmonic
         # series, higher/lighter for the mixed "other" stem.
         EXCITER_PROFILES = {
-            "bass": "aexciter=amount=2:drive=8.5:blend=0.5:freq=2000",
+            "bass": "aexciter=amount=1:drive=4:blend=0.25:freq=2000",
             "other": "aexciter=amount=1.5:drive=6:blend=0.3:freq=3000",
         }
         STEM_FILTER_CHAINS = {
