@@ -986,7 +986,7 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
         # most, small lift on the fundamental so it doesn't feel thinned
         # out.
         EQ_PROFILES = {
-            "vocals": "highpass=f=100,equalizer=f=4000:t=q:w=1:g=3",
+            "vocals": "highpass=f=120,equalizer=f=300:t=q:w=1.5:g=-3,equalizer=f=4000:t=q:w=1:g=3",
             "bass": "equalizer=f=350:t=q:w=1.5:g=-4,equalizer=f=70:t=q:w=1:g=2",
             # Drums: strip sub-rumble bleed from bass, add snap/presence.
             "drums": "highpass=f=30,equalizer=f=3000:t=q:w=1:g=2",
