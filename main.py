@@ -700,6 +700,26 @@ def root():
 def reset_password_page():
     return FileResponse("stemline101_landing_page.html", media_type="text/html")
 
+@app.get("/favicon.ico")
+def favicon_ico():
+    return FileResponse("favicon.ico", media_type="image/x-icon")
+
+@app.get("/favicon.svg")
+def favicon_svg():
+    return FileResponse("favicon.svg", media_type="image/svg+xml")
+
+@app.get("/icon-180.png")
+def icon_180():
+    return FileResponse("icon-180.png", media_type="image/png")
+
+@app.get("/icon-192.png")
+def icon_192():
+    return FileResponse("icon-192.png", media_type="image/png")
+
+@app.get("/icon-512.png")
+def icon_512():
+    return FileResponse("icon-512.png", media_type="image/png")
+
 @app.get("/api/v1/health")
 def health():
     return {"status": "Stemline API is running"}
