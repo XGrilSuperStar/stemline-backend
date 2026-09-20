@@ -327,6 +327,44 @@
   .wave-marker.active::after { color: var(--vu-amber, #E7A33E); border-color: rgba(231,163,62,0.5); }
   .wave-marker:hover::after, .wave-marker.active::after { display: block; }
   .wave-marker.dragging { cursor: grabbing; }
+  /* Sample chops: Shift+drag a range on a stem's wave to save a
+     triggerable slice of it (live-sampling / hot-cue style). Lives in
+     .wave-canvas-wrap so its x-offsets line up with the canvas with no
+     extra math. Color-keyed per stem via --region-color. */
+  .wave-sample-region {
+    position: absolute; top: 0; bottom: 0; z-index: 5;
+    border-left: 1px solid var(--region-color, #3CFDE0);
+    border-right: 1px solid var(--region-color, #3CFDE0);
+    cursor: pointer; touch-action: none;
+  }
+  .wave-sample-region::after {
+    content: attr(data-label);
+    position: absolute; top: -20px; left: 50%; transform: translateX(-50%);
+    font-family: 'JetBrains Mono', monospace; font-size: 0.46rem; font-weight: 700;
+    letter-spacing: 0.02em; white-space: nowrap; padding: 1px 4px; border-radius: 2px;
+    background: rgba(6,32,28,0.92); color: var(--region-color, #3CFDE0);
+    border: 1px solid var(--region-color, #3CFDE0); display: none; pointer-events: none; z-index: 8;
+  }
+  .wave-sample-region:hover::after { display: block; }
+  .wave-sample-region-ghost {
+    background: rgba(255,255,255,0.18);
+    border-left: 1px dashed #fff; border-right: 1px dashed #fff;
+    pointer-events: none; z-index: 7;
+  }
+  .wave-sample-handle {
+    position: absolute; top: 0; bottom: 0; width: 6px; cursor: ew-resize;
+    z-index: 6; touch-action: none;
+  }
+  .wave-sample-handle-start { left: -3px; }
+  .wave-sample-handle-end { right: -3px; }
+  .wave-sample-play {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 13px; height: 13px; border-radius: 50%; z-index: 6; padding: 0;
+    background: rgba(6,32,28,0.85); border: 1px solid var(--region-color, #3CFDE0);
+    color: var(--region-color, #3CFDE0); font-size: 0.42rem; line-height: 1;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .wave-sample-play:hover { background: var(--region-color, #3CFDE0); color: #06201C; }
   .wave-row { display: flex; align-items: center; gap: 0.5rem; height: 26px; position: relative; }
   .wave-row-label {
     width: 46px; flex-shrink: 0; font-family: 'JetBrains Mono', monospace; font-size: 0.5rem;
@@ -1287,7 +1325,7 @@
             </button>
             <span class="tp-source mono" id="previewLabel">no track loaded</span>
           </div>
-          <div class="wave-hint mono" id="waveHint">click waveform to seek &middot; drag to nudge that stem &middot; <span style="color:var(--vu-teal,#3CFDE0);">+CUE</span> sets where this stem starts playing from</div>
+          <div class="wave-hint mono" id="waveHint">click waveform to seek &middot; drag to nudge that stem &middot; <span style="color:var(--vu-teal,#3CFDE0);">+CUE</span> sets where this stem starts playing from &middot; shift+drag to chop a triggerable sample</div>
           <div class="waveform-rows" id="waveformRows">
             <div class="wave-row" data-stem="vocals"><span class="wave-row-label">VOCALS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="add-marker-btn" data-stem="vocals" title="Add a cue marker here">+CUE</button></div>
             <div class="wave-row" data-stem="drums"><span class="wave-row-label">DRUMS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="add-marker-btn" data-stem="drums" title="Add a cue marker here">+CUE</button></div>
@@ -2325,6 +2363,7 @@ async function loadBackendStemToChannel(channelKey, stemId, trackName) {
       const windowLen = Math.min(full.length, Math.round(LOOP_DUR * audioBuffer.sampleRate));
       drawWaveformFromSamples(canvas, full.subarray(0, windowLen), WAVE_COLORS[channelKey] || '#3CFDE0');
     }
+    if (stemSampleRegions[channelKey]) renderStemSampleRegions(channelKey);
 
     // Set badge + LED on the channel strip.
     const channel = document.querySelector('.channel[data-stem="' + channelKey + '"]');
@@ -2430,6 +2469,14 @@ function restoreOriginalStem(channelKey) {
   const canvas = document.querySelector('.wave-row[data-stem="' + channelKey + '"] .wave-canvas');
   if (canvas) {
     drawEmptyWaveform(canvas, WAVE_COLORS[channelKey] || '#3CFDE0');
+  }
+
+  // Eject clears the loaded audio out from under any saved sample chops
+  // (their start/end times would no longer point at anything meaningful),
+  // so drop them along with everything else.
+  if (stemSampleRegions[channelKey]) {
+    stemSampleRegions[channelKey] = [];
+    renderStemSampleRegions(channelKey);
   }
 
   const channel = document.querySelector('.channel[data-stem="' + channelKey + '"]');
@@ -2992,6 +3039,172 @@ function renderAllStemMarkers() {
   Object.keys(stemMarkers).forEach(renderStemMarkers);
 }
 
+// ===== Per-stem sample chops (live-sampling) =====
+// Shift+drag a range on a stem's waveform to save a triggerable slice of
+// it — click the slice (or its play button) to fire just that chunk as a
+// one-shot, independent of the main transport. Multiple chops per stem,
+// same "unlimited, per-row" shape as the cue markers above. Edge handles
+// let you trim start/end after the fact; double-click to rename, right-
+// click to remove — same gesture vocabulary as cue markers for consistency.
+const stemSampleRegions = { vocals: [], drums: [], bass: [], guitar: [], piano: [], other: [] };
+let sampleRegionIdCounter = 0;
+
+function hexToRgba(hex, alpha) {
+  const h = (hex || '#3CFDE0').replace('#', '');
+  const full = h.length === 3 ? h.split('').map(c => c + c).join('') : h;
+  const n = parseInt(full, 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+}
+
+function addStemSampleRegion(stem, startT, endT, label) {
+  const list = stemSampleRegions[stem];
+  if (!list) return null;
+  const lo = Math.min(startT, endT), hi = Math.max(startT, endT);
+  if (hi - lo < 0.05) return null; // drag was too short to be a real selection
+  const region = { id: 'r' + (++sampleRegionIdCounter), start: lo, end: hi, label: label || ('Chop ' + (list.length + 1)) };
+  list.push(region);
+  list.sort((a, b) => a.start - b.start);
+  renderStemSampleRegions(stem);
+  return region;
+}
+
+function removeStemSampleRegion(stem, id) {
+  const list = stemSampleRegions[stem];
+  if (!list) return;
+  stemSampleRegions[stem] = list.filter(r => r.id !== id);
+  renderStemSampleRegions(stem);
+}
+
+function renameStemSampleRegion(stem, id) {
+  const list = stemSampleRegions[stem];
+  const region = list && list.find(r => r.id === id);
+  if (!region) return;
+  const next = window.prompt('Label this chop:', region.label);
+  if (next === null) return;
+  const trimmed = next.trim();
+  if (trimmed) region.label = trimmed;
+  renderStemSampleRegions(stem);
+}
+
+// Fires one chop as a one-shot playback straight to the master output —
+// deliberately bypasses that channel's mute/solo/fader chain so a chop
+// always plays when triggered, same as a sample pad, regardless of
+// whether the source channel is currently playing, muted, or stopped.
+function triggerStemSampleRegion(stem, id) {
+  const list = stemSampleRegions[stem];
+  const region = list && list.find(r => r.id === id);
+  const buffer = stemBuffers[stem];
+  if (!region || !buffer || !audioCtx) return;
+  const dur = Math.min(region.end, buffer.duration) - region.start;
+  if (dur <= 0) return;
+  try {
+    const src = audioCtx.createBufferSource();
+    src.buffer = buffer;
+    const gain = audioCtx.createGain();
+    gain.gain.value = 0.9;
+    src.connect(gain);
+    gain.connect(audioCtx.destination);
+    src.start(0, region.start, dur);
+  } catch (e) {
+    console.warn('Sample trigger failed', e);
+  }
+}
+
+function renderStemSampleRegions(stem) {
+  const row = document.querySelector('.wave-row[data-stem="' + stem + '"]');
+  const wrap = row && row.querySelector('.wave-canvas-wrap');
+  const canvas = row && row.querySelector('.wave-canvas');
+  if (!row || !wrap || !canvas) return;
+  wrap.querySelectorAll('.wave-sample-region').forEach(el => el.remove());
+  const canvasRect = canvas.getBoundingClientRect();
+  const stemDur = (stemBuffers[stem] && stemBuffers[stem].duration) || LOOP_DUR;
+  const color = WAVE_COLORS[stem] || '#3CFDE0';
+
+  (stemSampleRegions[stem] || []).forEach(region => {
+    const el = document.createElement('div');
+    el.className = 'wave-sample-region';
+    el.dataset.label = region.label;
+    el.style.setProperty('--region-color', color);
+    el.style.background = hexToRgba(color, 0.28);
+
+    const place = () => {
+      const x1 = (region.start / stemDur) * canvasRect.width;
+      const x2 = (region.end / stemDur) * canvasRect.width;
+      el.style.left = x1 + 'px';
+      el.style.width = Math.max(2, x2 - x1) + 'px';
+    };
+    place();
+    el.title = region.label + ' — ' + formatMarkerTime(region.start) + ' to ' + formatMarkerTime(region.end)
+      + ' — click to play, drag edges to trim, double-click to rename, right-click to remove';
+
+    const playBtn = document.createElement('button');
+    playBtn.type = 'button';
+    playBtn.className = 'wave-sample-play';
+    playBtn.setAttribute('aria-label', 'Play ' + region.label);
+    playBtn.textContent = '▶';
+    playBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+    playBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      triggerStemSampleRegion(stem, region.id);
+    });
+    el.appendChild(playBtn);
+
+    const startHandle = document.createElement('div');
+    startHandle.className = 'wave-sample-handle wave-sample-handle-start';
+    el.appendChild(startHandle);
+    const endHandle = document.createElement('div');
+    endHandle.className = 'wave-sample-handle wave-sample-handle-end';
+    el.appendChild(endHandle);
+
+    function wireHandle(handleEl, edge) {
+      let dragging = false, startClientX = 0, startVal = 0;
+      handleEl.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        dragging = true;
+        startClientX = e.clientX;
+        startVal = edge === 'start' ? region.start : region.end;
+        try { handleEl.setPointerCapture(e.pointerId); } catch (err) {}
+      });
+      handleEl.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+        const dx = e.clientX - startClientX;
+        const secPerPx = stemDur / canvasRect.width;
+        let val = startVal + dx * secPerPx;
+        if (edge === 'start') {
+          region.start = Math.max(0, Math.min(region.end - 0.05, val));
+        } else {
+          region.end = Math.min(stemDur, Math.max(region.start + 0.05, val));
+        }
+        place();
+      });
+      const endDrag = (e) => {
+        if (!dragging) return;
+        dragging = false;
+        try { handleEl.releasePointerCapture(e.pointerId); } catch (err) {}
+        stemSampleRegions[stem].sort((a, b) => a.start - b.start);
+      };
+      handleEl.addEventListener('pointerup', endDrag);
+      handleEl.addEventListener('pointercancel', endDrag);
+    }
+    wireHandle(startHandle, 'start');
+    wireHandle(endHandle, 'end');
+
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      triggerStemSampleRegion(stem, region.id);
+    });
+    el.addEventListener('dblclick', (e) => { e.stopPropagation(); renameStemSampleRegion(stem, region.id); });
+    el.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); removeStemSampleRegion(stem, region.id); });
+
+    wrap.appendChild(el);
+  });
+}
+
+function renderAllStemSampleRegions() {
+  Object.keys(stemSampleRegions).forEach(renderStemSampleRegions);
+}
+
 // ===== Playhead scrub: grab the amber line and drag it anywhere along the
 // wave. Hit-tested on the whole waveformRows container (not just the 1px
 // line) so it's easy to grab, and clamped to the canvas width so it can
@@ -3051,7 +3264,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('wavePlayhead')?.classList.add('on');
   updatePlayheadPosition();
   renderAllStemMarkers();
-  window.addEventListener('resize', () => { updatePlayheadPosition(); renderAllStemMarkers(); });
+  renderAllStemSampleRegions();
+  window.addEventListener('resize', () => { updatePlayheadPosition(); renderAllStemMarkers(); renderAllStemSampleRegions(); });
 
   // Click-to-seek on any waveform row — jumps ALL stems to that position
   // together, keeping them in lockstep. Drag-to-nudge (see below) offsets a
@@ -3102,7 +3316,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let moved = false;
 
     canvas.addEventListener('pointerdown', (e) => {
-      if (e.button !== 0) return;
+      if (e.button !== 0 || e.shiftKey) return; // Shift+drag chops a sample region instead — see below
       canvas.setPointerCapture(e.pointerId);
       dragging = true;
       moved = false;
@@ -3132,6 +3346,53 @@ document.addEventListener('DOMContentLoaded', () => {
     // Note: double-click on the wave is reserved for dropping a cue marker
     // (wired above) — the old "double-click resets nudge" shortcut was
     // removed since it competed with marker placement on the same canvas.
+  });
+
+  // ===== Shift+drag to chop a sample region =====
+  // The plain drag above nudges a stem; holding Shift while dragging draws
+  // a selection on that stem's wave instead, and releasing saves it as a
+  // triggerable chop (see renderStemSampleRegions/triggerStemSampleRegion).
+  document.querySelectorAll('.wave-row').forEach(row => {
+    const stem = row.dataset.stem;
+    const canvas = row.querySelector('.wave-canvas');
+    const wrap = row.querySelector('.wave-canvas-wrap');
+    if (!canvas || !wrap || !(stem in stemSampleRegions)) return;
+    let selecting = false;
+    let startX = 0;
+    let ghostEl = null;
+
+    canvas.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 || !e.shiftKey) return;
+      canvas.setPointerCapture(e.pointerId);
+      selecting = true;
+      startX = e.clientX;
+      ghostEl = document.createElement('div');
+      ghostEl.className = 'wave-sample-region wave-sample-region-ghost';
+      wrap.appendChild(ghostEl);
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      if (!selecting || !ghostEl) return;
+      const rect = canvas.getBoundingClientRect();
+      const x1 = Math.max(0, Math.min(rect.width, startX - rect.left));
+      const x2 = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+      ghostEl.style.left = Math.min(x1, x2) + 'px';
+      ghostEl.style.width = Math.max(1, Math.abs(x2 - x1)) + 'px';
+    });
+    const endSelect = (e) => {
+      if (!selecting) return;
+      selecting = false;
+      const rect = canvas.getBoundingClientRect();
+      const stemDur = (stemBuffers[stem] && stemBuffers[stem].duration) || LOOP_DUR;
+      const xStart = Math.max(0, Math.min(rect.width, startX - rect.left));
+      const xEnd = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+      if (ghostEl) { ghostEl.remove(); ghostEl = null; }
+      const secPerPx = stemDur / rect.width;
+      addStemSampleRegion(stem, xStart * secPerPx, xEnd * secPerPx);
+      canvas._suppressClick = true;
+      try { canvas.releasePointerCapture(e.pointerId); } catch (err) {}
+    };
+    canvas.addEventListener('pointerup', endSelect);
+    canvas.addEventListener('pointercancel', endSelect);
   });
 
   // Screen tabs: WAVES (per-stem waveforms) vs MY STEMS (saved-track browser)
