@@ -22,7 +22,6 @@
     --vu-green: #6FA97E;
     --clip-red: #C4453A;
 
-    /* Detroit/Chicago 90s flyer palette — dialed back from neon to muted industrial */
     --void: #0B0B0D;
     --concrete: #17171A;
     --concrete-line: rgba(216,220,226,0.14);
@@ -179,7 +178,6 @@
       inset 0 0 3px rgba(60,253,224,0.25),
       0 0 18px rgba(60,253,224,0.25),
       0 0 34px rgba(60,253,224,0.12),
-      /* raised metal bezel around the LCD, like the hardware reference */
       0 0 0 5px #1B1D21,
       0 0 0 6px #34373C,
       0 0 0 7px #0A0B0D,
@@ -231,9 +229,6 @@
     box-shadow: inset 0 0 16px rgba(0,0,0,0.85), 0 0 0 1px #000, 0 0 22px rgba(60,253,224,0.08);
     display: block;
   }
-  /* Two scopes flanking the hero headline, in place of the old single
-     scope below the mixer. Straight flat-line idle look at rest, real
-     master-signal trace once audio plays (see drawScope). */
   .hero-headline-row {
     display: flex; align-items: center; justify-content: center;
     gap: 1.6rem;
@@ -246,8 +241,6 @@
     .scope-square-inline { width: 64px; height: 64px; }
   }
   @media (max-width: 620px) {
-    /* Too tight for side-by-side scopes at small sizes — hide them rather
-       than crushing the headline. */
     .scope-square-inline { display: none; }
   }
   .wave-canvas-wrap {
@@ -263,6 +256,27 @@
   }
   .add-marker-btn:hover { background: rgba(60,253,224,0.25); }
   .add-marker-btn:active { background: rgba(60,253,224,0.4); }
+  /* New: SAMPLE toggle button, one per stem row. When active it turns a
+     plain click-drag on that row's waveform into a sample-chop selection
+     instead of a stem nudge, so the sampling gesture is discoverable
+     without needing Shift+drag. Shift+drag still works too as a shortcut
+     once someone already knows it. */
+  .sample-toggle-btn {
+    flex-shrink: 0; width: auto; height: 16px; line-height: 14px; padding: 0 5px;
+    font-family: 'JetBrains Mono', monospace; font-size: 0.55rem; font-weight: 700;
+    letter-spacing: 0.02em;
+    color: rgba(216,220,226,0.55); background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(216,220,226,0.25); border-radius: 3px; cursor: pointer;
+    white-space: nowrap;
+  }
+  .sample-toggle-btn:hover { background: rgba(255,255,255,0.1); }
+  .sample-toggle-btn.active {
+    color: #ffb020; background: rgba(255,176,32,0.15); border-color: #ffb020;
+    box-shadow: 0 0 6px rgba(255,176,32,0.4);
+  }
+  .wave-row.sampling-mode .wave-canvas-wrap {
+    outline: 1px solid rgba(255,176,32,0.5); outline-offset: 1px;
+  }
   .wave-hint {
     font-size: 0.58rem; color: var(--chrome-dim); text-transform: uppercase;
     letter-spacing: 0.02em; margin-bottom: 0.35rem; opacity: 0.75;
@@ -271,24 +285,18 @@
     width: 100%; height: 24px; display: block;
     cursor: grab;
     transition: transform 0.05s linear;
-    touch-action: none; /* let pointerdown handle drags on mobile without scrolling */
+    touch-action: none;
   }
   .wave-canvas.dragging { cursor: grabbing; }
   .wave-canvas:hover { filter: brightness(1.15); }
-  /* Playhead line — one vertical bar overlaying all six stem rows so the
-     eye can align kicks, snares, drops across stems while playing. */
   .wave-playhead {
     position: absolute; top: 0; bottom: 0; width: 1px;
     background: var(--vu-amber);
     box-shadow: 0 0 6px rgba(231,163,62,0.9);
     left: 0; pointer-events: none;
     display: none;
-    /* offset past the label column so 0 = start of the wave, not start of row */
   }
   .wave-playhead.on { display: block; }
-  /* Small grip at the top so the amber line reads as grabbable. Purely
-     visual — the actual drag hit-test happens on #waveformRows in JS so
-     you can grab anywhere along the line, not just this triangle. */
   .wave-playhead::before {
     content: ''; position: absolute; top: -5px; left: -4px;
     width: 0; height: 0; pointer-events: none;
@@ -296,10 +304,6 @@
     border-top: 6px solid var(--vu-amber);
   }
   .waveform-rows.scrubbing { cursor: grabbing; }
-  /* Per-stem start markers (cue points). One flag per marker, positioned
-     inside its own .wave-row (not the shared rowsEl), so every stem has its
-     own independent set. Active marker (the stem's actual Play start point)
-     renders amber instead of teal. */
   .wave-marker {
     position: absolute; top: -5px; bottom: 0; width: 2px;
     background: var(--vu-teal, #3CFDE0);
@@ -327,10 +331,6 @@
   .wave-marker.active::after { color: var(--vu-amber, #E7A33E); border-color: rgba(231,163,62,0.5); }
   .wave-marker:hover::after, .wave-marker.active::after { display: block; }
   .wave-marker.dragging { cursor: grabbing; }
-  /* Sample chops: Shift+drag a range on a stem's wave to save a
-     triggerable slice of it (live-sampling / hot-cue style). Lives in
-     .wave-canvas-wrap so its x-offsets line up with the canvas with no
-     extra math. Color-keyed per stem via --region-color. */
   .wave-sample-region {
     position: absolute; top: 0; bottom: 0; z-index: 5;
     border-left: 1px solid var(--region-color, #3CFDE0);
@@ -371,7 +371,6 @@
     font-weight: 700; color: var(--row-accent, rgba(60,253,224,0.55)); letter-spacing: 0.02em;
     text-shadow: 0 0 6px var(--row-accent, rgba(60,253,224,0.55));
   }
-  /* per-stem LCD colors, matching the channel strip accents */
   .wave-row[data-stem="vocals"] { --row-accent: #ff5540; }
   .wave-row[data-stem="drums"]  { --row-accent: #ffa022; }
   .wave-row[data-stem="bass"]   { --row-accent: #2fe08a; }
@@ -478,7 +477,6 @@
     text-overflow: ellipsis; white-space: nowrap; display: none;
   }
   .channel .assigned-badge.show { display: block; }
-  /* Group nav + letter-jump: a small sub-display above the stem list */
   .screen-browse { display: flex; gap: 0.4rem; align-items: stretch; margin-bottom: 0.45rem; }
   .group-nav {
     display: flex; align-items: stretch; gap: 2px;
@@ -519,7 +517,6 @@
   .stem-search::placeholder { color: rgba(60,253,224,0.3); }
   .stem-search:focus { outline: none; border-color: var(--sci-glow); box-shadow: inset 0 0 10px rgba(60,253,224,0.2), 0 0 8px rgba(60,253,224,0.25); }
 
-  /* LCD footer readout bar — fills the dead space under the waveforms */
   .screen-footer {
     display: flex; align-items: center; gap: 0.9rem;
     margin-top: 0.5rem; padding-top: 0.4rem;
@@ -597,7 +594,6 @@
     box-shadow: 0 0 6px var(--clip-red), 0 0 2px var(--clip-red);
   }
 
-  /* Small metal trim/gain knob */
   .knob {
     width: 22px; height: 22px; border-radius: 50%;
     background:
@@ -629,7 +625,6 @@
     color: rgba(226,230,236,0.55); letter-spacing: 0.04em; margin-top: -0.3rem;
   }
 
-  /* 3-band EQ: tiny knobs in a compact stack */
   .eq-stack { display: flex; flex-direction: column; gap: 0.4rem; align-items: center; }
   .eq-row { display: flex; flex-direction: column; align-items: center; gap: 0.12rem; }
   .eq-row .knob-xs {
@@ -662,7 +657,6 @@
     color: rgba(226,230,236,0.5); text-align: center;
   }
 
-  /* Vertical LED meter ladder */
   .meter {
     display: flex; flex-direction: column-reverse; gap: 2px;
     width: 11px; height: 62px;
@@ -691,13 +685,12 @@
     width: 1px; background: rgba(255,255,255,0.06); transform: translateX(-50%);
   }
   .fader-slot::after {
-    /* unity / 0dB reference notch, fixed at the default fader position */
     content: ''; position: absolute; left: 1px; right: 1px; bottom: 78%;
     height: 1px; background: var(--vu-amber); opacity: 0.55;
   }
   .fader-cap {
     position: absolute; left: 50%; width: 30px; height: 15px;
-    pointer-events: none; /* let drags land on the slot underneath */
+    pointer-events: none;
     background:
       linear-gradient(180deg, rgba(255,255,255,0.5) 0%, transparent 12%, transparent 88%, rgba(0,0,0,0.35) 100%),
       repeating-linear-gradient(180deg, rgba(0,0,0,0.06) 0px, transparent 1px, transparent 2px),
@@ -720,7 +713,6 @@
   }
 
 
-  /* ===== WOOD TRIM STRIP (front armrest edge, like hardware consoles) ===== */
   .wood-trim {
     margin: 1.1rem -1.4rem 1.1rem;
     height: 26px;
@@ -735,7 +727,6 @@
     background: rgba(255,255,255,0.25);
   }
 
-  /* ===== interactive controls ===== */
   .btn-row { display: flex; gap: 3px; }
   .mute-btn, .cue-btn {
     width: 26px; height: 20px; border-radius: 2px;
@@ -755,14 +746,9 @@
     box-shadow: 0 0 7px var(--vu-amber);
   }
 
-  /* ===== MASTER STRIP ===== */
   .mixer-row { display: flex; gap: 7px; align-items: stretch; overflow-x: auto; }
   .channels { flex: 1; }
-  /* ===== PER-CHANNEL BROWSE BUTTON + POPUP ===== */
   .channel { position: relative; }
-  /* BROWSE and CLR sit side by side; BROWSE takes the remaining width. */
-  /* min-width:0 lets both buttons shrink inside a 52px channel instead of
-     overflowing and making neighbouring strips overlap. */
   .ch-btn-row { display: flex; gap: 2px; width: 100%; margin: 2px 0 1px; }
   .ch-btn-row .ch-browse { flex: 1 1 auto; min-width: 0; margin: 0; overflow: hidden; }
   .ch-clear {
@@ -775,7 +761,6 @@
     touch-action: manipulation;
     box-shadow: 0 1px 2px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06);
   }
-  /* Lit only when the channel actually holds a loaded stem. */
   .ch-clear.armed { color: var(--vu-amber, #ffb020); }
   .ch-clear:hover { background: linear-gradient(180deg, #34363B, #17181B); }
   .ch-clear:active { background: var(--vu-amber, #ffb020); color: #201406; }
@@ -879,7 +864,6 @@
   .stem-pop-btn:active { background: var(--ch-accent, #3ab6ff); color: #06201C; }
   .stem-pop-btn.wide { flex: 2; }
 
-  /* ===== PER-CHANNEL KEY + PITCH ===== */
   .ch-pitch {
     display: flex; align-items: center; gap: 3px; width: 100%;
     justify-content: center;
@@ -995,11 +979,8 @@
     box-shadow: 0 0 7px rgba(60,253,122,0.6);
   }
 
-  /* ===== MOBILE MIXER (stacked, larger touch targets) ===== */
   @media (max-width: 700px) {
     .mixer-row { flex-wrap: wrap; overflow-x: visible; }
-    /* Mobile splits use the 4-stem engine (vocals/drums/bass/other), so
-       guitar and piano never have audio here — hide those channels. */
     .channel[data-stem="guitar"], .channel[data-stem="piano"] { display: none; }
     .channels {
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1017,7 +998,6 @@
     .master-strip .name { width: 100%; text-align: center; }
   }
 
-  /* ===== AD SLOTS ===== */
   .ad-slot {
     width: 100%;
     max-width: 970px;
@@ -1057,7 +1037,6 @@
   }
   .drop-zone strong { color: #fff; font-weight: 700; }
 
-  /* ===== Transport bar: hardware-style Play / Pause / Stop ===== */
   .transport {
     display: flex; align-items: center; gap: 0.55rem;
     margin-top: 1.1rem;
@@ -1100,7 +1079,6 @@
     color: rgba(216,220,226,0.5); margin-left: auto; padding-right: 0.4rem;
   }
 
-  /* ===== Split preloader: spinning ring + segmented VU-style progress ===== */
   .split-loader {
     display: flex; align-items: center; gap: 0.7rem;
     justify-content: center; margin-top: 0.6rem;
@@ -1130,7 +1108,6 @@
     50% { background: var(--vu-amber); }
   }
 
-  /* ===== THE STUDIO — room framing around the deck ===== */
   .studio-room {
     position: relative;
     background:
@@ -1140,7 +1117,6 @@
     box-shadow: 0 30px 70px -20px rgba(0,0,0,0.7);
     border: 1px solid #0d0b09;
   }
-  /* acoustic foam panel texture on the "walls" */
   .studio-room::before {
     content: '';
     position: absolute; inset: 0; border-radius: 10px;
@@ -1161,7 +1137,6 @@
   }
   .studio-room .deck { position: relative; z-index: 1; }
 
-  /* ===== HOW IT WORKS ===== */
   .section { max-width: 1180px; margin: 0 auto; padding: 5rem 2.5rem; }
   .section-head { margin-bottom: 3rem; }
   .section-head .eyebrow { justify-content: flex-start; }
@@ -1197,10 +1172,6 @@
 </head>
 <body>
 
-<!-- ===== AD SLOT (free-tier only) =====
-     Placeholder — drop in the real Google AdSense <ins> tag + your
-     ca-pub-XXXXXXXXXX client ID here once you have your publisher ID.
-     Hidden automatically for premium users via #adSlot.style.display. -->
 <div id="adSlot" style="display:none;text-align:center;padding:0.5rem;background:var(--concrete);border-bottom:1px solid var(--concrete-line);font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:var(--chrome-dim);">
   Ad space — upgrade to Premium to remove ads
 </div>
@@ -1242,7 +1213,6 @@
   </div>
 </nav>
 
-<!-- ===== PRICING MODAL ===== -->
 <div id="pricingOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:1200;"></div>
 <div id="pricingModal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:90%;max-width:480px;background:var(--concrete);border:1px solid var(--concrete-line);z-index:1201;font-family:'JetBrains Mono',monospace;padding:2rem;border-radius:4px;">
   <button id="pricingCloseBtn" style="position:absolute;top:0.75rem;right:0.75rem;background:none;border:none;color:var(--chrome-dim);font-size:1.2rem;cursor:pointer;">✕</button>
@@ -1267,7 +1237,6 @@
   <div id="pricingError" style="display:none;color:#ff6b6b;font-size:0.8rem;margin-top:1rem;text-align:center;"></div>
 </div>
 
-<!-- ===== MY STEMS PANEL ===== -->
 <div id="myStemsOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:1100;"></div>
 <div id="myStemsPanel" style="display:none;position:fixed;top:0;right:0;bottom:0;width:90%;max-width:400px;background:var(--concrete);border-left:1px solid var(--concrete-line);z-index:1101;font-family:'JetBrains Mono',monospace;overflow-y:auto;">
   <div style="display:flex;justify-content:space-between;align-items:center;padding:1.4rem;border-bottom:1px solid var(--concrete-line);position:sticky;top:0;background:var(--concrete);">
@@ -1325,14 +1294,14 @@
             </button>
             <span class="tp-source mono" id="previewLabel">no track loaded</span>
           </div>
-          <div class="wave-hint mono" id="waveHint">click waveform to seek &middot; drag to nudge that stem &middot; <span style="color:var(--vu-teal,#3CFDE0);">+CUE</span> sets where this stem starts playing from &middot; shift+drag to chop a triggerable sample</div>
+          <div class="wave-hint mono" id="waveHint">click waveform to seek &middot; drag to nudge that stem &middot; <span style="color:var(--vu-teal,#3CFDE0);">+CUE</span> sets where this stem starts playing from &middot; <span style="color:#ffb020;">SAMPLE</span> toggles click-drag sample chopping on this row</div>
           <div class="waveform-rows" id="waveformRows">
-            <div class="wave-row" data-stem="vocals"><span class="wave-row-label">VOCALS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="add-marker-btn" data-stem="vocals" title="Add a cue marker here">+CUE</button></div>
-            <div class="wave-row" data-stem="drums"><span class="wave-row-label">DRUMS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="add-marker-btn" data-stem="drums" title="Add a cue marker here">+CUE</button></div>
-            <div class="wave-row" data-stem="bass"><span class="wave-row-label">BASS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="add-marker-btn" data-stem="bass" title="Add a cue marker here">+CUE</button></div>
-            <div class="wave-row" data-stem="guitar"><span class="wave-row-label">GUITAR</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="add-marker-btn" data-stem="guitar" title="Add a cue marker here">+CUE</button></div>
-            <div class="wave-row" data-stem="piano"><span class="wave-row-label">SYNTH</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="add-marker-btn" data-stem="piano" title="Add a cue marker here">+CUE</button></div>
-            <div class="wave-row" data-stem="other"><span class="wave-row-label">OTHER</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="add-marker-btn" data-stem="other" title="Add a cue marker here">+CUE</button></div>
+            <div class="wave-row" data-stem="vocals"><span class="wave-row-label">VOCALS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="sample-toggle-btn" data-stem="vocals" title="Toggle sample mode: click-drag on the wave chops a triggerable sample">SAMPLE</button><button class="add-marker-btn" data-stem="vocals" title="Add a cue marker here">+CUE</button></div>
+            <div class="wave-row" data-stem="drums"><span class="wave-row-label">DRUMS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="sample-toggle-btn" data-stem="drums" title="Toggle sample mode: click-drag on the wave chops a triggerable sample">SAMPLE</button><button class="add-marker-btn" data-stem="drums" title="Add a cue marker here">+CUE</button></div>
+            <div class="wave-row" data-stem="bass"><span class="wave-row-label">BASS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="sample-toggle-btn" data-stem="bass" title="Toggle sample mode: click-drag on the wave chops a triggerable sample">SAMPLE</button><button class="add-marker-btn" data-stem="bass" title="Add a cue marker here">+CUE</button></div>
+            <div class="wave-row" data-stem="guitar"><span class="wave-row-label">GUITAR</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="sample-toggle-btn" data-stem="guitar" title="Toggle sample mode: click-drag on the wave chops a triggerable sample">SAMPLE</button><button class="add-marker-btn" data-stem="guitar" title="Add a cue marker here">+CUE</button></div>
+            <div class="wave-row" data-stem="piano"><span class="wave-row-label">SYNTH</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="sample-toggle-btn" data-stem="piano" title="Toggle sample mode: click-drag on the wave chops a triggerable sample">SAMPLE</button><button class="add-marker-btn" data-stem="piano" title="Add a cue marker here">+CUE</button></div>
+            <div class="wave-row" data-stem="other"><span class="wave-row-label">OTHER</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="sample-toggle-btn" data-stem="other" title="Toggle sample mode: click-drag on the wave chops a triggerable sample">SAMPLE</button><button class="add-marker-btn" data-stem="other" title="Add a cue marker here">+CUE</button></div>
             <div class="wave-playhead" id="wavePlayhead"></div>
           </div>
           <div class="screen-browse" id="screenBrowse" style="display:none;">
@@ -1699,11 +1668,9 @@
   </p>
 </section>
 
-<!-- ===== AD SLOT: TOP BANNER ===== -->
 <div class="ad-slot ad-slot-top" id="adSlotTop" data-ad-slot="top-banner">
 </div>
 
-<!-- ===== LOGIN / SIGNUP MODAL ===== -->
 <div id="authModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:1000;align-items:center;justify-content:center;">
   <div style="background:var(--concrete);border:1px solid var(--concrete-line);padding:2rem;width:90%;max-width:360px;box-shadow:0 30px 70px -20px rgba(0,0,0,0.85);font-family:'JetBrains Mono',monospace;position:relative;">
     <div style="position:absolute;top:10px;left:10px;width:8px;height:8px;border-left:2px solid var(--chrome-dim);border-top:2px solid var(--chrome-dim);"></div>
@@ -1767,19 +1734,15 @@
 
 
 <script>
-// Global sample cache — Float32Arrays of the synthesized demo audio. Used
-// directly by the AudioBufferSourceNode approach, no encoding/decoding.
 const STEM_SAMPLES = {};
 
-// No demo song. Channels start genuinely silent (empty AudioBuffers) until
-// the person splits a track or loads a saved stem from their library.
 (function initSilentStems() {
   const SR = 22050;
   const DUR_S = 6.0;
   const N = Math.round(SR * DUR_S);
   try {
     ['vocals', 'drums', 'bass', 'guitar', 'piano', 'other'].forEach(name => {
-      STEM_SAMPLES[name] = new Float32Array(N); // all zeros = silence
+      STEM_SAMPLES[name] = new Float32Array(N);
     });
     STEM_SAMPLES._sr = SR;
     STEM_SAMPLES._duration = DUR_S;
@@ -1790,9 +1753,9 @@ const STEM_SAMPLES = {};
 
 
 let audioCtx = null;
-let stemNodes = {}; // { vocals: {gainNode, trimNode, eqLow, eqMid, eqHigh, analyser, volPct, trimDb, muted}, ... }
-let stemBuffers = {}; // AudioBuffer per stem — created once when audioCtx is ready
-let activeSources = {}; // currently-playing AudioBufferSourceNode per stem (or null)
+let stemNodes = {};
+let stemBuffers = {};
+let activeSources = {};
 let masterGain = null;
 let cueBus = null;
 let cueStreamDest = null;
@@ -1802,29 +1765,23 @@ let isPlaying = false;
 let rafId = null;
 const BASE_BPM = 120;
 let tempoRatio = 1;
-// Auto tempo-matching: every real stem loaded from the library gets time-
-// stretched (pitch-compensated) to BASE_BPM so stems from different songs
-// share one common tempo from the start. stemAutoStretch[name] is that
-// per-stem stretch ratio (1 = no change, i.e. synth demo stems or anything
-// not yet detected). detectedBpmByStemId caches the detected BPM per split
-// (stemId) — not per channel — so all 6 stems of the SAME song always get
-// the identical stretch and stay in sync with each other; only stems
-// loaded from a DIFFERENT song get re-stretched to match.
 let stemAutoStretch = { vocals: 1, drums: 1, bass: 1, guitar: 1, piano: 1, other: 1 };
 const detectedBpmByStemId = {};
-const detectedBpmPromiseByStemId = {}; // stemId -> in-flight detection promise, avoids duplicate drum fetches
+const detectedBpmPromiseByStemId = {};
 let masterVolPct = 80;
-let keySemitones = 0; // -12 .. +12, manual key shift
-let keyLockOn = true; // when true, Tempo changes speed without changing pitch
+let keySemitones = 0;
+let keyLockOn = true;
 
-// Playback timeline (all in seconds relative to the 6s loop):
-// - masterOffset is the current "song position" when paused/stopped.
-// - playStartCtxTime is audioCtx.currentTime captured at the moment Play started.
-// - stemNudge[name] is a per-stem offset the user can drag to align stems.
 let masterOffset = 0;
 let playStartCtxTime = 0;
 const stemNudge = { vocals: 0, drums: 0, bass: 0, guitar: 0, piano: 0, other: 0 };
 const LOOP_DUR = 6.0;
+// New: per-stem SAMPLE-mode toggle state, driven by the visible SAMPLE
+// button on each waveform row. When true for a stem, a plain (non-shift)
+// click-drag on that row chops a sample region instead of nudging the
+// stem's timing — Shift+drag still works as a shortcut regardless of
+// this toggle.
+const sampleModeByStem = { vocals: false, drums: false, bass: false, guitar: false, piano: false, other: false };
 const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 function keyLabel(semis) {
   const idx = ((Math.round(semis) % 12) + 12) % 12;
@@ -1832,9 +1789,6 @@ function keyLabel(semis) {
   return `${sign}${Math.round(semis)}st (${NOTE_NAMES[idx]})`;
 }
 function tempoInducedSemitonesFor(name) {
-  // playbackRate speed change shifts pitch by 12*log2(rate) semitones.
-  // Each stem's real rate is the master tempo knob combined with its own
-  // auto-tempo-match stretch, so the pitch compensation must be per-stem.
   const rate = tempoRatio * (stemAutoStretch[name] || 1);
   return 12 * Math.log2(rate);
 }
@@ -1845,15 +1799,6 @@ function applyKeyShift() {
     const totalShift = keySemitones + compensate;
     node.pitchShift.pitch = totalShift;
 
-    // Only route audio through the (expensive) pitch node when a real
-    // shift is requested. At zero shift, use the direct bypass connection
-    // instead — this is what fixes channels going silent when multiple
-    // PitchShift nodes were all active simultaneously.
-    // Auto-tempo-match on loaded real stems means near-every channel gets a
-    // tiny nonzero compensation — engaging PitchShift (CPU-heavy) on most/all
-    // channels at once, which is what was silently dropping audio. A quarter-
-    // semitone is below what's audible, so skip the pitch node for anything
-    // under that instead of any nonzero shift.
     const needsPitch = Math.abs(totalShift) > 0.25;
     if (needsPitch && !node._pitchConnectedToGain) {
       try { node.eqHigh.disconnect(node.gainNode); } catch (e) {}
@@ -1867,22 +1812,15 @@ function applyKeyShift() {
   });
 }
 
-// ===== Auto tempo-match BPM detection =====
-// Estimates BPM via autocorrelation of an onset-strength envelope. Not a
-// professional-grade beat tracker, but reliable enough to normalize stems
-// from different songs onto a common tempo so they play together from the
-// moment they're loaded. Analyzes at most the first 45s of audio to stay
-// fast even on long tracks.
 function detectBpm(audioBuffer) {
   try {
     const data = audioBuffer.getChannelData(0);
     const sr = audioBuffer.sampleRate;
     const maxSamples = Math.min(data.length, sr * 45);
-    const frameSize = Math.round(sr * 0.023); // ~23ms frames
+    const frameSize = Math.round(sr * 0.023);
     const frameCount = Math.floor(maxSamples / frameSize);
     if (frameCount < 20) return null;
 
-    // RMS energy envelope per frame.
     const energy = new Float32Array(frameCount);
     for (let i = 0; i < frameCount; i++) {
       let sum = 0;
@@ -1893,14 +1831,11 @@ function detectBpm(audioBuffer) {
       }
       energy[i] = Math.sqrt(sum / frameSize);
     }
-    // Onset strength: half-wave rectified frame-to-frame energy rise.
     const onset = new Float32Array(frameCount);
     for (let i = 1; i < frameCount; i++) {
       onset[i] = Math.max(0, energy[i] - energy[i - 1]);
     }
 
-    // Autocorrelate the onset envelope at lags corresponding to 60-200 BPM;
-    // the lag with the strongest periodic match wins.
     const frameRate = sr / frameSize;
     let bestBpm = null, bestScore = -Infinity;
     for (let bpm = 60; bpm <= 200; bpm += 0.5) {
@@ -1917,8 +1852,6 @@ function detectBpm(audioBuffer) {
     }
     if (!bestBpm) return null;
 
-    // Autocorrelation often locks onto a half/double-time multiple of the
-    // true beat — fold the result into a normal song-tempo range.
     while (bestBpm > 180) bestBpm /= 2;
     while (bestBpm < 70) bestBpm *= 2;
     return bestBpm;
@@ -1928,12 +1861,6 @@ function detectBpm(audioBuffer) {
   }
 }
 
-// Real Solo/Mute logic: if any channel is soloed, only soloed (and unmuted)
-// channels are audible. Otherwise every unmuted channel plays normally.
-// Muting a channel NEVER stops the master/main mix — it only removes that
-// one channel from the main output. Muted channels are simultaneously sent
-// to the separate cue/headphone bus (cueSendGain) so they stay audible for
-// pre-listening without affecting what's playing on the main output.
 function updateAllChannelGains() {
   const anySolo = Object.values(stemNodes).some(n => n.solo);
   Object.values(stemNodes).forEach(n => {
@@ -1942,9 +1869,6 @@ function updateAllChannelGains() {
       n.gainNode.gain.value = silent ? 0 : (n.volPct / 100);
     }
     if (n.cueSendGain) {
-      // Cue bus only ever carries muted channels, at their fader level,
-      // regardless of solo state — so several muted channels can all be
-      // heard together in the headphones at once.
       n.cueSendGain.gain.value = n.muted ? (n.volPct / 100) : 0;
     }
   });
@@ -1952,8 +1876,6 @@ function updateAllChannelGains() {
 const dbToGain = db => Math.pow(10, db / 20);
 
 function initEngine() {
-  // Just initialize per-stem control state. Audio buffers get built once
-  // audioCtx exists (in connectAnalysers), and sources are ephemeral.
   Object.keys(STEM_SAMPLES).filter(k => !k.startsWith('_')).forEach(name => {
     const existing = stemNodes[name] || {};
     stemNodes[name] = Object.assign(
@@ -1963,12 +1885,6 @@ function initEngine() {
   });
 }
 
-// Real oscilloscope trace of the master output, drawn from the same
-// masterAnalyser byte-time-domain buffer already read each frame for the
-// master meter — no synthetic/decorative data, this is the actual signal.
-// Two scopes now flank the hero headline (left/right of "Unmix any song").
-// Both read the same masterAnalyser data and animate together — this is
-// just two canvases sharing one draw call per frame, not two signals.
 let scopeCanvases = [];
 let scopeCtxs = [];
 function initScope() {
@@ -1989,9 +1905,6 @@ function initScope() {
   resize();
   window.addEventListener('resize', resize);
 }
-// Flat line at rest (per Kelly's spec), circular/warping trace once audio
-// plays — draws the same real time-domain samples used for the meters,
-// mapped around a ring so it pulses/warps with the actual master audio.
 function drawScope(ctx, canvas, dataArray, flat) {
   if (!ctx || !canvas) return;
   const w = canvas.clientWidth, h = canvas.clientHeight;
@@ -2014,13 +1927,12 @@ function drawScope(ctx, canvas, dataArray, flat) {
   ctx.shadowBlur = 8;
   ctx.beginPath();
   if (flat) {
-    // Idle state: a straight flat line across the circle, not a ring trace.
     ctx.moveTo(cx - baseR, cy);
     ctx.lineTo(cx + baseR, cy);
   } else {
     const n = dataArray.length;
     for (let i = 0; i <= n; i++) {
-      const v = (dataArray[i % n] - 128) / 128; // -1..1 real sample
+      const v = (dataArray[i % n] - 128) / 128;
       const angle = (i / n) * Math.PI * 2;
       const r = baseR + v * ampR;
       const x = cx + Math.cos(angle) * r;
@@ -2033,9 +1945,6 @@ function drawScope(ctx, canvas, dataArray, flat) {
   ctx.shadowBlur = 0;
 }
 
-// Runs continuously regardless of transport state — so the scopes are
-// never dead. Flat line at rest; both switch to real masterAnalyser data
-// together once playback starts.
 function scopeLoop() {
   if (!scopeCanvases.length) { requestAnimationFrame(scopeLoop); return; }
   const playing = masterAnalyser && transportState === 'playing';
@@ -2060,12 +1969,6 @@ function connectAnalysers() {
   masterDataArray = new Uint8Array(masterAnalyser.frequencyBinCount);
   masterGain.connect(masterAnalyser);
 
-  // Independent cue/headphone bus. Carries ONLY muted channels (see
-  // updateAllChannelGains) so you can pre-listen to whatever's muted while
-  // the main output keeps playing everything else untouched. Feeds a
-  // MediaStreamDestination -> the hidden <audio id="cueMonitorAudio">
-  // element, whose sink can be pointed at a real headphone device via
-  // setSinkId (see pickCueOutputDevice()).
   cueBus = audioCtx.createGain();
   cueBus.gain.value = 1;
   cueStreamDest = audioCtx.createMediaStreamDestination();
@@ -2083,8 +1986,6 @@ function connectAnalysers() {
     const samples = STEM_SAMPLES[name];
     if (!samples) return;
 
-    // AudioBuffer built once from the raw Float32Array. Sources get attached
-    // to this buffer on Play and disconnected on Stop/Pause.
     const buf = audioCtx.createBuffer(1, samples.length, sr);
     buf.copyToChannel(samples, 0);
     stemBuffers[name] = buf;
@@ -2110,11 +2011,6 @@ function connectAnalysers() {
     const analyser = audioCtx.createAnalyser();
     analyser.fftSize = 256;
 
-    // PitchShift nodes are CPU-heavy (continuous grain processing even at
-    // zero shift). Running 6 at once was overloading the audio graph and
-    // causing one or more channels to silently stop passing audio. Fix:
-    // create the node but bypass it with a direct connection by default;
-    // only route through it when a real key shift is active.
     let pitchShift = null;
     let pitchAvailable = false;
     if (window.Tone && Tone.PitchShift) {
@@ -2126,10 +2022,6 @@ function connectAnalysers() {
       }
     }
 
-    // Chain: (source attached at play time) → trimNode → EQ → gain (direct,
-    // always audible) → analyser → master. Pitch path is wired in
-    // parallel and only connected to gainNode by applyKeyShift() when a
-    // real shift is requested, to keep idle channels cheap and reliable.
     trimNode.connect(eqLow);
     eqLow.connect(eqMid);
     eqMid.connect(eqHigh);
@@ -2155,29 +2047,16 @@ function connectAnalysers() {
   });
 }
 
-// ===== Playback: create fresh AudioBufferSourceNodes each Play =====
-// AudioBufferSourceNodes are one-shot — you start() once. So Play creates
-// them, Pause/Stop stops+discards them, and resuming Play creates fresh ones.
-// This is standard Web Audio and how DAWs handle scheduled playback.
-
-// Wrap-around helper: keeps offset in [0, dur) even for negative nudges.
 function wrapOffset(offset, dur) {
   return ((offset % dur) + dur) % dur;
 }
 
-// The master timeline used to run on a fixed 6s window (LOOP_DUR) so stems
-// pulled from different songs would stay locked together. That also meant
-// every stem — including a normal single-song split — got cut off after 6
-// seconds instead of playing the whole track. This restores full-length
-// playback: the master runs as long as the longest loaded stem, falling
-// back to LOOP_DUR only when nothing real is loaded yet (e.g. demo tones).
 function getMasterDuration() {
   const durs = Object.values(stemBuffers).filter(Boolean).map(b => b.duration);
   return durs.length ? Math.max(...durs) : LOOP_DUR;
 }
 
 function startStem(name, masterPos) {
-  // Stop any existing source for this stem first.
   stopStem(name);
   const buffer = stemBuffers[name];
   if (!buffer || !stemNodes[name]?.trimNode) return;
@@ -2185,14 +2064,9 @@ function startStem(name, masterPos) {
   src.buffer = buffer;
   src.loop = true;
   src.playbackRate.value = tempoRatio * (stemAutoStretch[name] || 1);
-  // Loop each stem at its own actual length so a normal single-song split
-  // plays the whole track instead of cutting off after a few seconds.
   src.loopStart = 0;
   src.loopEnd = buffer.duration;
   src.connect(stemNodes[name].trimNode);
-  // A stem with an active cue marker starts from that marker instead of the
-  // shared master position — lets different stems kick in from different
-  // parts of the song. Nudge still layers on top as a fine-alignment offset.
   const activeMarker = (stemMarkers[name] || []).find(m => m.active);
   const base = activeMarker ? activeMarker.time : masterPos;
   const eff = wrapOffset(base + stemNudge[name], buffer.duration);
@@ -2219,7 +2093,6 @@ function stopAllStems() {
   Object.keys(activeSources).forEach(stopStem);
 }
 
-// Current position in the master timeline (0..getMasterDuration()), respecting tempo.
 function currentPlaybackTime() {
   if (transportState === 'playing' && audioCtx) {
     return wrapOffset(masterOffset + (audioCtx.currentTime - playStartCtxTime) * tempoRatio, getMasterDuration());
@@ -2227,7 +2100,6 @@ function currentPlaybackTime() {
   return masterOffset;
 }
 
-// Light up the LED meter ladder from real signal RMS (6 segments per channel)
 function updateFaders() {
   Object.keys(stemNodes).forEach(name => {
     const node = stemNodes[name];
@@ -2269,23 +2141,9 @@ function updateFaders() {
   rafId = requestAnimationFrame(updateFaders);
 }
 
-// ===== Backend-stem loading — actually swap the audio, not just the badge =====
-// Load a real stem file from the backend into a channel: fetch it, decode it,
-// swap the channel's AudioBuffer, re-render its waveform, and if playback is
-// running, restart that one stem so the change takes effect immediately.
-// The original silent buffer is kept as originalStemBuffers[channelKey]
-// so Eject can restore it.
-const originalStemBuffers = {};   // channelKey -> the pre-load synth buffer
-const currentStemMeta = {};       // channelKey -> { stemId, trackName }
+const originalStemBuffers = {};
+const currentStemMeta = {};
 
-// Detect a song's BPM once per split, always from its DRUMS channel —
-// drums have the clear rhythmic hits the detector needs. Previously each
-// channel detected BPM from its own audio, and since all 6 channels load
-// in parallel, whichever happened to finish first "won" — often vocals,
-// which have weak/no percussive onsets and threw the detection way off.
-// That's why two channels from the same song could end up stretched to
-// wildly different speeds. Now every channel of a split shares one
-// drums-derived BPM, cached by stemId so it's only fetched/analyzed once.
 async function ensureBpmForStemId(stemId) {
   if (detectedBpmByStemId[stemId] !== undefined) return detectedBpmByStemId[stemId];
   if (!detectedBpmPromiseByStemId[stemId]) {
@@ -2324,10 +2182,6 @@ async function loadBackendStemToChannel(channelKey, stemId, trackName) {
       showErr('Log in first to load a stem from your library.');
       return false;
     }
-    // channelKey is always one of vocals/drums/bass/guitar/piano/other — the
-    // same instrument names the backend's per-instrument endpoint expects,
-    // so this pulls just this channel's wav out of the split instead of the
-    // full 6-stem zip (which decodeAudioData can't parse as audio).
     const url = window.API_BASE + '/api/v1/my-stems/' + encodeURIComponent(stemId)
               + '/download/' + encodeURIComponent(channelKey)
               + '?token=' + encodeURIComponent(getToken());
@@ -2336,13 +2190,8 @@ async function loadBackendStemToChannel(channelKey, stemId, trackName) {
     const arrayBuf = await res.arrayBuffer();
     const audioBuffer = await audioCtx.decodeAudioData(arrayBuf);
 
-    // Auto tempo-match: every channel of the SAME song shares one BPM
-    // (detected from that song's drums, see ensureBpmForStemId) so they
-    // all get the identical stretch and stay in sync with each other;
-    // stems loaded from a DIFFERENT song get re-stretched to match.
     const nativeBpm = await ensureBpmForStemId(stemId);
     const rawStretch = nativeBpm ? (BASE_BPM / nativeBpm) : 1;
-    // Clamp — a bad detection shouldn't be able to mangle the audio.
     stemAutoStretch[channelKey] = Math.min(1.5, Math.max(0.7, rawStretch));
 
     if (!originalStemBuffers[channelKey]) {
@@ -2351,12 +2200,6 @@ async function loadBackendStemToChannel(channelKey, stemId, trackName) {
     stemBuffers[channelKey] = audioBuffer;
     currentStemMeta[channelKey] = { stemId, trackName };
 
-    // Re-render waveform from the new buffer's samples. The mixer only ever
-    // plays/loops the first LOOP_DUR seconds of a stem (see startStem), so
-    // draw just that window — not the whole (often minutes-long) track.
-    // Drawing the full song here made the waveform look like a solid block:
-    // compressed into ~600px, a full track's loud/quiet peaks all collapse
-    // into near-full-height columns almost everywhere.
     const canvas = document.querySelector('.wave-row[data-stem="' + channelKey + '"] .wave-canvas');
     if (canvas) {
       const full = audioBuffer.getChannelData(0);
@@ -2365,7 +2208,6 @@ async function loadBackendStemToChannel(channelKey, stemId, trackName) {
     }
     if (stemSampleRegions[channelKey]) renderStemSampleRegions(channelKey);
 
-    // Set badge + LED on the channel strip.
     const channel = document.querySelector('.channel[data-stem="' + channelKey + '"]');
     if (channel) {
       const badge = channel.querySelector('.assigned-badge');
@@ -2375,18 +2217,12 @@ async function loadBackendStemToChannel(channelKey, stemId, trackName) {
       const muteBtnEl = channel.querySelector('.mute-btn');
       if (muteBtnEl) muteBtnEl.classList.remove('active');
     }
-    // Un-mute in case this channel was previously cleared — a fresh load
-    // should always be audible regardless of prior clear/mute state.
     if (stemNodes[channelKey]) {
       stemNodes[channelKey].muted = false;
       if (typeof updateAllChannelGains === 'function') updateAllChannelGains();
     }
-    // Re-apply key-lock pitch compensation now that this channel has its
-    // own auto-tempo-match stretch factor.
     applyKeyShift();
 
-    // Live-swap: if playing, restart just this stem at the current position
-    // so the new audio takes over without breaking the master timeline.
     if (transportState === 'playing') {
       startStem(channelKey, currentPlaybackTime());
     }
@@ -2400,9 +2236,6 @@ async function loadBackendStemToChannel(channelKey, stemId, trackName) {
   }
 }
 
-// Clear a channel completely: stop its audio, make it silent (not the demo
-// tone), and reset the waveform to empty. This is what CLR / EJECT actually
-// need — "empty" means silent, not "swapped for the placeholder track."
 function silentBuffer() {
   const sr = (audioCtx && audioCtx.sampleRate) || 44100;
   const buf = (audioCtx || { createBuffer: (c,l,s)=>({length:l,duration:l/s}) }).createBuffer(1, 1, sr);
@@ -2434,9 +2267,6 @@ function restoreOriginalStem(channelKey) {
   stemAutoStretch[channelKey] = 1;
   applyKeyShift();
 
-  // Kill any currently-playing source for this channel with a quick gain
-  // fade first so it doesn't click/scratch on the hard stop, then swap in
-  // true silence — not the demo tone — so the channel is genuinely empty.
   const node = stemNodes[channelKey];
   const g = node && node.trimNode ? node.trimNode.gain : null;
   const restoreGain = g ? g.value : null;
@@ -2455,10 +2285,6 @@ function restoreOriginalStem(channelKey) {
     }
   }, g && audioCtx ? 14 : 0);
 
-  // Second, independent silencing path: mute this channel through the SAME
-  // gainNode.gain.value mechanism the Mute button already uses reliably.
-  // Belt-and-suspenders in case the trimNode/buffer path above is bypassed
-  // by anything downstream — this guarantees the channel is inaudible.
   if (node) {
     node.muted = true;
     if (typeof updateAllChannelGains === 'function') updateAllChannelGains();
@@ -2471,9 +2297,6 @@ function restoreOriginalStem(channelKey) {
     drawEmptyWaveform(canvas, WAVE_COLORS[channelKey] || '#3CFDE0');
   }
 
-  // Eject clears the loaded audio out from under any saved sample chops
-  // (their start/end times would no longer point at anything meaningful),
-  // so drop them along with everything else.
   if (stemSampleRegions[channelKey]) {
     stemSampleRegions[channelKey] = [];
     renderStemSampleRegions(channelKey);
@@ -2486,15 +2309,8 @@ function restoreOriginalStem(channelKey) {
     const led = channel.querySelector('.status-led');
     if (led) { led.classList.remove('playing'); led.classList.add('muted'); }
   }
-
-  // Deliberately do NOT restart playback for this stem — cleared means
-  // silent, even while the transport keeps running for the other channels.
 }
 
-// Save the audio currently loaded into a mixer channel as its own entry in
-// MY STEMS, separate from the full 6-stem split it came from. Only works for
-// channels loaded from a saved split (currentStemMeta tracks that origin) —
-// there's nothing to save server-side for a channel still on the demo tone.
 function showSaveHint() {
   const tab = document.getElementById('screenStemsTab');
   if (!tab) return;
@@ -2531,10 +2347,7 @@ async function saveChannelAsStem(channelKey, btn) {
       btn.textContent = 'SAVED';
       setTimeout(() => { btn.classList.remove('saved'); btn.textContent = 'SAVE'; }, 1600);
     }
-    // Refresh the MY STEMS list if it's loaded, so the new entry shows up.
     if (typeof window.__refreshMyStems === 'function') window.__refreshMyStems();
-    // First-time hint: point the user at the MY STEMS tab so they know
-    // where saved stems go. Shown once per browser via localStorage.
     if (!localStorage.getItem('stemline_seen_save_hint')) {
       localStorage.setItem('stemline_seen_save_hint', '1');
       showSaveHint();
@@ -2559,16 +2372,10 @@ document.querySelectorAll('.ch-save').forEach(btn => {
   });
 });
 
-// Expose to inline handlers wired inside other IIFEs.
 window.__loadBackendStemToChannel = loadBackendStemToChannel;
 window.__restoreOriginalStem = restoreOriginalStem;
 window.__saveChannelAsStem = saveChannelAsStem;
 
-// ===== END backend-stem loading =====
-
-
-// Sets the amber playhead line's left offset over the wave canvases based
-// on the current playback position.
 function updatePlayheadPosition() {
   const playhead = document.getElementById('wavePlayhead');
   if (!playhead) return;
@@ -2583,8 +2390,6 @@ function updatePlayheadPosition() {
   playhead.style.left = x + 'px';
 }
 
-// Transport state: 'idle' | 'playing' | 'paused'. Stored globally so button
-// styling can reflect it. isPlaying stays around because updateFaders reads it.
 let transportState = 'idle';
 
 function refreshTransportButtons() {
@@ -2627,7 +2432,6 @@ async function playPreview() {
 
 function pausePreview() {
   if (transportState !== 'playing') return;
-  // Capture current position before stopping the sources.
   const pos = currentPlaybackTime();
   stopAllStems();
   masterOffset = pos;
@@ -2637,7 +2441,6 @@ function pausePreview() {
   if (rafId) cancelAnimationFrame(rafId);
   document.querySelectorAll('.status-led').forEach(led => led.classList.remove('playing'));
   document.querySelectorAll('.meter-seg').forEach(seg => seg.classList.remove('lit'));
-  // Playhead stays visible at its paused position, so you can see where you are.
 }
 
 function stopPreview() {
@@ -2652,9 +2455,6 @@ function stopPreview() {
   updatePlayheadPosition();
 }
 
-// Jump playback to a specific master-timeline position (called from click-seek
-// and future scrub interactions). Restarts all active sources at the new
-// offset if we're currently playing.
 function seekTo(pos) {
   masterOffset = wrapOffset(pos, getMasterDuration());
   if (transportState === 'playing') {
@@ -2663,8 +2463,6 @@ function seekTo(pos) {
   updatePlayheadPosition();
 }
 
-// Change one stem's nudge (drag-to-align). If we're currently playing, restart
-// just that stem at the new effective offset.
 function setStemNudge(name, nudgeSec) {
   stemNudge[name] = nudgeSec;
   const row = document.querySelector('.wave-row[data-stem="' + name + '"]');
@@ -2678,13 +2476,6 @@ function setStemNudge(name, nudgeSec) {
   }
 }
 
-// Shift the waveform visually to match the nudge — so you SEE the stem
-// slide as you drag, and can eyeball alignment against other stems. Cue
-// markers were never re-rendered here, so they stayed put on-screen while
-// the waveform slid underneath — no longer pointing at the sound they were
-// placed on. Re-rendering after the transform fixes that: marker x-position
-// is computed from the canvas's bounding rect, which already reflects the
-// CSS transform, so the marker now shifts along with the waveform.
 function updateNudgeVisual(row, nudgeSec) {
   const canvas = row.querySelector('.wave-canvas');
   if (!canvas) return;
@@ -2694,7 +2485,6 @@ function updateNudgeVisual(row, nudgeSec) {
   if (stem) renderStemMarkers(stem);
 }
 
-// Small ms-offset readout on the label so you can see the exact nudge.
 function updateNudgeReadout(row, nudgeSec) {
   const label = row.querySelector('.wave-row-label');
   if (!label) return;
@@ -2708,21 +2498,10 @@ function updateNudgeReadout(row, nudgeSec) {
   }
 }
 
-/* ===== Draggable knob: vertical drag, -135deg to +135deg sweep ===== */
-/* ===== Endless browse encoder: spins continuously, emits detent steps =====
-   Unlike setupKnob (absolute -135..+135 with end stops), a browse encoder
-   never hits a stop — it just accumulates rotation and fires onStep(+1/-1)
-   every DETENT pixels of drag, like a hardware browse wheel. */
-/* ===== Shared pointer drag =====
-   One set of listeners per control, bound to the element itself and active
-   only while a drag is in progress. Pointer capture routes every move to the
-   element even if the finger slides off it, so no window-level listeners are
-   needed. This replaces the old mouse+touch pairs, which registered ~35
-   window listeners each and ran on every touchmove anywhere on the page. */
 function onDrag(el, { onStart, onMove, onEnd }) {
-  let active = null; // pointerId of the drag in progress
+  let active = null;
   el.addEventListener('pointerdown', e => {
-    if (active !== null) return;      // ignore extra fingers on this control
+    if (active !== null) return;
     active = e.pointerId;
     el.setPointerCapture(e.pointerId);
     onStart && onStart(e);
@@ -2759,15 +2538,15 @@ function setupEncoder(el, { onStep, onClick, detent = 18 }) {
     lastY = clientY;
     moved += Math.abs(dy);
     accum += dy;
-    spin(dy * 2.2); // visual rotation follows the drag
+    spin(dy * 2.2);
     while (Math.abs(accum) >= detent) {
-      const dir = accum > 0 ? -1 : 1; // drag up = move up the list
+      const dir = accum > 0 ? -1 : 1;
       accum -= (accum > 0 ? 1 : -1) * detent;
       onStep(dir);
     }
   };
   const end = () => {
-    if (dragging && moved < 4 && onClick) onClick(); // treat as a tap
+    if (dragging && moved < 4 && onClick) onClick();
     dragging = false; touchId = null;
   };
 
@@ -2777,7 +2556,6 @@ function setupEncoder(el, { onStep, onClick, detent = 18 }) {
     onEnd:   () => end()
   });
 
-  // mouse wheel over the knob also scrolls, which feels natural on desktop
   el.addEventListener('wheel', e => {
     e.preventDefault();
     const dir = e.deltaY > 0 ? 1 : -1;
@@ -2809,12 +2587,9 @@ function setupKnob(el, { min, max, initial, onChange }) {
   return { set: apply, get: () => value };
 }
 
-/* ===== Draggable fader: vertical drag sets channel volume 0-100% ===== */
 function setupFader(slotEl, capEl, { initial, onChange }) {
   let pct = initial;
   const apply = p => {
-    // Bottom reaches 0 (true silence). Top clamped at 95 to keep the cap
-    // visible inside the slot.
     pct = Math.min(95, Math.max(0, p));
     capEl.style.bottom = pct + '%';
     onChange(pct);
@@ -2842,8 +2617,6 @@ function drawWaveform(canvas, audioBuffer, color) {
   drawWaveformFromSamples(canvas, data, color);
 }
 
-// Same rendering, but takes a raw Float32Array — used by the new pipeline
-// that doesn't need to decode anything.
 function drawWaveformFromSamples(canvas, data, color) {
   const dpr = window.devicePixelRatio || 1;
   const rect = canvas.getBoundingClientRect();
@@ -2857,15 +2630,6 @@ function drawWaveformFromSamples(canvas, data, color) {
   const samplesPerPixel = Math.max(1, Math.floor(data.length / width));
   const mid = height / 2;
 
-  // Pass 1: per-column blended amplitude (RMS body + a touch of peak so
-  // transients still register), plus the loudest column in this window.
-  // Raw min/max-per-column pins to ±1 on almost every column for dense,
-  // loud material (drums, bass) — the whole row renders as a solid block.
-  // Blending RMS in fixes that, but a fixed scale then makes quieter stems
-  // (vocals, a soft bass take) draw too faint to see even though they're
-  // audible. Normalizing to this stem's own loudest column — like a real
-  // DAW waveform — fixes both: dense stems show real shape, quiet stems
-  // still fill a visible range.
   const amps = new Array(width);
   let loudest = 0;
   for (let x = 0; x < width; x++) {
@@ -2901,8 +2665,6 @@ function drawWaveformFromSamples(canvas, data, color) {
   ctx.stroke();
 }
 
-// Draws every stem waveform straight from the synthesized Float32Array.
-// No fetch, no data URL, no decode — this is the whole point of the rewrite.
 function renderStemWaveforms() {
   document.querySelectorAll('.wave-row').forEach(row => {
     const stem = row.dataset.stem;
@@ -2917,11 +2679,6 @@ function renderStemWaveforms() {
   });
 }
 
-// ===== Per-stem cue markers =====
-// Each stem (row) keeps its own independent list of markers — unlimited,
-// draggable, labeled. Exactly one marker per stem can be "active": that's
-// the point this stem actually starts from on Play (see startStem()), so
-// different stems can kick in from different parts of the song.
 const stemMarkers = { vocals: [], drums: [], bass: [], guitar: [], piano: [], other: [] };
 let markerIdCounter = 0;
 
@@ -2935,7 +2692,7 @@ function formatMarkerTime(t) {
 function addStemMarkerAt(stem, t, label) {
   const list = stemMarkers[stem];
   if (!list) return null;
-  if (list.some(m => Math.abs(m.time - t) < 0.05)) return null; // avoid dupes on dblclick jitter
+  if (list.some(m => Math.abs(m.time - t) < 0.05)) return null;
   const marker = { id: 'm' + (++markerIdCounter), time: t, label: label || ('Cue ' + (list.length + 1)), active: list.length === 0 };
   list.push(marker);
   list.sort((a, b) => a.time - b.time);
@@ -2948,7 +2705,6 @@ function removeStemMarker(stem, id) {
   if (!list) return;
   const wasActive = list.find(m => m.id === id)?.active;
   stemMarkers[stem] = list.filter(m => m.id !== id);
-  // If we removed the active marker, the stem falls back to the master position.
   renderStemMarkers(stem);
 }
 
@@ -2957,8 +2713,6 @@ function setActiveStemMarker(stem, id) {
   if (!list) return;
   list.forEach(m => { m.active = (m.id === id); });
   renderStemMarkers(stem);
-  // Restart this stem immediately from its new cue point if we're playing,
-  // so selecting a cue previews it right away.
   if (transportState === 'playing') {
     const marker = list.find(m => m.id === id);
     if (marker) startStem(stem, masterOffset);
@@ -3026,7 +2780,7 @@ function renderStemMarkers(stem) {
     el.addEventListener('pointercancel', endDrag);
     el.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (moved) { moved = false; return; } // trailing click after a drag
+      if (moved) { moved = false; return; }
       setActiveStemMarker(stem, marker.id);
     });
     el.addEventListener('dblclick', (e) => { e.stopPropagation(); renameStemMarker(stem, marker.id); });
@@ -3039,13 +2793,6 @@ function renderAllStemMarkers() {
   Object.keys(stemMarkers).forEach(renderStemMarkers);
 }
 
-// ===== Per-stem sample chops (live-sampling) =====
-// Shift+drag a range on a stem's waveform to save a triggerable slice of
-// it — click the slice (or its play button) to fire just that chunk as a
-// one-shot, independent of the main transport. Multiple chops per stem,
-// same "unlimited, per-row" shape as the cue markers above. Edge handles
-// let you trim start/end after the fact; double-click to rename, right-
-// click to remove — same gesture vocabulary as cue markers for consistency.
 const stemSampleRegions = { vocals: [], drums: [], bass: [], guitar: [], piano: [], other: [] };
 let sampleRegionIdCounter = 0;
 
@@ -3061,7 +2808,7 @@ function addStemSampleRegion(stem, startT, endT, label) {
   const list = stemSampleRegions[stem];
   if (!list) return null;
   const lo = Math.min(startT, endT), hi = Math.max(startT, endT);
-  if (hi - lo < 0.05) return null; // drag was too short to be a real selection
+  if (hi - lo < 0.05) return null;
   const region = { id: 'r' + (++sampleRegionIdCounter), start: lo, end: hi, label: label || ('Chop ' + (list.length + 1)) };
   list.push(region);
   list.sort((a, b) => a.start - b.start);
@@ -3087,10 +2834,6 @@ function renameStemSampleRegion(stem, id) {
   renderStemSampleRegions(stem);
 }
 
-// Fires one chop as a one-shot playback straight to the master output —
-// deliberately bypasses that channel's mute/solo/fader chain so a chop
-// always plays when triggered, same as a sample pad, regardless of
-// whether the source channel is currently playing, muted, or stopped.
 function triggerStemSampleRegion(stem, id) {
   const list = stemSampleRegions[stem];
   const region = list && list.find(r => r.id === id);
@@ -3205,10 +2948,9 @@ function renderAllStemSampleRegions() {
   Object.keys(stemSampleRegions).forEach(renderStemSampleRegions);
 }
 
-// ===== Playhead scrub: grab the amber line and drag it anywhere along the
-// wave. Hit-tested on the whole waveformRows container (not just the 1px
-// line) so it's easy to grab, and clamped to the canvas width so it can
-// never leave the visible waveform. =====
+// FIX 1: playhead scrub now uses the real song length (getMasterDuration)
+// instead of the old hardcoded 6-second LOOP_DUR, matching the click-to-seek
+// and playback behavior elsewhere in the file.
 (function setupPlayheadScrub() {
   const rowsEl = document.getElementById('waveformRows');
   if (!rowsEl) return;
@@ -3224,13 +2966,13 @@ function renderAllStemSampleRegions() {
     if (!firstCanvas) return;
     const rect = firstCanvas.getBoundingClientRect();
     const fraction = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    seekTo(fraction * LOOP_DUR);
+    seekTo(fraction * getMasterDuration());
   };
 
   rowsEl.addEventListener('pointerdown', (e) => {
     const rowsRect = rowsEl.getBoundingClientRect();
     const xInRows = e.clientX - rowsRect.left;
-    if (Math.abs(xInRows - playheadX()) > GRAB_PX) return; // not grabbing the playhead
+    if (Math.abs(xInRows - playheadX()) > GRAB_PX) return;
     scrubbing = true;
     rowsEl.classList.add('scrubbing');
     try { rowsEl.setPointerCapture(e.pointerId); } catch (err) {}
@@ -3267,12 +3009,8 @@ document.addEventListener('DOMContentLoaded', () => {
   renderAllStemSampleRegions();
   window.addEventListener('resize', () => { updatePlayheadPosition(); renderAllStemMarkers(); renderAllStemSampleRegions(); });
 
-  // Click-to-seek on any waveform row — jumps ALL stems to that position
-  // together, keeping them in lockstep. Drag-to-nudge (see below) offsets a
-  // single stem instead. Double-click drops a marker at that point instead.
   document.querySelectorAll('.wave-canvas').forEach(canvas => {
     canvas.addEventListener('click', (e) => {
-      // If a drag just happened, ignore the trailing click (see nudge wiring).
       if (canvas._suppressClick) { canvas._suppressClick = false; return; }
       const rect = canvas.getBoundingClientRect();
       const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
@@ -3289,9 +3027,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Visible "+" button — the discoverable way to drop a cue marker (the
-  // waveform double-click above still works too, for anyone used to DAWs).
-  // Adds the marker at the current playhead position for that stem.
   document.querySelectorAll('.add-marker-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -3301,10 +3036,26 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // FIX 2: visible SAMPLE toggle wiring. Click toggles sampleModeByStem for
+  // that row and marks the row visually (amber outline + active button) so
+  // sampling mode is discoverable without needing Shift+drag.
+  document.querySelectorAll('.sample-toggle-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const stem = btn.dataset.stem;
+      if (!stem || !(stem in sampleModeByStem)) return;
+      sampleModeByStem[stem] = !sampleModeByStem[stem];
+      btn.classList.toggle('active', sampleModeByStem[stem]);
+      const row = document.querySelector('.wave-row[data-stem="' + stem + '"]');
+      if (row) row.classList.toggle('sampling-mode', sampleModeByStem[stem]);
+    });
+  });
+
   // ===== Drag-to-nudge on a single wave =====
-  // Grab a waveform and drag horizontally to shift THAT stem's playback
-  // earlier or later than the others. Lets you align kicks/vocals/etc. across
-  // stems without moving the master timeline.
+  // FIX 2 (continued): a plain drag now nudges the stem ONLY when SAMPLE
+  // mode is off for that row and Shift isn't held. When SAMPLE mode is on
+  // (or Shift is held), this handler steps aside and the chop handler below
+  // takes the drag instead.
   document.querySelectorAll('.wave-row').forEach(row => {
     const stem = row.dataset.stem;
     const canvas = row.querySelector('.wave-canvas');
@@ -3316,7 +3067,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let moved = false;
 
     canvas.addEventListener('pointerdown', (e) => {
-      if (e.button !== 0 || e.shiftKey) return; // Shift+drag chops a sample region instead — see below
+      if (e.button !== 0) return;
+      if (e.shiftKey || sampleModeByStem[stem]) return; // sample-chop handler takes this drag instead
       canvas.setPointerCapture(e.pointerId);
       dragging = true;
       moved = false;
@@ -3342,16 +3094,9 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     canvas.addEventListener('pointerup', endDrag);
     canvas.addEventListener('pointercancel', endDrag);
-
-    // Note: double-click on the wave is reserved for dropping a cue marker
-    // (wired above) — the old "double-click resets nudge" shortcut was
-    // removed since it competed with marker placement on the same canvas.
   });
 
-  // ===== Shift+drag to chop a sample region =====
-  // The plain drag above nudges a stem; holding Shift while dragging draws
-  // a selection on that stem's wave instead, and releasing saves it as a
-  // triggerable chop (see renderStemSampleRegions/triggerStemSampleRegion).
+  // ===== Sample chopping: Shift+drag, OR plain drag when SAMPLE mode is on =====
   document.querySelectorAll('.wave-row').forEach(row => {
     const stem = row.dataset.stem;
     const canvas = row.querySelector('.wave-canvas');
@@ -3362,7 +3107,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let ghostEl = null;
 
     canvas.addEventListener('pointerdown', (e) => {
-      if (e.button !== 0 || !e.shiftKey) return;
+      if (e.button !== 0) return;
+      if (!(e.shiftKey || sampleModeByStem[stem])) return; // nudge handler takes this drag instead
       canvas.setPointerCapture(e.pointerId);
       selecting = true;
       startX = e.clientX;
@@ -3395,7 +3141,6 @@ document.addEventListener('DOMContentLoaded', () => {
     canvas.addEventListener('pointercancel', endSelect);
   });
 
-  // Screen tabs: WAVES (per-stem waveforms) vs MY STEMS (saved-track browser)
   const waveformRows = document.getElementById('waveformRows');
   const screenStemList = document.getElementById('screenStemList');
   const screenTitle = document.getElementById('screenTitle');
@@ -3412,8 +3157,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // ===== BROWSE ENCODER (SCROLL knob) =====
-  // Spin: move selection through the stem list on the LCD. Tap: assign selected.
   const browseKnob = document.getElementById('browseKnob');
   const browseReadout = document.getElementById('browseReadout');
 
@@ -3455,15 +3198,12 @@ document.addEventListener('DOMContentLoaded', () => {
       onClick: () => {
         const sel = document.querySelector('#screenStemList .screen-row.selected');
         if (sel) sel.querySelector('.assign-btn')?.click();
-        else moveSelection(1); // nothing selected yet — select first
+        else moveSelection(1);
       }
     });
   }
   window.__updateBrowseReadout = updateBrowseReadout;
 
-  // ===== GROUP NAV + LETTER JUMP =====
-  // Groups mirror the six channel types. Stems carry a stem_type once the
-  // library schema lands; until then rows fall back to ALL so nothing breaks.
   const STEM_GROUPS = [
     { key: 'all',    label: 'ALL STEMS', accent: '#3CFDE0' },
     { key: 'vocals', label: 'VOCALS',    accent: '#ff5540' },
@@ -3496,7 +3236,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (nameEl) { nameEl.textContent = group.label; nameEl.style.setProperty('--grp-accent', group.accent); }
     if (countEl) countEl.textContent = shown + (searchTerm ? ' FOUND' : '');
 
-    // keep a valid selection inside the filtered set
     if (!document.querySelector('#screenStemList .screen-row.selected')) {
       const first = rows.find(r => r.style.display !== 'none');
       if (first) first.classList.add('selected');
@@ -3517,13 +3256,11 @@ document.addEventListener('DOMContentLoaded', () => {
     searchTerm = e.target.value.trim().toLowerCase();
     applyBrowseFilter();
   });
-  // Escape clears the search
   stemSearch?.addEventListener('keydown', e => {
     if (e.key === 'Escape') { e.target.value = ''; searchTerm = ''; applyBrowseFilter(); e.target.blur(); }
   });
   window.__applyBrowseFilter = applyBrowseFilter;
 
-  // Per-channel: gain trim, 3-band EQ, fader, mute
   document.querySelectorAll('.channel').forEach(channel => {
     const stem = channel.dataset.stem;
     const ensure = () => {
@@ -3558,7 +3295,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     channel.querySelectorAll('.knob-xs').forEach(k => {
-      const band = k.dataset.eq; // high | mid | low
+      const band = k.dataset.eq;
       setupKnob(k, {
         min: -12, max: 12, initial: 0,
         onChange: db => {
@@ -3580,9 +3317,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (statusLed) statusLed.classList.toggle('muted', active);
     });
 
-    // CUE / SOLO: isolates this channel in the shared output. True separate
-    // headphone-only cueing needs a second physical audio output (setSinkId),
-    // which most browsers/laptops don't support, so this is Solo instead.
     if (cueBtn) {
       cueBtn.addEventListener('click', () => {
         const active = cueBtn.classList.toggle('active');
@@ -3593,7 +3327,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Master tempo knob (60-180 BPM, 120 = center/unity)
   const tempoKnob = document.getElementById('tempoKnob');
   const tempoReadout = document.getElementById('tempoReadout');
   if (tempoKnob) {
@@ -3604,9 +3337,6 @@ document.addEventListener('DOMContentLoaded', () => {
         tempoReadout.textContent = rounded + ' BPM';
         const lcdBpm = document.getElementById('lcdBpm');
         if (lcdBpm) lcdBpm.textContent = rounded.toFixed(1);
-        // Capture current master-timeline position at the OLD tempo before we
-        // change it, so switching tempo doesn't cause a time jump. Then apply
-        // the new rate to any active sources and reset the reference point.
         const posNow = currentPlaybackTime();
         tempoRatio = rounded / BASE_BPM;
         if (transportState === 'playing' && audioCtx) {
@@ -3621,7 +3351,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Master key shift knob (-12..+12 semitones, 0 = center/unaltered)
   const keyKnob = document.getElementById('keyKnob');
   const keyReadout = document.getElementById('keyReadout');
   if (keyKnob) {
@@ -3640,7 +3369,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Key Lock: keeps pitch fixed while Tempo changes playback speed
   const keyLockBtn = document.getElementById('keyLockBtn');
   if (keyLockBtn) {
     keyLockBtn.classList.toggle('active', keyLockOn);
@@ -3651,7 +3379,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Master volume knob (0-100%)
   const masterVolKnob = document.getElementById('masterVolKnob');
   const masterVolReadout = document.getElementById('masterVolReadout');
   if (masterVolKnob) {
@@ -3666,9 +3393,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Headphone/cue output routing: lets you pick a real output device (e.g.
-  // your headphones) to receive the cue bus, which only carries muted
-  // channels. Main output is untouched either way.
   const cueOutBtn = document.getElementById('cueOutBtn');
   const cueOutStatus = document.getElementById('cueOutStatus');
   async function pickCueOutputDevice() {
@@ -3742,8 +3466,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const fileInput = document.getElementById('fileInput');
   const uploadStatus = document.getElementById('uploadStatus');
 
-  let authMode = 'login'; // or 'signup'
-  let pendingFile = null; // file waiting on login before we upload it
+  let authMode = 'login';
+  let pendingFile = null;
 
   function getToken() {
     return localStorage.getItem('soundlounge101_token');
@@ -3775,7 +3499,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const adSlot = document.getElementById('adSlot');
   async function refreshAdSlot() {
     if (!getToken()) {
-      adSlot.style.display = 'block'; // logged-out visitors see ads
+      adSlot.style.display = 'block';
       navUpgradeBtn.style.display = '';
       return;
     }
@@ -3785,7 +3509,7 @@ document.addEventListener('DOMContentLoaded', () => {
       adSlot.style.display = data.show_ads ? 'block' : 'none';
       navUpgradeBtn.style.display = data.is_premium ? 'none' : '';
     } catch (err) {
-      adSlot.style.display = 'block'; // fail open to showing ads
+      adSlot.style.display = 'block';
       navUpgradeBtn.style.display = '';
     }
   }
@@ -3835,7 +3559,6 @@ document.addEventListener('DOMContentLoaded', () => {
   pricingMonthlyBtn.addEventListener('click', () => startCheckout('monthly'));
   pricingAnnualBtn.addEventListener('click', () => startCheckout('annual'));
 
-  // Post-checkout redirect landing (?subscribed=success / cancelled)
   (function handleSubscribedRedirect() {
     const params = new URLSearchParams(window.location.search);
     const sub = params.get('subscribed');
@@ -3900,7 +3623,6 @@ document.addEventListener('DOMContentLoaded', () => {
     authPasswordToggle.textContent = showing ? 'SHOW' : 'HIDE';
   });
 
-  // ---- Forgot password / reset password ----
   const authForgotWrap = document.getElementById('authForgotWrap');
   const authForgotLink = document.getElementById('authForgotLink');
   const forgotPasswordForm = document.getElementById('forgotPasswordForm');
@@ -3998,7 +3720,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // If we landed on /reset-password?token=..., open the modal straight into the reset form
   (function checkForResetToken() {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
@@ -4070,7 +3791,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // ---- Drop zone: click to browse, drag and drop, or select a file ----
   dropZone.addEventListener('click', () => fileInput.click());
   dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = 'var(--vu-amber)'; });
   dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = ''; });
@@ -4128,12 +3848,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (splitTimerId) { clearInterval(splitTimerId); splitTimerId = null; }
   }
 
-  // Polls /api/v1/split/status/{stemId} until the backend reports the
-  // split as done or errored. Demucs takes 3+ minutes on a real song, so
-  // the actual split call now returns immediately (see startUpload) instead
-  // of holding one long request open — a long-open connection was getting
-  // killed by a proxy/browser network timeout before the response came
-  // back, even though the split itself always finished fine server-side.
   async function pollSplitStatus(stemId) {
     const token = encodeURIComponent(getToken());
     while (true) {
@@ -4141,14 +3855,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const res = await fetch(API_BASE + '/api/v1/split/status/' + stemId + '?token=' + token);
       if (!res.ok) {
         if (res.status === 401) throw new Error('Your session expired. Please log in again.');
-        // A transient blip polling status shouldn't kill the whole upload —
-        // just try again on the next tick.
         continue;
       }
       const data = await res.json();
       if (data.status === 'done') return data;
       if (data.status === 'error') throw new Error(data.error || 'Split failed.');
-      // else still "processing" — keep polling
     }
   }
 
@@ -4158,19 +3869,11 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      // Phones get the lighter 4-stem model (vocals/drums/bass/other) —
-      // matches the mobile mixer's smaller 4-channel layout below 700px.
       formData.append('stems', window.innerWidth <= 700 ? '4' : '6');
-      // Give it a beat to actually upload the file before switching to the
-      // splitting message.
       setTimeout(() => {
         dropZoneLabel.textContent = 'Splitting ' + file.name + '…';
         startSplitLoader();
       }, 600);
-      // Backend reads the token from the query string, not an Authorization header.
-      // This call now only covers the upload + kicking off the split — it
-      // returns right away with status "processing" instead of waiting for
-      // Demucs to finish.
       const res = await fetch(API_BASE + '/api/v1/split?token=' + encodeURIComponent(getToken()), {
         method: 'POST',
         body: formData
@@ -4192,15 +3895,9 @@ document.addEventListener('DOMContentLoaded', () => {
       dropZoneLabel.innerHTML = 'Drop an MP3 or WAV here, or <strong>click to browse</strong>';
       const dlUrl = API_BASE + '/api/v1/my-stems/' + data.stem_id + '/download?token=' + encodeURIComponent(getToken());
       uploadStatus.innerHTML = 'Loading stems into the mixer…';
-      // Refresh the per-channel stem libraries so the new track shows up in the mixer right away.
       if (typeof window.__reloadLibraries === 'function') window.__reloadLibraries();
       if (typeof loadScreenStems === 'function') loadScreenStems();
 
-      // Auto-load: drop split stems into their matching mixer channels so
-      // the person doesn't have to load each one by hand. A fresh upload
-      // is a new song, so it always replaces whatever's currently in every
-      // channel — leaving old channels holding the previous song's stems
-      // meant the mixer played a mix of two different songs.
       if (typeof window.__loadBackendStemToChannel === 'function') {
         const trackLabel = data.track_name || file.name;
         const channelsToLoad = CHANNEL_LIST;
@@ -4223,7 +3920,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // ===== MY STEMS PANEL =====
   const myStemsOverlay = document.getElementById('myStemsOverlay');
   const myStemsPanel = document.getElementById('myStemsPanel');
   const myStemsClose = document.getElementById('myStemsClose');
@@ -4242,14 +3938,8 @@ document.addEventListener('DOMContentLoaded', () => {
     return div.innerHTML;
   }
 
-  // ===== SCREEN STEM BROWSER (mixer LCD) =====
   const CHANNEL_LIST = ['vocals', 'drums', 'bass', 'guitar', 'piano', 'other'];
-  // Each split is one song, but is rendered as SIX rows here — one per
-  // instrument — so it's obvious the song actually got separated instead of
-  // looking like one opaque "whole song" entry. channelAssignments is keyed
-  // by channel (only one stem can occupy a channel at a time), pointing at
-  // whichever stem_id currently loaded there.
-  const channelAssignments = {}; // channelKey -> stemId
+  const channelAssignments = {};
   const STEM_ROW_META = {
     vocals: { label: 'VOCALS', accent: '#ff5540' },
     drums:  { label: 'DRUMS',  accent: '#ffa022' },
@@ -4277,11 +3967,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Could not load stems.');
 
-      // Group saved instruments back under the song they came from. Older
-      // rows saved before parent_stem_id existed fall back to grouping by
-      // the base track name (stripping the " (Vocals)" etc. suffix).
       const INSTR_SUFFIX = /\s\((Vocals|Drums|Bass|Guitar|Piano|Other)\)$/i;
-      const groups = new Map(); // groupKey -> { songName, rows: [] }
+      const groups = new Map();
       data.forEach(stem => {
         const groupKey = stem.parent_stem_id != null ? ('p' + stem.parent_stem_id) : ('n' + stem.track_name.replace(INSTR_SUFFIX, ''));
         const songName = stem.track_name.replace(INSTR_SUFFIX, '');
@@ -4289,7 +3976,6 @@ document.addEventListener('DOMContentLoaded', () => {
         groups.get(groupKey).rows.push(stem);
       });
 
-      // Count is songs (folders), not individual saved stems.
       if (countEl) countEl.textContent = '(' + groups.size + ')';
 
       if (!data.length) {
@@ -4352,8 +4038,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const nameDeleteBtn = row.querySelector('.name-delete');
         const nameSpan = row.querySelector('.track-name');
 
-        // Reflect whatever's already loaded into this channel (e.g. after
-        // a re-render from a search/filter change).
         if (channelAssignments[chan] === stemId) {
           assignBtn.textContent = 'LOADED';
           assignBtn.classList.add('assigned');
@@ -4370,7 +4054,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const resData = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(resData.detail || 'Could not delete.');
-            // Release any channel this split's stems were loaded into.
             Object.keys(channelAssignments).forEach(ch => {
               if (channelAssignments[ch] === stemId) {
                 clearChannelBadge(ch);
@@ -4397,7 +4080,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         renameBtn.addEventListener('click', () => {
-          if (row.querySelector('.rename-input')) return; // already editing
+          if (row.querySelector('.rename-input')) return;
           const input = document.createElement('input');
           input.type = 'text';
           input.className = 'rename-input mono';
@@ -4423,8 +4106,6 @@ document.addEventListener('DOMContentLoaded', () => {
               const resData = await res.json();
               if (!res.ok) throw new Error(resData.detail || 'Could not rename.');
               trackName = resData.track_name;
-              // Propagate the new name to all 6 rows for this split, plus
-              // any channel badge currently showing it.
               listEl.querySelectorAll('.screen-row[data-stem-id="' + stemId + '"]').forEach(r => {
                 r.dataset.trackName = trackName;
                 const ns = r.querySelector('.track-name');
@@ -4448,15 +4129,11 @@ document.addEventListener('DOMContentLoaded', () => {
           });
         });
 
-        // One row = one instrument = one channel. LOAD pulls just that
-        // instrument's separated audio straight into its matching channel —
-        // no picker needed since the mapping is always 1:1.
         assignBtn.addEventListener('click', async (e) => {
           e.stopPropagation();
           if (assignBtn.disabled) return;
 
           if (channelAssignments[chan] === stemId) {
-            // Toggle off: unload.
             delete channelAssignments[chan];
             clearChannelBadge(chan);
             if (window.__restoreOriginalStem) window.__restoreOriginalStem(chan);
@@ -4466,8 +4143,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
           }
 
-          // If this channel already holds a different split's stem, reset
-          // that row's button back to LOAD.
           const prevStemId = channelAssignments[chan];
           if (prevStemId && prevStemId !== stemId) {
             const prevBtn = listEl.querySelector('.screen-row[data-chan="' + chan + '"][data-stem-id="' + prevStemId + '"] .assign-btn');
@@ -4496,7 +4171,6 @@ document.addEventListener('DOMContentLoaded', () => {
           if (!wasActive) cueJack.classList.add('active');
         });
 
-        // tapping a row selects it, keeping touch and the browse knob in sync
         row.addEventListener('click', e => {
           if (e.target.closest('button') || e.target.closest('input')) return;
           listEl.querySelectorAll('.screen-row.selected').forEach(r => r.classList.remove('selected'));
@@ -4522,14 +4196,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Release a channel from the MY STEMS assignment map. Stems loaded from the
-  // MY STEMS list are tracked here rather than in the per-channel popup's
-  // library, so CLR has to clear this too — otherwise the channel keeps
-  // showing as occupied and the stem is never really released.
   window.__clearChannelAssignment = function (channelKey) {
     const changed = channelAssignments[channelKey] !== undefined;
     if (changed) delete channelAssignments[channelKey];
-    // Reset whichever row's LOAD button was showing "LOADED" for this channel.
     document.querySelectorAll('.screen-row[data-chan="' + channelKey + '"] .assign-btn.assigned').forEach(btn => {
       btn.textContent = 'LOAD';
       btn.classList.remove('assigned');
@@ -4563,8 +4232,6 @@ document.addEventListener('DOMContentLoaded', () => {
     myStemsPanel.style.display = 'block';
     myStemsList.innerHTML = '<div style="color:var(--chrome-dim);font-size:0.8rem;">Loading…</div>';
     try {
-      // This panel needs raw, not-yet-saved splits too — it's the picker
-      // where you choose which instruments from a split to actually save.
       const res = await fetch(API_BASE + '/api/v1/my-stems?include_unsaved=true&token=' + encodeURIComponent(getToken()));
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Could not load your stems.');
@@ -4578,10 +4245,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const origUrl = API_BASE + '/api/v1/my-stems/' + stem.id + '/download-original?token=' + encodeURIComponent(getToken());
         const isSingle = !!stem.instrument;
         const loadLabel = isSingle ? ('Load ' + stem.instrument) : 'Load into mixer';
-        // Whole-song splits get a click-to-expand panel listing each of the 6
-        // stems with a checkbox, so the user can save just the ones they want
-        // (via the existing save-instrument endpoint) instead of the whole zip.
-        // Stays open until the track name is clicked again to collapse it.
         const stemsPanel = isSingle ? '' :
           '<div class="stems-drop-panel" style="display:none;margin-top:0.7rem;padding-top:0.7rem;border-top:1px solid var(--concrete-line);">' +
             '<div style="display:flex;flex-wrap:wrap;gap:0.6rem;margin-bottom:0.6rem;">' +
@@ -4607,8 +4270,6 @@ document.addEventListener('DOMContentLoaded', () => {
           '</div>';
       }).join('');
 
-      // Click a whole-song's track name to expand/collapse its stem picker.
-      // Stays open until clicked again — no more hover-only reveal.
       myStemsList.querySelectorAll('.my-stems-row').forEach(row => {
         const panel = row.querySelector('.stems-drop-panel');
         const toggle = row.querySelector('.track-name-toggle');
@@ -4660,8 +4321,6 @@ document.addEventListener('DOMContentLoaded', () => {
           const prevText = btn.textContent;
           btn.textContent = 'Loading…';
           try {
-            // A single-channel save only has audio for its own instrument —
-            // loading it into the other five channels would just 404.
             const targets = instrument ? [instrument] : CHANNEL_LIST;
             const results = await Promise.all(
               targets.map(chan => window.__loadBackendStemToChannel(chan, stemId, trackName))
@@ -4679,7 +4338,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       let previewAudioCtx = null;
-      let previewActive = null; // { canvas, audio, buffer, raf }
+      let previewActive = null;
       function stopPreview() {
         if (!previewActive) return;
         try { previewActive.audio.pause(); } catch(e) {}
@@ -4714,15 +4373,8 @@ document.addEventListener('DOMContentLoaded', () => {
       myStemsList.querySelectorAll('.preview-wave-canvas').forEach(canvas => {
         let buffer = null;
         let loading = false;
-        // Tracks whether the pointer is still over THIS canvas. The fetch +
-        // decode below is async, so by the time it resolves the mouse may
-        // already be over a different row (or several rows, if the mouse
-        // swept across the list). Without this check, every row that was
-        // ever hovered eventually finishes its own fetch and calls
-        // audio.play() regardless of whether it's still being hovered --
-        // that's what was causing every saved song to start playing at once.
         let hovering = false;
-        let liveAudio = null; // this canvas's own in-flight/playing audio, if any
+        let liveAudio = null;
         canvas.addEventListener('mouseenter', async () => {
           stopPreview();
           hovering = true;
@@ -4742,7 +4394,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             loading = false;
           }
-          if (!hovering) return; // mouse moved on before decode finished
+          if (!hovering) return;
           const audio = new Audio(url);
           liveAudio = audio;
           audio.play().catch(() => {});
@@ -4757,9 +4409,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         canvas.addEventListener('mouseleave', () => {
           hovering = false;
-          // Stop this canvas's own audio even if a later hover already made
-          // some other row the tracked previewActive -- otherwise this one
-          // keeps playing in the background, orphaned.
           if (liveAudio) { try { liveAudio.pause(); } catch (e) {} liveAudio = null; }
           if (previewActive && previewActive.canvas === canvas) {
             stopPreview();
@@ -4798,18 +4447,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  /* ============================================================
-     PER-CHANNEL STEM LIBRARIES + KEYPAD + PER-CHANNEL KEY/PITCH
-     Structure-first wiring. Populates the six library windows,
-     drives the keypad, and gives each channel its own key/pitch.
-     ============================================================ */
   (function initMixerConsole() {
     const STEM_TYPES = ['vocals', 'drums', 'bass', 'guitar', 'piano', 'other'];
-    // library state per stem type: full item list + current view/selection
     const lib = {};
     STEM_TYPES.forEach(t => lib[t] = { items: [], filtered: [], selected: 0, loaded: null, query: '' });
 
-    // per-channel key/pitch, in semitones, 0 = original
     const chPitch = {};
     STEM_TYPES.forEach(t => chPitch[t] = 0);
 
@@ -4825,7 +4467,6 @@ document.addEventListener('DOMContentLoaded', () => {
         .replace(/"/g,'&quot;');
     }
 
-    // ---- apply the search query to build the filtered view ----
     function applyFilter(type) {
       const st = lib[type];
       const q = st.query.trim().toLowerCase();
@@ -4835,7 +4476,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (st.selected >= st.filtered.length) st.selected = Math.max(0, st.filtered.length - 1);
     }
 
-    // ---- render one channel's popup list ----
     function renderPop(type) {
       const listEl = document.querySelector('.stem-pop-list[data-poplist="' + type + '"]');
       if (!listEl) return;
@@ -4868,7 +4508,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (selEl) selEl.scrollIntoView({ block: 'nearest' });
     }
 
-    // ---- load the selected stem into its channel ----
     async function loadStemToChannel(type) {
       const st = lib[type];
       if (!st.filtered.length) return;
@@ -4877,12 +4516,9 @@ document.addEventListener('DOMContentLoaded', () => {
       renderPop(type);
       closePop(type);
 
-      // Actually swap the AudioBuffer for this channel — this is what makes
-      // the load audibly take effect, not just visually.
       if (window.__loadBackendStemToChannel) {
         await window.__loadBackendStemToChannel(type, item.id, item.name);
       } else {
-        // Fallback: legacy visual-only assignment.
         const channel = document.querySelector('.channel[data-stem="' + type + '"]');
         if (channel) {
           const badge = channel.querySelector('.assigned-badge');
@@ -4892,9 +4528,6 @@ document.addEventListener('DOMContentLoaded', () => {
       updateLoadedReadout();
     }
 
-    // ---- unload / eject the currently-loaded stem from a channel ----
-    // Reverts the channel's AudioBuffer to silence, clears the
-    // badge, and (if playing) restarts that stem so the change is immediate.
     function unloadStemFromChannel(type) {
       const st = lib[type];
       st.loaded = null;
@@ -4911,7 +4544,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       updateLoadedReadout();
     }
-    // Expose for the badge-click handler wired outside this IIFE.
     window.__unloadStemFromChannel = unloadStemFromChannel;
 
     function updateLoadedReadout() {
@@ -4922,7 +4554,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (status) status.textContent = n ? 'LOADED' : 'READY';
     }
 
-    // ---- rename the selected stem ----
     async function renameStem(type) {
       const st = lib[type];
       if (!st.filtered.length) return;
@@ -4931,14 +4562,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (next == null) return;
       const name = next.trim();
       if (!name || name === item.name) return;
-      item.name = name; // update locally right away
+      item.name = name;
       renderPop(type);
-      // if a loaded badge shows this stem, refresh it
       if (st.loaded === item.id) {
         const badge = document.querySelector('.channel[data-stem="' + type + '"] .assigned-badge');
         if (badge) badge.textContent = name;
       }
-      // persist to backend if the endpoint is live (silent if not)
       if (typeof getToken === 'function' && getToken()) {
         try {
           await fetch(API_BASE + '/api/v1/stems/' + encodeURIComponent(item.id) + '/rename', {
@@ -4950,14 +4579,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // ---- popup open / close ----
-    // The mixer's .deck container has `overflow:hidden` plus a 3D perspective
-    // transform (for the console look), which clips ANY popup that tries to
-    // render past its bounds — including this one. Rather than fight that
-    // with more absolute-positioning math, each popup gets portaled to
-    // document.body the first time it opens and repositioned with `fixed`
-    // coords computed from its trigger button, so it always renders fully
-    // on top of everything instead of getting silently chopped off.
     function positionPop(pop, anchorBtn) {
       const rect = anchorBtn.getBoundingClientRect();
       const popW = 168;
@@ -4965,7 +4586,6 @@ document.addEventListener('DOMContentLoaded', () => {
       left = Math.max(8, Math.min(left, window.innerWidth - popW - 8));
       pop.style.left = left + 'px';
       pop.style.width = popW + 'px';
-      // Try below the button first; flip above it if there isn't room.
       const estHeight = 230;
       let top = rect.bottom + 6;
       if (top + estHeight > window.innerHeight - 8) {
@@ -5000,7 +4620,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (pop && pop.style.display === 'flex') closePop(type); else openPop(type);
     }
 
-    // ---- wire per-channel browse buttons + popup controls ----
     document.querySelectorAll('.ch-browse').forEach(btn => {
       btn.addEventListener('click', (e) => { e.stopPropagation(); togglePop(btn.dataset.browse); });
     });
@@ -5012,9 +4631,6 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
 
-    // ---- CLR: clear this channel so any stem can be loaded into it ----
-    // Reuses unloadStemFromChannel, which reverts the AudioBuffer to the demo
-    // tone, clears the badge, and live-restarts the stem if playback is running.
     function syncClearButtons() {
       document.querySelectorAll('.ch-clear').forEach(btn => {
         const type = btn.dataset.clear;
@@ -5026,18 +4642,10 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const type = btn.dataset.clear;
-        // Clear every place a stem can be registered against this channel:
-        //  1. the per-channel popup library (lib[].loaded)
-        //  2. the MY STEMS assignment map (channelAssignments)
-        //  3. the audio buffer + badge + LED
-        // Stems loaded from MY STEMS aren't tracked in lib[], which is why
-        // clearing only that left the track still loaded.
         unloadStemFromChannel(type);
         if (window.__clearChannelAssignment) {
           window.__clearChannelAssignment(type);
         }
-        // Belt-and-braces: force the visual state clear even if a load path
-        // we don't know about set the badge directly.
         const chEl = document.querySelector('.channel[data-stem="' + type + '"]');
         if (chEl) {
           const badge = chEl.querySelector('.assigned-badge');
@@ -5049,8 +4657,6 @@ document.addEventListener('DOMContentLoaded', () => {
         syncClearButtons();
       });
     });
-    // Keep the lit/unlit state in step with loads happening anywhere else
-    // (popup LOAD, MY STEMS list, badge-click eject).
     const _origUpdateLoadedReadout = updateLoadedReadout;
     updateLoadedReadout = function () {
       _origUpdateLoadedReadout.apply(this, arguments);
@@ -5091,10 +4697,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const rename = pop.querySelector('[data-poprename]');
       if (rename) rename.addEventListener('click', () => renameStem(type));
     });
-    // click anywhere else closes any open popup
     document.addEventListener('click', () => STEM_TYPES.forEach(closePop));
 
-    // ---- badge click = quick eject: click the loaded stem's label to remove it ----
     document.querySelectorAll('.channel').forEach(channel => {
       const badge = channel.querySelector('.assigned-badge');
       if (!badge) return;
@@ -5106,7 +4710,6 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
 
-    // ---- per-channel key/pitch ----
     document.querySelectorAll('.channel').forEach(channel => {
       const type = channel.dataset.stem;
       const valEl = channel.querySelector('[data-pitch-val]');
@@ -5122,19 +4725,12 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
 
-    // ---- populate libraries from the backend, grouped by stem type ----
     async function loadLibraries() {
       if (typeof getToken !== 'function' || !getToken()) return;
       try {
-        // The per-channel BROWSE popups need raw, not-yet-saved splits too,
-        // so a song you just split can still be loaded/browsed per channel.
         const res = await fetch(API_BASE + '/api/v1/my-stems?include_unsaved=true&token=' + encodeURIComponent(getToken()));
         const data = await res.json();
         if (!res.ok || !Array.isArray(data)) return;
-        // A full split (instrument === null) has all 6 instruments in one
-        // zip, so it belongs in every channel's library. A single-channel
-        // save (instrument set) only belongs in the one matching channel —
-        // showing it under other channels would 404 when loaded.
         STEM_TYPES.forEach(t => {
           lib[t].items = data
             .filter(stem => !stem.instrument || stem.instrument === t)
@@ -5164,10 +4760,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 </script>
 <script>
-  // Scale the hero + mixer board down so the whole thing fits in one
-  // screen (below the nav bar) with no scrolling needed to reach any
-  // control. Only ever scales DOWN, never up, and never below 0.5 so
-  // it stays usable on very short viewports.
   (function () {
     var hero = document.querySelector('.hero');
     var nav = document.querySelector('nav');
@@ -5183,20 +4775,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
       var scale = available / contentHeight;
       if (scale > 1) scale = 1;
-      // Never shrink past 0.82 — below that, knobs/faders/text get too
-      // small to see or click. If it still doesn't fit at 0.82, the page
-      // scrolls a bit rather than becoming unusable.
       if (scale < 0.82) scale = 0.82;
 
       hero.style.transform = 'scale(' + scale + ')';
-      // Collapse the extra space the unscaled layout box would otherwise
-      // leave behind, so content after the hero moves up to meet it.
       hero.style.marginBottom = (contentHeight * (scale - 1)) + 'px';
     }
 
     window.addEventListener('load', fitHero);
     window.addEventListener('resize', fitHero);
-    // Re-fit after fonts/images settle, since scrollHeight can change.
     setTimeout(fitHero, 300);
   })();
 </script>
