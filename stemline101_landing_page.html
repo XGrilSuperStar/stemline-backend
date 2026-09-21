@@ -1794,19 +1794,19 @@ function tempoInducedSemitonesFor(name) {
 }
 function applyKeyShift() {
   Object.entries(stemNodes).forEach(([name, node]) => {
-    if (!node.pitchShift || !node.gainNode) return;
+    if (!node.pitchShift || !node.compressor) return;
     const compensate = keyLockOn ? -tempoInducedSemitonesFor(name) : 0;
     const totalShift = keySemitones + compensate;
     node.pitchShift.pitch = totalShift;
 
     const needsPitch = Math.abs(totalShift) > 0.25;
     if (needsPitch && !node._pitchConnectedToGain) {
-      try { node.eqHigh.disconnect(node.gainNode); } catch (e) {}
-      Tone.connect(node.pitchShift, node.gainNode);
+      try { node.eqHigh.disconnect(node.compressor); } catch (e) {}
+      Tone.connect(node.pitchShift, node.compressor);
       node._pitchConnectedToGain = true;
     } else if (!needsPitch && node._pitchConnectedToGain) {
-      try { node.pitchShift.disconnect(node.gainNode); } catch (e) {}
-      node.eqHigh.connect(node.gainNode);
+      try { node.pitchShift.disconnect(node.compressor); } catch (e) {}
+      node.eqHigh.connect(node.compressor);
       node._pitchConnectedToGain = false;
     }
   });
@@ -1875,11 +1875,21 @@ function updateAllChannelGains() {
 }
 const dbToGain = db => Math.pow(10, db / 20);
 
+// Default EQ starting points per stem, to cut down on vocal bleed into
+// "other"-family instruments separated by Demucs (guitar/piano/other all
+// come from the same catch-all stem, so they bleed into each other and
+// into vocals). These are just starting knob positions -- still fully
+// adjustable per channel.
+const EQ_DEFAULTS = {
+  guitar: { mid: -3, high: -2.5 }
+};
+
 function initEngine() {
   Object.keys(STEM_SAMPLES).filter(k => !k.startsWith('_')).forEach(name => {
     const existing = stemNodes[name] || {};
+    const eqDef = EQ_DEFAULTS[name] || {};
     stemNodes[name] = Object.assign(
-      { volPct: 78, trimDb: 0, eqLowDb: 0, eqMidDb: 0, eqHighDb: 0, muted: false, solo: false },
+      { volPct: 78, trimDb: 0, eqLowDb: eqDef.low || 0, eqMidDb: eqDef.mid || 0, eqHighDb: eqDef.high || 0, muted: false, solo: false },
       existing
     );
   });
@@ -2002,6 +2012,16 @@ function connectAnalysers() {
     const eqHigh = audioCtx.createBiquadFilter();
     eqHigh.type = 'highshelf'; eqHigh.frequency.value = 3200; eqHigh.gain.value = node.eqHighDb;
 
+    // Gentle per-stem compressor, sits after EQ. Smooths out the
+    // watery/phasey texture separation artifacts leave behind, without
+    // squashing the sound -- moderate ratio, soft knee.
+    const compressor = audioCtx.createDynamicsCompressor();
+    compressor.threshold.value = -24;
+    compressor.knee.value = 6;
+    compressor.ratio.value = 3;
+    compressor.attack.value = 0.01;
+    compressor.release.value = 0.2;
+
     const gainNode = audioCtx.createGain();
     gainNode.gain.value = node.muted ? 0 : node.volPct / 100;
 
@@ -2025,8 +2045,9 @@ function connectAnalysers() {
     trimNode.connect(eqLow);
     eqLow.connect(eqMid);
     eqMid.connect(eqHigh);
-    eqHigh.connect(gainNode);
-    eqHigh.connect(cueSendGain);
+    eqHigh.connect(compressor);
+    compressor.connect(gainNode);
+    compressor.connect(cueSendGain);
     cueSendGain.connect(cueBus);
     if (pitchAvailable) {
       Tone.connect(eqHigh, pitchShift);
@@ -2036,6 +2057,7 @@ function connectAnalysers() {
     analyser.connect(masterGain);
 
     node.trimNode = trimNode;
+    node.compressor = compressor;
     node.eqLow = eqLow;
     node.eqMid = eqMid;
     node.eqHigh = eqHigh;
@@ -3265,7 +3287,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const stem = channel.dataset.stem;
     const ensure = () => {
       if (!stemNodes[stem]) {
-        stemNodes[stem] = { volPct: 78, trimDb: 0, eqLowDb: 0, eqMidDb: 0, eqHighDb: 0, muted: false, solo: false };
+        const eqDef = EQ_DEFAULTS[stem] || {};
+        stemNodes[stem] = { volPct: 78, trimDb: 0, eqLowDb: eqDef.low || 0, eqMidDb: eqDef.mid || 0, eqHighDb: eqDef.high || 0, muted: false, solo: false };
       }
       return stemNodes[stem];
     };
@@ -3296,8 +3319,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     channel.querySelectorAll('.knob-xs').forEach(k => {
       const band = k.dataset.eq;
+      const eqDef = EQ_DEFAULTS[stem] || {};
+      const initVal = eqDef[band] || 0;
       setupKnob(k, {
-        min: -12, max: 12, initial: 0,
+        min: -12, max: 12, initial: initVal,
         onChange: db => {
           const n = ensure();
           if (band === 'high') { n.eqHighDb = db; if (n.eqHigh) n.eqHigh.gain.value = db; }
