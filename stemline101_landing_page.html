@@ -2273,8 +2273,7 @@ async function loadBackendStemToChannel(channelKey, stemId, trackName) {
     const canvas = document.querySelector('.wave-row[data-stem="' + channelKey + '"] .wave-canvas');
     if (canvas) {
       const full = audioBuffer.getChannelData(0);
-      const windowLen = Math.min(full.length, Math.round(LOOP_DUR * audioBuffer.sampleRate));
-      drawWaveformFromSamples(canvas, full.subarray(0, windowLen), WAVE_COLORS[channelKey] || '#3CFDE0');
+      drawWaveformFromSamples(canvas, full, WAVE_COLORS[channelKey] || '#3CFDE0');
     }
     if (stemSampleRegions[channelKey]) renderStemSampleRegions(channelKey);
 
@@ -2547,10 +2546,9 @@ function setStemNudge(name, nudgeSec) {
 }
 
 function updateNudgeVisual(row, nudgeSec) {
-  const canvas = row.querySelector('.wave-canvas');
-  if (!canvas) return;
-  const px = (nudgeSec / LOOP_DUR) * canvas.getBoundingClientRect().width;
-  canvas.style.transform = 'translateX(' + px + 'px)';
+  // Waveform picture stays fixed in place now -- nudge still shifts actual
+  // playback timing (see setStemNudge/startStem), only the visual slide
+  // was removed.
   const stem = row.dataset.stem;
   if (stem) renderStemMarkers(stem);
 }
