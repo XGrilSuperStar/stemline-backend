@@ -2260,6 +2260,25 @@ async function loadBackendStemToChannel(channelKey, stemId, trackName) {
     const arrayBuf = await res.arrayBuffer();
     const audioBuffer = await audioCtx.decodeAudioData(arrayBuf);
 
+    // Diagnostic: each stem's decoded length should match the others from
+    // the same split. If one comes back noticeably shorter, it will loop
+    // early on its own and sound like the song "cuts off" partway through.
+    console.log('[stem load] ' + channelKey + ' duration: ' + audioBuffer.duration.toFixed(2) + 's');
+    const otherDurs = Object.entries(stemBuffers)
+      .filter(([k, b]) => b && k !== channelKey)
+      .map(([k, b]) => [k, b.duration]);
+    for (const [k, d] of otherDurs) {
+      if (Math.abs(d - audioBuffer.duration) > 1.5) {
+        console.warn('[stem load] DURATION MISMATCH: ' + channelKey + ' is ' + audioBuffer.duration.toFixed(2)
+          + 's but ' + k + ' is ' + d.toFixed(2) + 's — the shorter one will loop early.');
+        if (status) {
+          status.style.display = 'block';
+          status.style.color = 'var(--clip-red)';
+          status.textContent = 'Heads up: ' + channelKey + ' and ' + k + ' came back different lengths — that stem will loop early and can sound like the song cuts off.';
+        }
+      }
+    }
+
     const nativeBpm = await ensureBpmForStemId(stemId);
     const rawStretch = nativeBpm ? (BASE_BPM / nativeBpm) : 1;
     stemAutoStretch[channelKey] = Math.min(1.5, Math.max(0.7, rawStretch));
