@@ -269,6 +269,7 @@
     border: 1px solid rgba(216,220,226,0.25); border-radius: 3px; cursor: pointer;
     white-space: nowrap;
     position: relative;
+    display: none;
   }
   .sample-toggle-btn:hover { background: rgba(255,255,255,0.1); }
   .sample-toggle-btn::after {
@@ -1342,7 +1343,7 @@
             </button>
             <span class="tp-source mono" id="previewLabel">no track loaded</span>
           </div>
-          <div class="wave-hint mono" id="waveHint">click waveform to seek &middot; drag to nudge that stem &middot; <span style="color:var(--vu-teal,#3CFDE0);">+CUE</span> sets where this stem starts playing from &middot; <span style="color:#ffb020;">SAMPLE</span> toggles click-drag sample chopping on this row</div>
+          <div class="wave-hint mono" id="waveHint">click or drag waveform to seek &middot; <span style="color:var(--vu-teal,#3CFDE0);">+CUE</span> sets where this stem starts playing from</div>
           <div class="waveform-rows" id="waveformRows">
             <div class="wave-row" data-stem="vocals"><span class="wave-row-label">VOCALS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="sample-toggle-btn" data-stem="vocals" title="Toggle sample mode: click-drag on the wave chops a triggerable sample">SAMPLE</button><button class="add-marker-btn" data-stem="vocals" title="Add a cue marker here">+CUE</button></div>
             <div class="wave-row" data-stem="drums"><span class="wave-row-label">DRUMS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="sample-toggle-btn" data-stem="drums" title="Toggle sample mode: click-drag on the wave chops a triggerable sample">SAMPLE</button><button class="add-marker-btn" data-stem="drums" title="Add a cue marker here">+CUE</button></div>
@@ -3104,9 +3105,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // FIX 2: visible SAMPLE toggle wiring. Click toggles sampleModeByStem for
-  // that row and marks the row visually (amber outline + active button) so
-  // sampling mode is discoverable without needing Shift+drag.
+  // SAMPLE toggle button is hidden in the UI now (see CSS: display:none)
+  // so this wiring stays for future re-enable but sampleModeByStem will
+  // always read false from here on -- Shift+drag remains the only way
+  // to reach the chop handler below.
   document.querySelectorAll('.sample-toggle-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -3119,20 +3121,23 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // ===== Drag-to-nudge on a single wave =====
-  // FIX 2 (continued): a plain drag now nudges the stem ONLY when SAMPLE
-  // mode is off for that row and Shift isn't held. When SAMPLE mode is on
-  // (or Shift is held), this handler steps aside and the chop handler below
-  // takes the drag instead.
+  // ===== Drag-on-wave now scrubs the shared playhead only =====
+  // Plain click-drag (no Shift) on ANY stem's waveform seeks the whole
+  // song continuously as you drag -- it does NOT nudge that stem's
+  // timing and does NOT touch the underlying audio buffer. Shift+drag
+  // still reaches the sample-chop handler below.
   document.querySelectorAll('.wave-row').forEach(row => {
     const stem = row.dataset.stem;
     const canvas = row.querySelector('.wave-canvas');
     if (!canvas || !(stem in stemNudge)) return;
     let dragging = false;
-    let startX = 0;
-    let startNudge = 0;
-    let secPerPx = 0;
     let moved = false;
+
+    const scrubFromEvent = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      seekTo(fraction * getMasterDuration());
+    };
 
     canvas.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
@@ -3140,18 +3145,13 @@ document.addEventListener('DOMContentLoaded', () => {
       canvas.setPointerCapture(e.pointerId);
       dragging = true;
       moved = false;
-      startX = e.clientX;
-      startNudge = stemNudge[stem];
-      secPerPx = LOOP_DUR / canvas.getBoundingClientRect().width;
       canvas.classList.add('dragging');
+      scrubFromEvent(e);
     });
     canvas.addEventListener('pointermove', (e) => {
       if (!dragging) return;
-      const dx = e.clientX - startX;
-      if (Math.abs(dx) > 2) moved = true;
-      const nudge = startNudge + dx * secPerPx;
-      const clamped = Math.max(-LOOP_DUR / 2, Math.min(LOOP_DUR / 2, nudge));
-      setStemNudge(stem, clamped);
+      moved = true;
+      scrubFromEvent(e);
     });
     const endDrag = (e) => {
       if (!dragging) return;
@@ -3164,7 +3164,7 @@ document.addEventListener('DOMContentLoaded', () => {
     canvas.addEventListener('pointercancel', endDrag);
   });
 
-  // ===== Sample chopping: Shift+drag, OR plain drag when SAMPLE mode is on =====
+  // ===== Sample chopping: Shift+drag only (SAMPLE toggle button hidden) =====
   document.querySelectorAll('.wave-row').forEach(row => {
     const stem = row.dataset.stem;
     const canvas = row.querySelector('.wave-canvas');
@@ -3176,7 +3176,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     canvas.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
-      if (!(e.shiftKey || sampleModeByStem[stem])) return; // nudge handler takes this drag instead
+      if (!(e.shiftKey || sampleModeByStem[stem])) return; // scrub handler takes this drag instead
       canvas.setPointerCapture(e.pointerId);
       selecting = true;
       startX = e.clientX;
@@ -3201,8 +3201,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const xEnd = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
       if (ghostEl) { ghostEl.remove(); ghostEl = null; }
       const secPerPx = stemDur / rect.width;
-      addStemSampleRegion(stem, xStart * secPerPx, xEnd * secPerPx);
-      canvas._suppressClick = true;
+      // FIX: only suppress the trailing click when a region was actually
+      // created. Previously this was set unconditionally, which silently
+      // broke plain click-to-seek any time a shift-drag/sample-mode drag
+      // was too small to register as a chop.
+      const region = addStemSampleRegion(stem, xStart * secPerPx, xEnd * secPerPx);
+      if (region) canvas._suppressClick = true;
       try { canvas.releasePointerCapture(e.pointerId); } catch (err) {}
     };
     canvas.addEventListener('pointerup', endSelect);
