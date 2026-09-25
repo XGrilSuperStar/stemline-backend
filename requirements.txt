@@ -6,6 +6,7 @@ torchcodec
 bs-roformer-infer
 sqlalchemy
 psycopg2-binary
+psycopg[binary]
 bcrypt==4.2.0
 PyJWT==2.9.0
 email-validator
