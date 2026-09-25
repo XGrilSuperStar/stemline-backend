@@ -517,6 +517,45 @@ def admin_delete_my_stems(token: str = None, db: Session = Depends(get_db)):
     db.commit()
     return {"deleted": deleted}
 
+@app.delete("/api/v1/admin/all-stems")
+def admin_delete_all_stems(token: str = None, db: Session = Depends(get_db)):
+    # Wipes every stem for every user: deletes the R2 (or local-disk) files
+    # behind each row, then the rows themselves. One-off full reset.
+    user_id = get_current_user(token)
+    if not is_admin_user(db, user_id):
+        raise HTTPException(status_code=403, detail="Admin only.")
+    rows = db.query(Stem).all()
+    r2_files_deleted = 0
+    local_files_deleted = 0
+    bytes_freed = 0
+    for row in rows:
+        for path in (row.zip_path, row.orig_path):
+            if not path:
+                continue
+            if is_r2_key(path):
+                try:
+                    r2_delete(path)
+                    r2_files_deleted += 1
+                except Exception as e:
+                    logger.warning(f"Could not delete R2 key {path}: {e}")
+            elif os.path.exists(path):
+                try:
+                    bytes_freed += os.path.getsize(path)
+                    os.remove(path)
+                    local_files_deleted += 1
+                except Exception as e:
+                    logger.warning(f"Could not remove local stem file {path}: {e}")
+    rows_deleted = len(rows)
+    for row in rows:
+        db.delete(row)
+    db.commit()
+    return {
+        "rows_deleted": rows_deleted,
+        "r2_files_deleted": r2_files_deleted,
+        "local_files_deleted": local_files_deleted,
+        "bytes_freed": bytes_freed,
+    }
+
 @app.delete("/api/v1/admin/local-disk-stems")
 def admin_delete_local_disk_stems(token: str = None, db: Session = Depends(get_db)):
     # One-off cleanup: stems saved before the R2 migration have zip_path
