@@ -518,20 +518,11 @@ def admin_delete_my_stems(token: str = None, db: Session = Depends(get_db)):
     return {"deleted": deleted}
 
 @app.delete("/api/v1/admin/all-stems")
-def admin_delete_all_stems(token: str = None, wipe_secret: str = None, db: Session = Depends(get_db)):
+def admin_delete_all_stems(token: str = None, db: Session = Depends(get_db)):
     # Wipes every stem for every user: deletes the R2 (or local-disk) files
     # behind each row, then the rows themselves. One-off full reset.
-    # Temporary: accepts either an admin login token OR a one-time secret
-    # (WIPE_SECRET env var) set for this cleanup, since no login token was
-    # on hand when this was run. Remove the wipe_secret path afterward.
-    authorized = False
-    if wipe_secret and os.getenv("WIPE_SECRET") and wipe_secret == os.getenv("WIPE_SECRET"):
-        authorized = True
-    else:
-        user_id = get_current_user(token)
-        if is_admin_user(db, user_id):
-            authorized = True
-    if not authorized:
+    user_id = get_current_user(token)
+    if not is_admin_user(db, user_id):
         raise HTTPException(status_code=403, detail="Admin only.")
     rows = db.query(Stem).all()
     r2_files_deleted = 0
