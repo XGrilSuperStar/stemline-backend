@@ -1673,20 +1673,34 @@ ABOUT_HTML = """
 <body>
 <a href="/" style="display:inline-block;margin-bottom:1.5rem;color:#f0a500;text-decoration:none;">&larr; Back to Stemline101</a>
 <h1>About Stemline101</h1>
-<p>Stemline101 splits any song into isolated stems — vocals, drums, bass, and more — then lets you remix and mix multiple tracks together right in your browser.</p>
+<p>Stemline101 lets you split any song into its individual parts — vocals, drums, bass, guitar, synth, and more — using AI-powered audio source separation. Once a track is split, you can remix it, blend stems from different songs together, and build entirely new mixes right in your browser.</p>
 
 <h2>What You Can Do</h2>
 <ul>
-  <li>Upload a track and separate it into individual stems</li>
-  <li>Download stems for use in your own projects</li>
-  <li>Mix and blend stems from multiple songs on our built-in DJ-style board</li>
+  <li><strong>Upload and split</strong> — Drop in an MP3 or WAV and Stemline101 automatically separates it into up to six stems: vocals, drums, bass, guitar, synth, and other instrumentation.</li>
+  <li><strong>Build a personal stem library</strong> — Save stems from every track you split so they're ready to load instantly, without re-processing.</li>
+  <li><strong>Mix live</strong> — Load stems from multiple songs onto our built-in DJ-style mixing board. Adjust gain, EQ (highs, mids, lows), key, and tempo per channel, then blend them together in real time.</li>
+  <li><strong>Key and tempo matching</strong> — Shift the pitch or tempo of any stem so tracks in different keys or BPMs can be mixed cleanly.</li>
+  <li><strong>Download your stems</strong> — Export separated stems for use in your own DAW, video projects, or live sets.</li>
 </ul>
 
-<h2>Why Stemline101</h2>
-<p>Most stem-splitting tools stop at separation. Stemline101 goes further, giving you a live mixing board so you can actually play with the results — blend a vocal from one track over the instrumental of another, right in the browser.</p>
+<h2>Who It's For</h2>
+<p>Stemline101 is built for DJs, remixers, producers, and hobbyists who want more creative control over the music they work with. Whether you're isolating an a cappella for a mashup, pulling drum stems for a sample pack, or building a live mashup set that blends vocals from one track over the instrumental of another, Stemline101 gives you the tools to do it without expensive studio software.</p>
+
+<h2>How It Works</h2>
+<ol>
+  <li><strong>Drop a track</strong> — Upload any MP3 or WAV file.</li>
+  <li><strong>Automatic splitting</strong> — Our audio separation engine processes the track into clean stems.</li>
+  <li><strong>Load onto the mixer</strong> — Browse your stem library and load any stem onto a channel.</li>
+  <li><strong>Mix on the board</strong> — Blend parts from different songs, adjust levels, and shape the sound live.</li>
+  <li><strong>Save and reuse</strong> — Every stem you create is saved to your library so it's ready the next time you want to use it.</li>
+</ol>
+
+<h2>Free forever</h2>
+<p>Stemline101 is free and ad-supported — no paid tiers, no limits beyond what keeps the servers running.</p>
 
 <h2>Contact</h2>
-<p>Questions or feedback: kellyschliewe@gmail.com</p>
+<p>Questions, feedback, or support requests: kellyschliewe@gmail.com</p>
 
 <div id="cookie-banner" style="position:fixed; bottom:0; left:0; right:0; background:#1a1a1a; color:#eee; padding:1rem 1.5rem; border-top:1px solid #333; font-family: system-ui, sans-serif; font-size:0.9rem; z-index:9999; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:1rem;">
   <span>We use cookies for essential site function and, with your consent, for advertising. See our <a href="/privacy" style="color:#f0a500;">Privacy Policy</a>.</span>
