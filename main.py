@@ -759,6 +759,10 @@ def icon_192():
 def icon_512():
     return FileResponse("icon-512.png", media_type="image/png")
 
+@app.get("/ads.txt")
+def ads_txt():
+    return Response(content="google.com, pub-1970454477202193, DIRECT, f08c47fec0942fa0", media_type="text/plain")
+
 @app.get("/api/v1/health")
 def health():
     return {"status": "Stemline API is running"}
