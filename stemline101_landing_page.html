@@ -2453,12 +2453,18 @@ function updatePlayheadPosition() {
   if (!playhead) return;
   const progress = Math.max(0, Math.min(1, currentPlaybackTime() / getMasterDuration()));
 
-  const firstCanvas = document.querySelector('.wave-row .wave-canvas');
-  if (!firstCanvas) return;
-  const canvasRect = firstCanvas.getBoundingClientRect();
+  // FIX: was tracking only the wave-canvas width, which stops short of
+  // the row's full width (the +CUE / SAMPLE buttons sit outside the
+  // canvas). That made the playhead visually stall at the canvas edge
+  // well before the song actually ended, even though audio kept playing.
+  // Track the wave-canvas-wrap instead, which spans the full scrubbable
+  // area of the row.
+  const firstWrap = document.querySelector('.wave-row .wave-canvas-wrap');
+  if (!firstWrap) return;
+  const wrapRect = firstWrap.getBoundingClientRect();
   const rowsRect = document.getElementById('waveformRows').getBoundingClientRect();
-  const canvasLeftInRows = canvasRect.left - rowsRect.left;
-  const x = canvasLeftInRows + progress * canvasRect.width;
+  const wrapLeftInRows = wrapRect.left - rowsRect.left;
+  const x = wrapLeftInRows + progress * wrapRect.width;
   playhead.style.left = x + 'px';
 }
 
@@ -3033,9 +3039,12 @@ function renderAllStemSampleRegions() {
     return ph ? parseFloat(ph.style.left) || 0 : 0;
   };
   const scrubTo = (clientX) => {
-    const firstCanvas = document.querySelector('.wave-row .wave-canvas');
-    if (!firstCanvas) return;
-    const rect = firstCanvas.getBoundingClientRect();
+    // FIX: same canvas-width bug as updatePlayheadPosition -- scrub range
+    // was capped at the canvas edge, so you couldn't drag the playhead
+    // into the last stretch of the row. Use the full wave-canvas-wrap.
+    const firstWrap = document.querySelector('.wave-row .wave-canvas-wrap');
+    if (!firstWrap) return;
+    const rect = firstWrap.getBoundingClientRect();
     const fraction = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
     seekTo(fraction * getMasterDuration());
   };
