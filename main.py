@@ -1724,6 +1724,70 @@ ABOUT_HTML = """
 async def about_page():
     return ABOUT_HTML
 
+FAQ_HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>FAQ — Stemline101</title>
+<style>
+  body { background:#111; color:#eee; font-family: system-ui, sans-serif;
+         max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem 4rem; line-height: 1.6; }
+  h1 { color: #f0a500; }
+  h2 { color: #f0a500; margin-top: 2rem; font-size: 1.1rem; }
+  a { color: #f0a500; }
+</style>
+</head>
+<body>
+<a href="/" style="display:inline-block;margin-bottom:1.5rem;color:#f0a500;text-decoration:none;">&larr; Back to Stemline101</a>
+<h1>Frequently Asked Questions</h1>
+
+<h2>What audio formats does Stemline101 accept?</h2>
+<p>MP3 and WAV files. If your track is in another format, convert it to one of these before uploading.</p>
+
+<h2>How long does splitting a song take?</h2>
+<p>Most tracks finish in under two minutes, depending on the song's length and how busy the server is at the time.</p>
+
+<h2>How does stem separation work?</h2>
+<p>Stemline101 uses an AI audio separation model trained to recognize the different instruments and voices layered in a mix. It analyzes the track and pulls each part — vocals, drums, bass, guitar, synth, and other instrumentation — into its own clean audio file, so you can work with them individually instead of the full mix.</p>
+
+<h2>Is Stemline101 free?</h2>
+<p>Yes. Stemline101 is free and ad-supported, with no paid tiers or hidden limits.</p>
+
+<h2>Can I use the stems I download?</h2>
+<p>Yes, once you've split a track you own the rights to, the stems are yours to use in your own projects, mixes, and sets. You're responsible for having the rights to any audio you upload — see our <a href="/terms">Terms of Service</a> for details.</p>
+
+<h2>Can I mix stems from different songs together?</h2>
+<p>Yes — that's the core of Stemline101. Load stems from more than one song onto the mixer board and blend them together live, like pairing a vocal from one track with the instrumental of another.</p>
+
+<h2>Do my saved stems stick around?</h2>
+<p>Yes, any stem you save is stored to your account library so you can reload it anytime without re-splitting the track.</p>
+
+<h2>I have another question.</h2>
+<p>Reach out any time: kellyschliewe@gmail.com</p>
+
+<div id="cookie-banner" style="position:fixed; bottom:0; left:0; right:0; background:#1a1a1a; color:#eee; padding:1rem 1.5rem; border-top:1px solid #333; font-family: system-ui, sans-serif; font-size:0.9rem; z-index:9999; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:1rem;">
+  <span>We use cookies for essential site function and, with your consent, for advertising. See our <a href="/privacy" style="color:#f0a500;">Privacy Policy</a>.</span>
+  <span>
+    <button onclick="document.cookie='stemline_consent=accepted; max-age=31536000; path=/'; document.getElementById('cookie-banner').style.display='none';" style="background:#f0a500; color:#111; border:none; padding:0.5rem 1.2rem; border-radius:4px; font-weight:600; cursor:pointer; margin-right:0.5rem;">Accept</button>
+    <button onclick="document.cookie='stemline_consent=denied; max-age=31536000; path=/'; document.getElementById('cookie-banner').style.display='none';" style="background:transparent; color:#eee; border:1px solid #555; padding:0.5rem 1.2rem; border-radius:4px; cursor:pointer;">Deny Non-Essential</button>
+  </span>
+</div>
+<script>
+  if (document.cookie.indexOf('stemline_consent=') !== -1) {
+    var b = document.getElementById('cookie-banner');
+    if (b) b.style.display = 'none';
+  }
+</script>
+</body>
+</html>
+"""
+
+
+@app.get("/faq", response_class=HTMLResponse)
+async def faq_page():
+    return FAQ_HTML
+
 @app.get("/reviews", response_class=HTMLResponse)
 async def reviews_page():
     return FileResponse("reviews_page.html", media_type="text/html")
