@@ -1696,8 +1696,8 @@ ABOUT_HTML = """
   <li><strong>Save and reuse</strong> — Every stem you create is saved to your library so it's ready the next time you want to use it.</li>
 </ol>
 
-<h2>Free forever</h2>
-<p>Stemline101 is free and ad-supported — no paid tiers, no limits beyond what keeps the servers running.</p>
+<h2>Free to start, Premium for more</h2>
+<p>Stemline101 is free to use, with ads and up to 5 song splits per month. Premium removes ads and unlocks unlimited splits for $5.99/month or $39.99/year.</p>
 
 <h2>Contact</h2>
 <p>Questions, feedback, or support requests: kellyschliewe@gmail.com</p>
@@ -1752,7 +1752,7 @@ FAQ_HTML = """
 <p>Stemline101 uses an AI audio separation model trained to recognize the different instruments and voices layered in a mix. It analyzes the track and pulls each part — vocals, drums, bass, guitar, synth, and other instrumentation — into its own clean audio file, so you can work with them individually instead of the full mix.</p>
 
 <h2>Is Stemline101 free?</h2>
-<p>Yes. Stemline101 is free and ad-supported, with no paid tiers or hidden limits.</p>
+<p>Stemline101 is free to use, with ads and up to 5 song splits per month. If you want more, Premium removes ads and unlocks unlimited splits for $5.99/month or $39.99/year.</p>
 
 <h2>Can I use the stems I download?</h2>
 <p>Yes, once you've split a track you own the rights to, the stems are yours to use in your own projects, mixes, and sets. You're responsible for having the rights to any audio you upload — see our <a href="/terms">Terms of Service</a> for details.</p>
@@ -1794,4 +1794,3 @@ async def reviews_page():
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8080)))
-
