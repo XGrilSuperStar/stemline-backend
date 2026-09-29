@@ -2123,8 +2123,18 @@ function wrapOffset(offset, dur) {
   return ((offset % dur) + dur) % dur;
 }
 
+// A "real" stem is one loaded from the backend (has metadata). Once any real
+// stem is loaded we are in SONG mode: placeholder channels go silent, nothing
+// loops, and playback stops at the end of the song.
+function hasRealSong() {
+  return Object.keys(currentStemMeta).some(k => currentStemMeta[k] && stemBuffers[k]);
+}
+
 function getMasterDuration() {
-  const durs = Object.values(stemBuffers).filter(Boolean).map(b => b.duration);
+  const real = hasRealSong();
+  const durs = Object.keys(stemBuffers)
+    .filter(k => stemBuffers[k] && (!real || currentStemMeta[k]))
+    .map(k => stemBuffers[k].duration);
   return durs.length ? Math.max(...durs) : LOOP_DUR;
 }
 
@@ -2132,16 +2142,27 @@ function startStem(name, masterPos) {
   stopStem(name);
   const buffer = stemBuffers[name];
   if (!buffer || !stemNodes[name]?.trimNode) return;
+  const songMode = hasRealSong();
+  if (songMode && !currentStemMeta[name]) return; // placeholder channel stays silent
   const src = audioCtx.createBufferSource();
   src.buffer = buffer;
-  src.loop = true;
+  src.loop = !songMode;
   src.playbackRate.value = tempoRatio * (stemAutoStretch[name] || 1);
-  src.loopStart = 0;
-  src.loopEnd = buffer.duration;
+  if (!songMode) {
+    src.loopStart = 0;
+    src.loopEnd = buffer.duration;
+  }
   src.connect(stemNodes[name].trimNode);
   const activeMarker = (stemMarkers[name] || []).find(m => m.active);
   const base = activeMarker ? activeMarker.time : masterPos;
-  const eff = wrapOffset(base + stemNudge[name], buffer.duration);
+  let eff;
+  if (songMode) {
+    eff = Math.max(0, base + stemNudge[name]);
+    if (eff >= buffer.duration) { try { src.disconnect(); } catch (e) {} return; }
+    src.onended = () => { if (activeSources[name] === src) checkSongEnded(); };
+  } else {
+    eff = wrapOffset(base + stemNudge[name], buffer.duration);
+  }
   src.start(0, eff);
   activeSources[name] = src;
 }
@@ -2165,11 +2186,29 @@ function stopAllStems() {
   Object.keys(activeSources).forEach(stopStem);
 }
 
-function currentPlaybackTime() {
-  if (transportState === 'playing' && audioCtx) {
-    return wrapOffset(masterOffset + (audioCtx.currentTime - playStartCtxTime) * tempoRatio, getMasterDuration());
+let scrubHold = false;
+
+function rawPlaybackTime() {
+  if (transportState === 'playing' && audioCtx && !scrubHold) {
+    return masterOffset + (audioCtx.currentTime - playStartCtxTime) * tempoRatio;
   }
   return masterOffset;
+}
+
+function currentPlaybackTime() {
+  const dur = getMasterDuration();
+  const raw = rawPlaybackTime();
+  if (hasRealSong()) return Math.max(0, Math.min(raw, dur));
+  return wrapOffset(raw, dur);
+}
+
+// Song mode only: when the playhead reaches the end, stop and rewind
+// instead of looping back to the start.
+function checkSongEnded() {
+  if (transportState !== 'playing' || scrubHold || !hasRealSong()) return;
+  if (rawPlaybackTime() >= getMasterDuration() - 0.02) {
+    stopPreview();
+  }
 }
 
 function updateFaders() {
@@ -2209,6 +2248,7 @@ function updateFaders() {
   }
 
   updatePlayheadPosition();
+  checkSongEnded();
 
   rafId = requestAnimationFrame(updateFaders);
 }
@@ -2522,6 +2562,7 @@ function pausePreview() {
 }
 
 function stopPreview() {
+  scrubHold = false;
   stopAllStems();
   masterOffset = 0;
   transportState = 'idle';
@@ -2534,10 +2575,33 @@ function stopPreview() {
 }
 
 function seekTo(pos) {
-  masterOffset = wrapOffset(pos, getMasterDuration());
+  const dur = getMasterDuration();
+  masterOffset = hasRealSong() ? Math.max(0, Math.min(pos, dur - 0.05)) : wrapOffset(pos, dur);
   if (transportState === 'playing') {
     startAllStems(masterOffset);
   }
+  updatePlayheadPosition();
+}
+
+// Smooth scrubbing: silence audio while the playhead is dragged, then
+// restart every stem together once on release (no stutter, no drift).
+function beginScrub() {
+  if (scrubHold) return;
+  if (transportState === 'playing') {
+    masterOffset = currentPlaybackTime();
+    stopAllStems();
+  }
+  scrubHold = true;
+}
+function scrubMove(pos) {
+  const dur = getMasterDuration();
+  masterOffset = hasRealSong() ? Math.max(0, Math.min(pos, dur - 0.05)) : wrapOffset(pos, dur);
+  updatePlayheadPosition();
+}
+function endScrub() {
+  if (!scrubHold) return;
+  scrubHold = false;
+  if (transportState === 'playing') startAllStems(masterOffset);
   updatePlayheadPosition();
 }
 
@@ -3046,7 +3110,7 @@ function renderAllStemSampleRegions() {
     if (!firstWrap) return;
     const rect = firstWrap.getBoundingClientRect();
     const fraction = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    seekTo(fraction * getMasterDuration());
+    scrubMove(fraction * getMasterDuration());
   };
 
   rowsEl.addEventListener('pointerdown', (e) => {
@@ -3054,6 +3118,7 @@ function renderAllStemSampleRegions() {
     const xInRows = e.clientX - rowsRect.left;
     if (Math.abs(xInRows - playheadX()) > GRAB_PX) return;
     scrubbing = true;
+    beginScrub();
     rowsEl.classList.add('scrubbing');
     try { rowsEl.setPointerCapture(e.pointerId); } catch (err) {}
     e.stopPropagation();
@@ -3068,6 +3133,7 @@ function renderAllStemSampleRegions() {
   const endScrub = (e) => {
     if (!scrubbing) return;
     scrubbing = false;
+    endScrub();
     rowsEl.classList.remove('scrubbing');
     try { rowsEl.releasePointerCapture(e.pointerId); } catch (err) {}
   };
@@ -3147,7 +3213,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const scrubFromEvent = (e) => {
       const rect = canvas.getBoundingClientRect();
       const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-      seekTo(fraction * getMasterDuration());
+      scrubMove(fraction * getMasterDuration());
     };
 
     canvas.addEventListener('pointerdown', (e) => {
@@ -3156,6 +3222,7 @@ document.addEventListener('DOMContentLoaded', () => {
       canvas.setPointerCapture(e.pointerId);
       dragging = true;
       moved = false;
+      beginScrub();
       canvas.classList.add('dragging');
       scrubFromEvent(e);
     });
@@ -3167,6 +3234,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const endDrag = (e) => {
       if (!dragging) return;
       dragging = false;
+      endScrub();
       canvas.classList.remove('dragging');
       if (moved) canvas._suppressClick = true;
       try { canvas.releasePointerCapture(e.pointerId); } catch (err) {}
