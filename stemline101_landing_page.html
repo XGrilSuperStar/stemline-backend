@@ -269,6 +269,7 @@
     border: 1px solid rgba(216,220,226,0.25); border-radius: 3px; cursor: pointer;
     white-space: nowrap;
     position: relative;
+    display: none;
   }
   .sample-toggle-btn:hover { background: rgba(255,255,255,0.1); }
   .sample-toggle-btn::after {
@@ -315,6 +316,19 @@
   .sample-toggle-btn.active {
     color: #ffb020; background: rgba(255,176,32,0.15); border-color: #ffb020;
     box-shadow: 0 0 6px rgba(255,176,32,0.4);
+  }
+  .sample-main-btn {
+    display: block; margin: 8px auto 0; padding: 6px 22px;
+    font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; font-weight: 700;
+    letter-spacing: 0.12em; color: rgba(216,220,226,0.75);
+    background: linear-gradient(180deg, #3a3f47, #23272d);
+    border: 1px solid rgba(216,220,226,0.3); border-radius: 4px; cursor: pointer;
+  }
+  .sample-main-btn:hover { background: linear-gradient(180deg, #454b54, #2a2f36); }
+  .sample-main-btn.active {
+    color: #ffb020; border-color: #ffb020;
+    background: linear-gradient(180deg, rgba(255,176,32,0.25), rgba(255,176,32,0.1));
+    box-shadow: 0 0 8px rgba(255,176,32,0.45);
   }
   .wave-row.sampling-mode .wave-canvas-wrap {
     outline: 1px solid rgba(255,176,32,0.5); outline-offset: 1px;
@@ -1387,6 +1401,7 @@
             <div class="wave-row" data-stem="other"><span class="wave-row-label">OTHER</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="sample-toggle-btn" data-stem="other" title="Toggle sample mode: click-drag on the wave chops a triggerable sample">SAMPLE</button><button class="add-marker-btn" data-stem="other" title="Add a cue marker here">+CUE</button></div>
             <div class="wave-playhead" id="wavePlayhead"></div>
           </div>
+          <button type="button" class="sample-main-btn" id="sampleMainBtn" title="Sample mode: drag on any waveform to cut a sample">SAMPLE</button>
           <div class="screen-browse" id="screenBrowse" style="display:none;">
             <div class="group-nav">
               <button type="button" class="grp-arrow" id="grpPrev" aria-label="Previous group">&#9650;</button>
@@ -3239,6 +3254,19 @@ document.addEventListener('DOMContentLoaded', () => {
       if (row) row.classList.toggle('sampling-mode', sampleModeByStem[stem]);
     });
   });
+
+  const sampleMainBtn = document.getElementById('sampleMainBtn');
+  if (sampleMainBtn) {
+    sampleMainBtn.addEventListener('click', () => {
+      const on = !sampleMainBtn.classList.contains('active');
+      sampleMainBtn.classList.toggle('active', on);
+      Object.keys(sampleModeByStem).forEach(stem => {
+        sampleModeByStem[stem] = on;
+        const row = document.querySelector('.wave-row[data-stem="' + stem + '"]');
+        if (row) row.classList.toggle('sampling-mode', on);
+      });
+    });
+  }
 
   // ===== Drag-on-wave now scrubs the shared playhead only =====
   // Plain click-drag (no Shift) on ANY stem's waveform seeks the whole
