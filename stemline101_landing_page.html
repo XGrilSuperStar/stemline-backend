@@ -269,7 +269,6 @@
     border: 1px solid rgba(216,220,226,0.25); border-radius: 3px; cursor: pointer;
     white-space: nowrap;
     position: relative;
-    display: none;
   }
   .sample-toggle-btn:hover { background: rgba(255,255,255,0.1); }
   .sample-toggle-btn::after {
@@ -761,6 +760,40 @@
     box-shadow: 24px 0 0 rgba(0,0,0,0.45);
   }
 
+
+  /* ===== sampler pads + library ===== */
+  .pad-row { display: flex; align-items: center; justify-content: center; gap: 3px; }
+  .sampler-pad {
+    --pc: #888; width: 34px; height: 34px; border-radius: 5px; cursor: pointer; padding: 0;
+    background: #17181b; border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.7); transition: box-shadow .08s, background .08s, border-color .08s;
+    display: flex; align-items: center; justify-content: center; position: relative;
+  }
+  .sampler-pad span { font: 700 0.45rem 'JetBrains Mono', monospace; color: var(--pc); opacity: 0.6; pointer-events: none; }
+  .sampler-pad.has-sample { border-color: color-mix(in srgb, var(--pc) 55%, transparent); }
+  .sampler-pad.lit { background: var(--pc); border-color: var(--pc); box-shadow: 0 0 14px var(--pc), 0 0 4px var(--pc); }
+  .sampler-pad.lit span { color: #000; opacity: 0.8; }
+  .pad-hp {
+    width: 20px; height: 34px; padding: 0; border-radius: 4px; cursor: pointer;
+    font: 700 0.45rem 'JetBrains Mono', monospace; color: rgba(216,220,226,0.55);
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(216,220,226,0.25);
+  }
+  .pad-hp.on { color: #000; background: #3CFDE0; border-color: #3CFDE0; }
+  #sampleLibList { display: none; flex-direction: column; gap: 8px; padding: 6px; overflow-y: auto; max-height: 100%; }
+  .lib-empty { color: rgba(216,220,226,0.55); font-size: 0.7rem; padding: 14px; }
+  .lib-item { --pc: #888; border: 1px solid color-mix(in srgb, var(--pc) 45%, transparent); border-radius: 6px; padding: 6px; background: rgba(0,0,0,0.25); }
+  .lib-top { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .lib-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--pc); box-shadow: 0 0 6px var(--pc); flex-shrink: 0; }
+  .lib-name { color: #eee; font-size: 0.72rem; cursor: pointer; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lib-stem { color: rgba(216,220,226,0.5); font-size: 0.55rem; text-transform: uppercase; }
+  .lib-top button { font: 700 0.55rem 'JetBrains Mono', monospace; color: rgba(216,220,226,0.8); background: rgba(255,255,255,0.06); border: 1px solid rgba(216,220,226,0.25); border-radius: 3px; padding: 2px 6px; cursor: pointer; }
+  .lib-top button.on { color: #000; background: var(--pc); border-color: var(--pc); }
+  .lib-wave { width: 100%; height: 54px; display: block; touch-action: none; cursor: ew-resize; background: rgba(0,0,0,0.3); border-radius: 3px; }
+  #samplerMenu { position: fixed; z-index: 10000; background: #1a1a1d; border: 1px solid var(--pc); border-radius: 6px; padding: 3px; display: flex; flex-direction: column; min-width: 130px; box-shadow: 0 6px 20px rgba(0,0,0,0.6); }
+  #samplerMenu button { text-align: left; background: none; border: 0; color: #eee; font: 600 0.75rem 'JetBrains Mono', monospace; padding: 7px 10px; cursor: pointer; border-radius: 4px; }
+  #samplerMenu button:hover { background: rgba(255,255,255,0.1); }
+  #samplerToast { position: fixed; left: 50%; bottom: 70px; transform: translateX(-50%); background: #111; color: #fff; border: 1px solid #3CFDE0; padding: 7px 14px; border-radius: 6px; font: 600 0.75rem 'JetBrains Mono', monospace; z-index: 10001; opacity: 0; pointer-events: none; transition: opacity .15s; }
+  #samplerToast.show { opacity: 1; }
 
   .wood-trim {
     margin: 1.1rem -1.4rem 1.1rem;
@@ -1329,6 +1362,7 @@
             <span class="screen-tabs">
               <button type="button" class="screen-tab active" data-view="waves">WAVES</button>
               <button type="button" class="screen-tab" data-view="stems" id="screenStemsTab">MY STEMS <span id="screenCount">(0)</span></button>
+              <button type="button" class="screen-tab" data-view="samples" id="screenSamplesTab">SAMPLES</button>
             </span>
           </div>
           <div class="transport" role="group" aria-label="Playback transport">
@@ -1343,7 +1377,7 @@
             </button>
             <span class="tp-source mono" id="previewLabel">no track loaded</span>
           </div>
-          <div class="wave-hint mono" id="waveHint">click or drag waveform to seek &middot; <span style="color:var(--vu-teal,#3CFDE0);">+CUE</span> sets where this stem starts playing from</div>
+          <div class="wave-hint mono" id="waveHint">click or drag waveform to seek &middot; <span style="color:#ffa022;">SAMPLE</span> + drag cuts a sample, right-click it to save &middot; <span style="color:var(--vu-teal,#3CFDE0);">+CUE</span> sets where this stem starts playing from</div>
           <div class="waveform-rows" id="waveformRows">
             <div class="wave-row" data-stem="vocals"><span class="wave-row-label">VOCALS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="sample-toggle-btn" data-stem="vocals" title="Toggle sample mode: click-drag on the wave chops a triggerable sample">SAMPLE</button><button class="add-marker-btn" data-stem="vocals" title="Add a cue marker here">+CUE</button></div>
             <div class="wave-row" data-stem="drums"><span class="wave-row-label">DRUMS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="sample-toggle-btn" data-stem="drums" title="Toggle sample mode: click-drag on the wave chops a triggerable sample">SAMPLE</button><button class="add-marker-btn" data-stem="drums" title="Add a cue marker here">+CUE</button></div>
@@ -1364,6 +1398,7 @@
             </div>
             <input type="text" class="stem-search" id="stemSearch" placeholder="TYPE TO FIND…" autocomplete="off" spellcheck="false">
           </div>
+          <div class="screen-list" id="sampleLibList"></div>
           <div class="screen-list" id="screenStemList" style="display:none;">
             <div class="screen-empty">Log in to browse your saved stems here.</div>
           </div>
@@ -1408,6 +1443,7 @@
               <div class="meter-seg red"></div><div class="meter-seg red"></div>
             </div>
             <div class="fader-slot"><div class="fader-cap"></div></div>
+            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="vocals" style="--pc:#ff5540" aria-label="Sample pad"><span></span></button><button type="button" class="pad-hp" data-hp="vocals" title="On = pad plays in headphones only">HP</button></div>
             <div class="btn-row">
               <button class="cue-btn" type="button" title="Solo: isolate this channel, mute all others" aria-label="Solo">S</button>
               <button class="mute-btn" type="button" title="Mute this channel (stays out of main mix)">M</button>
@@ -1444,6 +1480,7 @@
               <div class="meter-seg red"></div><div class="meter-seg red"></div>
             </div>
             <div class="fader-slot"><div class="fader-cap"></div></div>
+            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="drums" style="--pc:#ffa022" aria-label="Sample pad"><span></span></button><button type="button" class="pad-hp" data-hp="drums" title="On = pad plays in headphones only">HP</button></div>
             <div class="btn-row">
               <button class="cue-btn" type="button" title="Solo: isolate this channel, mute all others" aria-label="Solo">S</button>
               <button class="mute-btn" type="button" title="Mute this channel (stays out of main mix)">M</button>
@@ -1480,6 +1517,7 @@
               <div class="meter-seg red"></div><div class="meter-seg red"></div>
             </div>
             <div class="fader-slot"><div class="fader-cap"></div></div>
+            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="bass" style="--pc:#2fe08a" aria-label="Sample pad"><span></span></button><button type="button" class="pad-hp" data-hp="bass" title="On = pad plays in headphones only">HP</button></div>
             <div class="btn-row">
               <button class="cue-btn" type="button" title="Solo: isolate this channel, mute all others" aria-label="Solo">S</button>
               <button class="mute-btn" type="button" title="Mute this channel (stays out of main mix)">M</button>
@@ -1516,6 +1554,7 @@
               <div class="meter-seg red"></div><div class="meter-seg red"></div>
             </div>
             <div class="fader-slot"><div class="fader-cap"></div></div>
+            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="guitar" style="--pc:#9b6dff" aria-label="Sample pad"><span></span></button><button type="button" class="pad-hp" data-hp="guitar" title="On = pad plays in headphones only">HP</button></div>
             <div class="btn-row">
               <button class="cue-btn" type="button" title="Solo: isolate this channel, mute all others" aria-label="Solo">S</button>
               <button class="mute-btn" type="button" title="Mute this channel (stays out of main mix)">M</button>
@@ -1552,6 +1591,7 @@
               <div class="meter-seg red"></div><div class="meter-seg red"></div>
             </div>
             <div class="fader-slot"><div class="fader-cap"></div></div>
+            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="piano" style="--pc:#ff5cb0" aria-label="Sample pad"><span></span></button><button type="button" class="pad-hp" data-hp="piano" title="On = pad plays in headphones only">HP</button></div>
             <div class="btn-row">
               <button class="cue-btn" type="button" title="Solo: isolate this channel, mute all others" aria-label="Solo">S</button>
               <button class="mute-btn" type="button" title="Mute this channel (stays out of main mix)">M</button>
@@ -1588,6 +1628,7 @@
               <div class="meter-seg red"></div><div class="meter-seg red"></div>
             </div>
             <div class="fader-slot"><div class="fader-cap"></div></div>
+            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="other" style="--pc:#3ab6ff" aria-label="Sample pad"><span></span></button><button type="button" class="pad-hp" data-hp="other" title="On = pad plays in headphones only">HP</button></div>
             <div class="btn-row">
               <button class="cue-btn" type="button" title="Solo: isolate this channel, mute all others" aria-label="Solo">S</button>
               <button class="mute-btn" type="button" title="Mute this channel (stays out of main mix)">M</button>
@@ -2978,6 +3019,7 @@ function renameStemSampleRegion(stem, id) {
 function triggerStemSampleRegion(stem, id) {
   const list = stemSampleRegions[stem];
   const region = list && list.find(r => r.id === id);
+  if (region && window.__previewRegion) return window.__previewRegion(stem, region);
   const buffer = stemBuffers[stem];
   if (!region || !buffer || !audioCtx) return;
   const dur = Math.min(region.end, buffer.duration) - region.start;
@@ -3079,7 +3121,7 @@ function renderStemSampleRegions(stem) {
       triggerStemSampleRegion(stem, region.id);
     });
     el.addEventListener('dblclick', (e) => { e.stopPropagation(); renameStemSampleRegion(stem, region.id); });
-    el.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); removeStemSampleRegion(stem, region.id); });
+    el.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); if (window.__showSampleMenu) window.__showSampleMenu(stem, region, e); else removeStemSampleRegion(stem, region.id); });
 
     wrap.appendChild(el);
   });
@@ -3302,9 +3344,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const view = tab.dataset.view;
       if (waveformRows) waveformRows.style.display = view === 'waves' ? 'flex' : 'none';
       if (screenStemList) screenStemList.style.display = view === 'stems' ? 'block' : 'none';
+      const sampleLib = document.getElementById('sampleLibList');
+      if (sampleLib) { sampleLib.style.display = view === 'samples' ? 'flex' : 'none'; if (view === 'samples' && window.__renderLibrary) window.__renderLibrary(); }
       const browseBar = document.getElementById('screenBrowse');
       if (browseBar) browseBar.style.display = view === 'stems' ? 'flex' : 'none';
-      if (screenTitle) screenTitle.textContent = view === 'waves' ? 'STEM WAVEFORMS' : 'MY STEMS';
+      if (screenTitle) screenTitle.textContent = view === 'waves' ? 'STEM WAVEFORMS' : (view === 'samples' ? 'SAMPLE LIBRARY' : 'MY STEMS');
     });
   });
 
@@ -4900,6 +4944,251 @@ document.addEventListener('DOMContentLoaded', () => {
   })();
 })();
 </script>
+<script>
+/* ===== STEMLINE SAMPLER: one pad per stem + sample library ===== */
+(function () {
+  const COLORS = { vocals:'#ff5540', drums:'#ffa022', bass:'#2fe08a', guitar:'#9b6dff', piano:'#ff5cb0', other:'#3ab6ff' };
+  const PAD_KEY = 'stemline_pad_assign';
+  const PAD_PAD = 2; // seconds of extra audio kept each side for retrimming
+  let lib = [];
+  const playing = {}; // padStem -> {src}
+  let libPlaying = null;
+
+  /* ---------- storage ---------- */
+  let dbp = null;
+  function db() {
+    if (dbp) return dbp;
+    dbp = new Promise((res, rej) => {
+      try {
+        const rq = indexedDB.open('stemline_samples', 1);
+        rq.onupgradeneeded = () => rq.result.createObjectStore('samples', { keyPath: 'id' });
+        rq.onsuccess = () => res(rq.result);
+        rq.onerror = () => rej(rq.error);
+      } catch (e) { rej(e); }
+    });
+    return dbp;
+  }
+  async function idbPut(item) { try { const d = await db(); d.transaction('samples','readwrite').objectStore('samples').put(item); } catch (e) { console.warn('save failed', e); } }
+  async function idbDel(id) { try { const d = await db(); d.transaction('samples','readwrite').objectStore('samples').delete(id); } catch (e) {} }
+  async function idbAll() {
+    try { const d = await db(); return await new Promise((res, rej) => { const r = d.transaction('samples').objectStore('samples').getAll(); r.onsuccess = () => res(r.result || []); r.onerror = () => rej(r.error); }); }
+    catch (e) { return []; }
+  }
+  function getAssign() { try { return JSON.parse(localStorage.getItem(PAD_KEY)) || {}; } catch (e) { return {}; } }
+  function setAssign(a) { try { localStorage.setItem(PAD_KEY, JSON.stringify(a)); } catch (e) {} }
+
+  /* ---------- helpers ---------- */
+  function toast(msg) {
+    let t = document.getElementById('samplerToast');
+    if (!t) { t = document.createElement('div'); t.id = 'samplerToast'; document.body.appendChild(t); }
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+  function cueReady() { const b = document.getElementById('cueOutBtn'); return !!(b && b.classList.contains('active')); }
+  function songPlaying() { try { return !!isPlaying; } catch (e) { return false; } }
+
+  async function playItem(item, dest, onStart, onEnd, padStem) {
+    if (dest === 'cue' && !cueReady()) { toast('Pick CUE OUT (headphones) first'); return null; }
+    if (dest === 'main-safe') { // library audition: headphones if set, else main only when song is stopped
+      if (cueReady()) dest = 'cue';
+      else if (songPlaying()) { toast('Pick CUE OUT first - song is playing'); return null; }
+      else dest = 'main';
+    }
+    try { await ensureEngineReady(); } catch (e) {}
+    if (!audioCtx) return null;
+    const sr = item.sr, len = item.data[0].length;
+    const buf = audioCtx.createBuffer(item.data.length, len, sr);
+    item.data.forEach((ch, i) => buf.copyToChannel(ch, i));
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf;
+    const g = audioCtx.createGain(); g.gain.value = 0.95;
+    src.connect(g);
+    if (dest === 'cue') { if (!cueBus) return null; g.connect(cueBus); }
+    else {
+      const n = stemNodes[item.stem];
+      g.connect(n && n.analyser ? n.analyser : masterGain);
+    }
+    const dur = Math.max(0.02, item.outT - item.inT);
+    src.onended = () => { try { g.disconnect(); } catch (e) {} if (onEnd) onEnd(); };
+    src.start(0, item.inT, dur);
+    if (onStart) onStart();
+    return { src, g };
+  }
+
+  function sliceFromBuffer(stem, start, end) {
+    const buf = stemBuffers[stem];
+    if (!buf) return null;
+    const s0 = Math.max(0, start - PAD_PAD), s1 = Math.min(buf.duration, end + PAD_PAD);
+    const i0 = Math.floor(s0 * buf.sampleRate), i1 = Math.floor(s1 * buf.sampleRate);
+    const data = [];
+    for (let c = 0; c < buf.numberOfChannels; c++) data.push(buf.getChannelData(c).slice(i0, i1));
+    return { sr: buf.sampleRate, data, inT: start - s0, outT: end - s0 };
+  }
+
+  /* ---------- pads ---------- */
+  function padEl(stem) { return document.querySelector('.sampler-pad[data-pad="' + stem + '"]'); }
+  function itemById(id) { return lib.find(x => x.id === id); }
+
+  function refreshPads() {
+    const a = getAssign();
+    Object.keys(COLORS).forEach(stem => {
+      const p = padEl(stem); if (!p) return;
+      const it = a[stem] && itemById(a[stem]);
+      p.classList.toggle('has-sample', !!it);
+      p.title = it ? (it.name + ' - click to fire, right-click to clear') : 'Empty pad - right-click a waveform region, Save sample';
+      const lab = p.querySelector('span'); if (lab) lab.textContent = it ? it.name.slice(0, 6) : '';
+    });
+  }
+
+  async function firePad(stem) {
+    const a = getAssign(); const it = a[stem] && itemById(a[stem]);
+    const p = padEl(stem);
+    if (!it) { toast('Empty pad: cut a region, right-click, Save sample'); return; }
+    const hp = document.querySelector('.pad-hp[data-hp="' + stem + '"]');
+    const dest = hp && hp.classList.contains('on') ? 'cue' : 'main';
+    if (playing[stem]) { try { playing[stem].src.stop(); } catch (e) {} }
+    const h = await playItem(it, dest, () => p.classList.add('lit'), () => { if (playing[stem] === h) { delete playing[stem]; p.classList.remove('lit'); } }, stem);
+    if (h) playing[stem] = h;
+  }
+
+  function wirePads() {
+    Object.keys(COLORS).forEach(stem => {
+      const p = padEl(stem); if (!p) return;
+      p.addEventListener('click', () => firePad(stem));
+      p.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const a = getAssign(); if (!a[stem]) return;
+        delete a[stem]; setAssign(a); refreshPads(); toast('Pad cleared');
+      });
+      const hp = document.querySelector('.pad-hp[data-hp="' + stem + '"]');
+      if (hp) hp.addEventListener('click', () => {
+        if (!hp.classList.contains('on') && !cueReady()) { toast('Pick CUE OUT (headphones) first'); return; }
+        hp.classList.toggle('on');
+      });
+    });
+  }
+
+  /* ---------- save menu (from waveform region right-click) ---------- */
+  function closeMenu() { const m = document.getElementById('samplerMenu'); if (m) m.remove(); }
+  window.__showSampleMenu = function (stem, region, ev) {
+    closeMenu();
+    const m = document.createElement('div'); m.id = 'samplerMenu';
+    m.style.left = Math.min(ev.clientX, innerWidth - 150) + 'px';
+    m.style.top = Math.min(ev.clientY, innerHeight - 110) + 'px';
+    m.style.setProperty('--pc', COLORS[stem] || '#fff');
+    const mk = (label, fn) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.onclick = () => { closeMenu(); fn(); }; m.appendChild(b); };
+    mk('Save sample', () => saveRegion(stem, region));
+    mk('Delete region', () => removeStemSampleRegion(stem, region.id));
+    document.body.appendChild(m);
+    setTimeout(() => document.addEventListener('pointerdown', function h(e) { if (!m.contains(e.target)) { closeMenu(); document.removeEventListener('pointerdown', h); } }), 0);
+  };
+  window.__previewRegion = function (stem, region) {
+    const s = sliceFromBuffer(stem, region.start, region.end);
+    if (!s) return;
+    playItem({ stem, sr: s.sr, data: s.data, inT: s.inT, outT: s.outT }, 'main-safe');
+  };
+
+  async function saveRegion(stem, region) {
+    const s = sliceFromBuffer(stem, region.start, region.end);
+    if (!s) { toast('Nothing to save'); return; }
+    const name = (window.prompt('Name this sample:', region.label || 'Sample') || '').trim();
+    if (!name) return;
+    const item = { id: 's' + Date.now() + Math.floor(Math.random() * 1000), stem, name, sr: s.sr, data: s.data, inT: s.inT, outT: s.outT };
+    lib.push(item); await idbPut(item);
+    const a = getAssign(); a[stem] = item.id; setAssign(a);
+    refreshPads(); renderLibrary();
+    toast('Saved to ' + stem + ' pad');
+  }
+
+  /* ---------- library ---------- */
+  function drawWave(canvas, item) {
+    const w = canvas.clientWidth || 300, h = canvas.clientHeight || 54;
+    canvas.width = w * (devicePixelRatio || 1); canvas.height = h * (devicePixelRatio || 1);
+    const c = canvas.getContext('2d'); c.scale(devicePixelRatio || 1, devicePixelRatio || 1);
+    c.clearRect(0, 0, w, h);
+    const d = item.data[0], n = d.length, col = COLORS[item.stem] || '#fff';
+    c.fillStyle = col; c.globalAlpha = 0.85;
+    for (let x = 0; x < w; x++) {
+      const a = Math.floor(x / w * n), b = Math.max(a + 1, Math.floor((x + 1) / w * n));
+      let mx = 0; for (let i = a; i < b; i += Math.max(1, ((b - a) / 8) | 0)) { const v = Math.abs(d[i]); if (v > mx) mx = v; }
+      const hh = Math.max(1, mx * h * 0.95); c.fillRect(x, (h - hh) / 2, 1, hh);
+    }
+    c.globalAlpha = 1;
+    const total = n / item.sr, x0 = item.inT / total * w, x1 = item.outT / total * w;
+    c.fillStyle = 'rgba(0,0,0,0.62)'; c.fillRect(0, 0, x0, h); c.fillRect(x1, 0, w - x1, h);
+    c.fillStyle = col; c.fillRect(x0 - 1, 0, 3, h); c.fillRect(x1 - 1, 0, 3, h);
+  }
+
+  function renderLibrary() {
+    const root = document.getElementById('sampleLibList'); if (!root) return;
+    root.innerHTML = '';
+    if (!lib.length) {
+      const e = document.createElement('div'); e.className = 'lib-empty mono';
+      e.textContent = 'No samples yet. Cut a region on a waveform, right-click it, Save sample.';
+      root.appendChild(e); return;
+    }
+    const a = getAssign();
+    lib.forEach(item => {
+      const row = document.createElement('div'); row.className = 'lib-item';
+      row.style.setProperty('--pc', COLORS[item.stem] || '#fff');
+      const top = document.createElement('div'); top.className = 'lib-top';
+      const dot = document.createElement('span'); dot.className = 'lib-dot';
+      const nm = document.createElement('span'); nm.className = 'lib-name mono'; nm.textContent = item.name; nm.title = 'Click to rename';
+      nm.onclick = async () => { const v = (prompt('Rename sample:', item.name) || '').trim(); if (v) { item.name = v; await idbPut(item); renderLibrary(); refreshPads(); } };
+      const st = document.createElement('span'); st.className = 'lib-stem mono'; st.textContent = item.stem === 'piano' ? 'synth' : item.stem;
+      const play = document.createElement('button'); play.type = 'button'; play.textContent = '▶'; play.title = 'Listen (headphones)';
+      play.onclick = async () => {
+        if (libPlaying) { try { libPlaying.src.stop(); } catch (e) {} }
+        const h = await playItem(item, 'main-safe', null, () => { if (libPlaying === h) libPlaying = null; });
+        libPlaying = h;
+      };
+      const asg = document.createElement('button'); asg.type = 'button';
+      asg.textContent = a[item.stem] === item.id ? 'ON PAD' : 'PUT ON PAD';
+      asg.className = a[item.stem] === item.id ? 'on' : '';
+      asg.onclick = () => { const x = getAssign(); x[item.stem] = item.id; setAssign(x); refreshPads(); renderLibrary(); };
+      const del = document.createElement('button'); del.type = 'button'; del.textContent = '✕'; del.title = 'Delete';
+      del.onclick = async () => {
+        if (!confirm('Delete "' + item.name + '"?')) return;
+        lib = lib.filter(x => x !== item); await idbDel(item.id);
+        const x = getAssign(); Object.keys(x).forEach(k => { if (x[k] === item.id) delete x[k]; }); setAssign(x);
+        refreshPads(); renderLibrary();
+      };
+      top.append(dot, nm, st, play, asg, del);
+      const cv = document.createElement('canvas'); cv.className = 'lib-wave';
+      row.append(top, cv); root.appendChild(row);
+      drawWave(cv, item);
+      // retrim by dragging edges
+      cv.addEventListener('pointerdown', (e) => {
+        const r = cv.getBoundingClientRect(), total = item.data[0].length / item.sr;
+        const x = e.clientX - r.left, x0 = item.inT / total * r.width, x1 = item.outT / total * r.width;
+        const which = Math.abs(x - x0) <= Math.abs(x - x1) ? 'in' : 'out';
+        if (Math.min(Math.abs(x - x0), Math.abs(x - x1)) > 18) return;
+        cv.setPointerCapture(e.pointerId);
+        const move = (ev) => {
+          const t = Math.min(total, Math.max(0, (ev.clientX - r.left) / r.width * total));
+          if (which === 'in') item.inT = Math.min(t, item.outT - 0.03); else item.outT = Math.max(t, item.inT + 0.03);
+          drawWave(cv, item);
+        };
+        const up = async () => { cv.removeEventListener('pointermove', move); cv.removeEventListener('pointerup', up); cv.removeEventListener('pointercancel', up); await idbPut(item); };
+        cv.addEventListener('pointermove', move); cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+      });
+    });
+  }
+  window.__renderLibrary = renderLibrary;
+
+  /* ---------- init ---------- */
+  document.addEventListener('DOMContentLoaded', init);
+  if (document.readyState !== 'loading') init();
+  let inited = false;
+  async function init() {
+    if (inited) return; inited = true;
+    wirePads();
+    lib = await idbAll();
+    refreshPads(); renderLibrary();
+  }
+})();
+</script>
+
 <div id="cookie-banner" style="position:fixed; bottom:0; left:0; right:0; background:#1a1a1a; color:#eee; padding:1rem 1.5rem; border-top:1px solid #333; font-family: system-ui, sans-serif; font-size:0.9rem; z-index:9999; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:1rem;">
   <span>We use cookies for essential site function and, with your consent, for advertising. See our <a href="/privacy" style="color:#f0a500;">Privacy Policy</a>.</span>
   <span>
