@@ -1506,7 +1506,7 @@ TERMS_HTML = """
 <body>
 <a href="/" style="display:inline-block;margin-bottom:1.5rem;color:#f0a500;text-decoration:none;">&larr; Back to Stemline101</a>
 <h1>Stemline101 Terms of Service</h1>
-<p><em>Last Updated: [Date]</em></p>
+<p><em>Last Updated: October 1, 2026</em></p>
 
 <h2>1. Acceptance of Terms</h2>
 <p>By accessing or using Stemline101 ("the Service"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree, do not use the Service.</p>
@@ -1597,7 +1597,7 @@ PRIVACY_HTML = """
 <body>
 <a href="/" style="display:inline-block;margin-bottom:1.5rem;color:#f0a500;text-decoration:none;">&larr; Back to Stemline101</a>
 <h1>Stemline101 Privacy Policy</h1>
-<p><em>Last Updated: [Date]</em></p>
+<p><em>Last Updated: October 1, 2026</em></p>
 
 <h2>1. Information We Collect</h2>
 <p>When you use Stemline101, we may collect:</p>
@@ -1614,7 +1614,8 @@ PRIVACY_HTML = """
 <p>Audio you upload is processed to generate separated stems. Files you explicitly save are stored under your account; files you do not save may be removed automatically after processing. We do not claim ownership of your uploaded audio, and you remain responsible for having the rights to any audio you upload (see our Terms of Service).</p>
 
 <h2>4. Advertising</h2>
-<p>Stemline101 may display ads served by third-party providers, such as Google AdSense. These providers may use cookies or similar technologies to serve relevant ads. You can learn more about Google's use of data at <a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener">policies.google.com/technologies/partner-sites</a>.</p>
+<p>Stemline101 may display ads served by third-party providers, such as Google AdSense. Third-party vendors, including Google, use cookies to serve ads based on a user's prior visits to this website or other websites. Google's use of advertising cookies enables it and its partners to serve ads to you based on your visit to this site and/or other sites on the Internet.</p>
+<p>You may opt out of personalized advertising by visiting <a href="https://adssettings.google.com" target="_blank" rel="noopener">Google Ads Settings</a>. You can also opt out of some third-party vendors' use of cookies for personalized advertising by visiting <a href="https://www.aboutads.info" target="_blank" rel="noopener">aboutads.info</a>. You can learn more about Google's use of data at <a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener">policies.google.com/technologies/partner-sites</a>.</p>
 
 <h2>5. Data Sharing</h2>
 <p>We do not sell your personal information. We may share data with service providers who help us operate Stemline101 (such as hosting and analytics providers), and as required by law.</p>
