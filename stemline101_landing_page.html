@@ -317,20 +317,6 @@
     color: #ffb020; background: rgba(255,176,32,0.15); border-color: #ffb020;
     box-shadow: 0 0 6px rgba(255,176,32,0.4);
   }
-  .sample-main-btn {
-    display: block; margin: 8px auto 0; padding: 6px 22px;
-    font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; font-weight: 700;
-    letter-spacing: 0.12em; color: rgba(216,220,226,0.75);
-    background: linear-gradient(180deg, #3a3f47, #23272d);
-    border: 1px solid rgba(216,220,226,0.3); border-radius: 4px; cursor: pointer;
-  }
-  .sample-main-btn { display: none !important; }
-  .sample-main-btn:hover { background: linear-gradient(180deg, #454b54, #2a2f36); }
-  .sample-main-btn.active {
-    color: #ffb020; border-color: #ffb020;
-    background: linear-gradient(180deg, rgba(255,176,32,0.25), rgba(255,176,32,0.1));
-    box-shadow: 0 0 8px rgba(255,176,32,0.45);
-  }
   .wave-row.sampling-mode .wave-canvas-wrap {
     outline: 1px solid rgba(255,176,32,0.5); outline-offset: 1px;
   }
@@ -1784,7 +1770,7 @@
         <audio id="cueMonitorAudio" autoplay></audio>
 
       </div>
-      <button type="button" class="sample-main-btn" id="sampleMainBtn" title="Sample mode: drag on any waveform to cut a sample">SAMPLE</button>
+      
 
       <div class="wood-trim"></div>
     </div>
@@ -3274,19 +3260,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (row) row.classList.toggle('sampling-mode', sampleModeByStem[stem]);
     });
   });
-
-  const sampleMainBtn = document.getElementById('sampleMainBtn');
-  if (sampleMainBtn) {
-    sampleMainBtn.addEventListener('click', () => {
-      const on = !sampleMainBtn.classList.contains('active');
-      sampleMainBtn.classList.toggle('active', on);
-      Object.keys(sampleModeByStem).forEach(stem => {
-        sampleModeByStem[stem] = on;
-        const row = document.querySelector('.wave-row[data-stem="' + stem + '"]');
-        if (row) row.classList.toggle('sampling-mode', on);
-      });
-    });
-  }
 
   // ===== Drag-on-wave now scrubs the shared playhead only =====
   // Plain click-drag (no Shift) on ANY stem's waveform seeks the whole
