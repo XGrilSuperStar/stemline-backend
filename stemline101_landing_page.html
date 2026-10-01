@@ -763,6 +763,7 @@
 
 
   /* ===== sampler pads + library ===== */
+  .pad-cap { font: 700 0.5rem 'JetBrains Mono', monospace; letter-spacing: 0.12em; color: rgba(237,227,206,0.6); text-align: center; margin-top: -0.15rem; }
   .pad-row { display: flex; align-items: center; justify-content: center; gap: 3px; }
   .sampler-pad {
     --pc: #888; width: 34px; height: 34px; border-radius: 5px; cursor: pointer; padding: 0;
@@ -801,8 +802,8 @@
     margin: 1.1rem -1.4rem 1.1rem;
     height: 26px;
     background:
-      repeating-linear-gradient(90deg, rgba(0,0,0,0.06) 0px, transparent 2px 40px),
-      linear-gradient(180deg, var(--tape-light) 0%, var(--tape) 55%, #6E4520 100%);
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.18) 0 1px, rgba(0,0,0,0.04) 1px 3px),
+      linear-gradient(180deg, #f4f5f7 0%, #9a9da3 30%, #dcdde0 50%, #6d7075 78%, #c9cacd 100%);
     box-shadow: inset 0 2px 0 rgba(255,255,255,0.18), inset 0 -3px 6px rgba(0,0,0,0.35), 0 2px 4px rgba(0,0,0,0.3);
     position: relative;
   }
@@ -1494,11 +1495,12 @@
               <div class="meter-seg red"></div><div class="meter-seg red"></div>
             </div>
             <div class="fader-slot"><div class="fader-cap"></div></div>
-            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="vocals" style="--pc:#ff5540" aria-label="Sample pad"><span></span></button><button type="button" class="pad-hp" data-hp="vocals" title="On = pad plays in headphones only">HP</button></div>
             <div class="btn-row">
               <button class="cue-btn" type="button" title="Solo: isolate this channel, mute all others" aria-label="Solo">S</button>
               <button class="mute-btn" type="button" title="Mute this channel (stays out of main mix)">M</button>
             </div>
+            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="vocals" style="--pc:#ff5540" aria-label="Sample pad"><span></span></button><button type="button" class="pad-hp" data-hp="vocals" title="On = pad plays in headphones only">HP</button></div>
+            <div class="pad-cap">SAMPLE</div>
           </div>
           <div class="channel" data-stem="drums">
             <div class="name">Drums</div>
@@ -1531,11 +1533,12 @@
               <div class="meter-seg red"></div><div class="meter-seg red"></div>
             </div>
             <div class="fader-slot"><div class="fader-cap"></div></div>
-            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="drums" style="--pc:#ffa022" aria-label="Sample pad"><span></span></button><button type="button" class="pad-hp" data-hp="drums" title="On = pad plays in headphones only">HP</button></div>
             <div class="btn-row">
               <button class="cue-btn" type="button" title="Solo: isolate this channel, mute all others" aria-label="Solo">S</button>
               <button class="mute-btn" type="button" title="Mute this channel (stays out of main mix)">M</button>
             </div>
+            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="drums" style="--pc:#ffa022" aria-label="Sample pad"><span></span></button><button type="button" class="pad-hp" data-hp="drums" title="On = pad plays in headphones only">HP</button></div>
+            <div class="pad-cap">SAMPLE</div>
           </div>
           <div class="channel" data-stem="bass">
             <div class="name">Bass</div>
@@ -1568,11 +1571,12 @@
               <div class="meter-seg red"></div><div class="meter-seg red"></div>
             </div>
             <div class="fader-slot"><div class="fader-cap"></div></div>
-            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="bass" style="--pc:#2fe08a" aria-label="Sample pad"><span></span></button><button type="button" class="pad-hp" data-hp="bass" title="On = pad plays in headphones only">HP</button></div>
             <div class="btn-row">
               <button class="cue-btn" type="button" title="Solo: isolate this channel, mute all others" aria-label="Solo">S</button>
               <button class="mute-btn" type="button" title="Mute this channel (stays out of main mix)">M</button>
             </div>
+            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="bass" style="--pc:#2fe08a" aria-label="Sample pad"><span></span></button><button type="button" class="pad-hp" data-hp="bass" title="On = pad plays in headphones only">HP</button></div>
+            <div class="pad-cap">SAMPLE</div>
           </div>
           <div class="channel" data-stem="guitar">
             <div class="name">Guitar</div>
@@ -1605,11 +1609,12 @@
               <div class="meter-seg red"></div><div class="meter-seg red"></div>
             </div>
             <div class="fader-slot"><div class="fader-cap"></div></div>
-            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="guitar" style="--pc:#9b6dff" aria-label="Sample pad"><span></span></button><button type="button" class="pad-hp" data-hp="guitar" title="On = pad plays in headphones only">HP</button></div>
             <div class="btn-row">
               <button class="cue-btn" type="button" title="Solo: isolate this channel, mute all others" aria-label="Solo">S</button>
               <button class="mute-btn" type="button" title="Mute this channel (stays out of main mix)">M</button>
             </div>
+            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="guitar" style="--pc:#9b6dff" aria-label="Sample pad"><span></span></button><button type="button" class="pad-hp" data-hp="guitar" title="On = pad plays in headphones only">HP</button></div>
+            <div class="pad-cap">SAMPLE</div>
           </div>
           <div class="channel" data-stem="piano">
             <div class="name">Synth</div>
@@ -1642,11 +1647,12 @@
               <div class="meter-seg red"></div><div class="meter-seg red"></div>
             </div>
             <div class="fader-slot"><div class="fader-cap"></div></div>
-            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="piano" style="--pc:#ff5cb0" aria-label="Sample pad"><span></span></button><button type="button" class="pad-hp" data-hp="piano" title="On = pad plays in headphones only">HP</button></div>
             <div class="btn-row">
               <button class="cue-btn" type="button" title="Solo: isolate this channel, mute all others" aria-label="Solo">S</button>
               <button class="mute-btn" type="button" title="Mute this channel (stays out of main mix)">M</button>
             </div>
+            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="piano" style="--pc:#ff5cb0" aria-label="Sample pad"><span></span></button><button type="button" class="pad-hp" data-hp="piano" title="On = pad plays in headphones only">HP</button></div>
+            <div class="pad-cap">SAMPLE</div>
           </div>
           <div class="channel" data-stem="other">
             <div class="name">Other</div>
@@ -1679,11 +1685,12 @@
               <div class="meter-seg red"></div><div class="meter-seg red"></div>
             </div>
             <div class="fader-slot"><div class="fader-cap"></div></div>
-            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="other" style="--pc:#3ab6ff" aria-label="Sample pad"><span></span></button><button type="button" class="pad-hp" data-hp="other" title="On = pad plays in headphones only">HP</button></div>
             <div class="btn-row">
               <button class="cue-btn" type="button" title="Solo: isolate this channel, mute all others" aria-label="Solo">S</button>
               <button class="mute-btn" type="button" title="Mute this channel (stays out of main mix)">M</button>
             </div>
+            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="other" style="--pc:#3ab6ff" aria-label="Sample pad"><span></span></button><button type="button" class="pad-hp" data-hp="other" title="On = pad plays in headphones only">HP</button></div>
+            <div class="pad-cap">SAMPLE</div>
           </div>
         </div>
 
