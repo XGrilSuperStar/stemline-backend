@@ -269,7 +269,6 @@
     border: 1px solid rgba(216,220,226,0.25); border-radius: 3px; cursor: pointer;
     white-space: nowrap;
     position: relative;
-    display: none;
   }
   .sample-toggle-btn:hover { background: rgba(255,255,255,0.1); }
   .sample-toggle-btn::after {
@@ -763,8 +762,6 @@
 
 
   /* ===== sampler pads + library ===== */
-  /* SAMPLER HIDDEN FOR NOW: delete the next rule to turn the sampler back on (also unhide .sample-toggle-btn) */
-  .pad-row, #screenSamplesTab, #sampleLibList { display: none !important; }
   .pad-row { display: flex; align-items: center; justify-content: center; gap: 3px; }
   .sampler-pad {
     --pc: #888; width: 34px; height: 34px; border-radius: 5px; cursor: pointer; padding: 0;
@@ -1380,7 +1377,7 @@
             </button>
             <span class="tp-source mono" id="previewLabel">no track loaded</span>
           </div>
-          <div class="wave-hint mono" id="waveHint">click or drag waveform to seek &middot; <span style="color:var(--vu-teal,#3CFDE0);">+CUE</span> sets where this stem starts playing from</div>
+          <div class="wave-hint mono" id="waveHint">click or drag waveform to seek &middot; <span style="color:#ffa022;">SAMPLE</span> + drag cuts a sample, right-click it to save &middot; <span style="color:var(--vu-teal,#3CFDE0);">+CUE</span> sets where this stem starts playing from</div>
           <div class="waveform-rows" id="waveformRows">
             <div class="wave-row" data-stem="vocals"><span class="wave-row-label">VOCALS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="sample-toggle-btn" data-stem="vocals" title="Toggle sample mode: click-drag on the wave chops a triggerable sample">SAMPLE</button><button class="add-marker-btn" data-stem="vocals" title="Add a cue marker here">+CUE</button></div>
             <div class="wave-row" data-stem="drums"><span class="wave-row-label">DRUMS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="sample-toggle-btn" data-stem="drums" title="Toggle sample mode: click-drag on the wave chops a triggerable sample">SAMPLE</button><button class="add-marker-btn" data-stem="drums" title="Add a cue marker here">+CUE</button></div>
