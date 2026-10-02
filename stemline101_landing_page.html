@@ -807,11 +807,6 @@
     box-shadow: inset 0 2px 0 rgba(255,255,255,0.18), inset 0 -3px 6px rgba(0,0,0,0.35), 0 2px 4px rgba(0,0,0,0.3);
     position: relative;
   }
-  .trim-hint {
-    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-    font: 700 0.62rem 'JetBrains Mono', monospace; letter-spacing: 0.04em;
-    color: #1c1d1f; text-shadow: 0 1px 0 rgba(255,255,255,0.5); text-align: center; padding: 0 1rem;
-  }
   .wood-trim::after {
     content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
     background: rgba(255,255,255,0.25);
@@ -1208,6 +1203,30 @@
     border: 1px solid #55575b;
   }
   .studio-room .studio-label { color: rgba(18,18,20,0.85); }
+  .sample-help-btn {
+    margin-left: auto; width: 18px; height: 18px; border-radius: 50%;
+    font: 700 0.65rem 'JetBrains Mono', monospace; line-height: 1;
+    color: rgba(18,18,20,0.75); background: rgba(18,18,20,0.08);
+    border: 1px solid rgba(18,18,20,0.4); cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .sample-help-btn:hover { background: rgba(18,18,20,0.18); }
+  .sample-help-pop {
+    position: absolute; top: 2.4rem; right: 1.6rem; z-index: 20;
+    width: 240px; background: #1c1815; border: 1px solid #0d0b09; border-radius: 8px;
+    padding: 0.9rem 1rem 0.8rem; box-shadow: 0 16px 34px -10px rgba(0,0,0,0.7);
+  }
+  .sample-help-close {
+    position: absolute; top: 6px; right: 7px; background: none; border: none;
+    color: rgba(237,227,206,0.5); cursor: pointer; font-size: 0.8rem; line-height: 1; padding: 2px;
+  }
+  .sample-help-close:hover { color: rgba(237,227,206,0.9); }
+  .sample-help-title {
+    font: 700 0.68rem 'JetBrains Mono', monospace; letter-spacing: 0.08em;
+    color: #3CFDE0; margin-bottom: 0.5rem;
+  }
+  .sample-help-steps { margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: 0.45rem; }
+  .sample-help-steps li { font-size: 0.72rem; line-height: 1.35; color: rgba(237,227,206,0.85); }
   .studio-room::before {
     content: '';
     position: absolute; inset: 0; border-radius: 10px;
@@ -1402,6 +1421,17 @@
   <div class="studio-room" id="drop">
     <div class="studio-label mono">
       <span><span class="rec-dot"></span>LIVE ROOM — IN USE</span>
+      <button type="button" class="sample-help-btn" id="sampleHelpBtn" aria-label="How to sample">?</button>
+    </div>
+    <div class="sample-help-pop" id="sampleHelpPop" style="display:none;">
+      <button type="button" class="sample-help-close" id="sampleHelpClose" aria-label="Close">&#10005;</button>
+      <div class="sample-help-title">HOW TO SAMPLE</div>
+      <ol class="sample-help-steps">
+        <li>Hold Shift and drag across any track's waveform to grab a piece of it.</li>
+        <li>Right-click your selection and choose Save Sample.</li>
+        <li>Click that track's colored square to play the sample back.</li>
+        <li>The HP button next to the square sends it to headphones only.</li>
+      </ol>
     </div>
     <div class="rack-screw tl" style="width:9px;height:9px;"></div>
     <div class="rack-screw tr" style="width:9px;height:9px;"></div>
@@ -1778,7 +1808,7 @@
       </div>
       
 
-      <div class="wood-trim"><span class="trim-hint">HOLD SHIFT + DRAG A WAVEFORM TO GRAB A SOUND. CLICK THE SQUARE TO PLAY IT BACK.</span></div>
+      <div class="wood-trim"></div>
     </div>
   </div>
 </section>
@@ -5077,6 +5107,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const h = await playItem(it, dest, () => p.classList.add('lit'), () => { if (playing[stem] === h) { delete playing[stem]; p.classList.remove('lit'); } }, stem);
     if (h) playing[stem] = h;
   }
+
+  const sampleHelpBtn = document.getElementById('sampleHelpBtn');
+  const sampleHelpPop = document.getElementById('sampleHelpPop');
+  const sampleHelpClose = document.getElementById('sampleHelpClose');
+  if (sampleHelpBtn && sampleHelpPop) {
+    sampleHelpBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      sampleHelpPop.style.display = sampleHelpPop.style.display === 'none' ? 'block' : 'none';
+    });
+  }
+  if (sampleHelpClose && sampleHelpPop) {
+    sampleHelpClose.addEventListener('click', () => { sampleHelpPop.style.display = 'none'; });
+  }
+  document.addEventListener('click', (e) => {
+    if (sampleHelpPop && sampleHelpPop.style.display === 'block' && !sampleHelpPop.contains(e.target) && e.target !== sampleHelpBtn) {
+      sampleHelpPop.style.display = 'none';
+    }
+  });
 
   function wirePads() {
     Object.keys(COLORS).forEach(stem => {
