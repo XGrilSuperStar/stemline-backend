@@ -807,6 +807,11 @@
     box-shadow: inset 0 2px 0 rgba(255,255,255,0.18), inset 0 -3px 6px rgba(0,0,0,0.35), 0 2px 4px rgba(0,0,0,0.3);
     position: relative;
   }
+  .trim-hint {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font: 700 0.62rem 'JetBrains Mono', monospace; letter-spacing: 0.04em;
+    color: #1c1d1f; text-shadow: 0 1px 0 rgba(255,255,255,0.5); text-align: center; padding: 0 1rem;
+  }
   .wood-trim::after {
     content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
     background: rgba(255,255,255,0.25);
@@ -1773,7 +1778,7 @@
       </div>
       
 
-      <div class="wood-trim"></div>
+      <div class="wood-trim"><span class="trim-hint">HOLD SHIFT + DRAG A WAVEFORM TO GRAB A SOUND. CLICK THE SQUARE TO PLAY IT BACK.</span></div>
     </div>
   </div>
 </section>
