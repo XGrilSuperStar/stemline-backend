@@ -800,7 +800,7 @@
   #samplerToast.show { opacity: 1; }
 
   .wood-trim {
-    margin: 1.1rem -1.4rem 1.1rem;
+    margin: 0.5rem -1.4rem 0.3rem;
     height: 26px;
     background:
       repeating-linear-gradient(90deg, rgba(255,255,255,0.18) 0 1px, rgba(0,0,0,0.04) 1px 3px),
@@ -812,6 +812,14 @@
     content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
     background: rgba(255,255,255,0.25);
   }
+  .sample-help-pill {
+    display: block; margin: 0 auto 0.4rem; padding: 0.35rem 0.9rem;
+    border-radius: 999px; border: 1px solid #3CFDE0;
+    background: rgba(60,253,224,0.12); color: #3CFDE0;
+    font: 700 0.65rem 'JetBrains Mono', monospace; letter-spacing: 0.04em;
+    cursor: pointer; box-shadow: 0 0 10px rgba(60,253,224,0.3);
+  }
+  .sample-help-pill:hover { background: rgba(60,253,224,0.22); }
 
   .btn-row { display: flex; gap: 3px; }
   .mute-btn, .cue-btn {
@@ -1422,8 +1430,7 @@
   <div class="studio-room" id="drop">
     <div class="studio-label mono">
       <span><span class="rec-dot"></span>LIVE ROOM — IN USE</span>
-      <button type="button" class="sample-help-btn" id="sampleHelpBtn" aria-label="How to sample">?</button>
-    </div>
+      </div>
     <div class="sample-help-pop" id="sampleHelpPop" style="display:none;">
       <button type="button" class="sample-help-close" id="sampleHelpClose" aria-label="Close">&#10005;</button>
       <div class="sample-help-title">HOW TO SAMPLE</div>
@@ -1810,6 +1817,7 @@
       
 
       <div class="wood-trim"></div>
+      <button type="button" class="sample-help-pill" id="sampleHelpBtn">HOW TO SAMPLE</button>
     </div>
   </div>
 </section>
