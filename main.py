@@ -1,7 +1,8 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, Request
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import Optional
 import uvicorn
 import os
 import shutil
@@ -170,8 +171,26 @@ class Review(Base):
     comment = Column(Text)
     approved = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+    # Admin-only. "rejected" keeps a turned-down review (and your reply to
+    # it) on file instead of deleting it. admin_reply is a private note
+    # saved next to the review -- it is never shown publicly and never
+    # emailed to the reviewer.
+    rejected = Column(Boolean, default=False)
+    admin_reply = Column(Text, nullable=True)
 
 Base.metadata.create_all(bind=engine)
+
+# One-time migration: add rejected/admin_reply columns to reviews table if
+# they don't exist yet. Existing reviews get rejected = FALSE so they keep
+# behaving exactly as before.
+try:
+    with engine.connect() as conn:
+        conn.execute(text("ALTER TABLE reviews ADD COLUMN IF NOT EXISTS rejected BOOLEAN DEFAULT FALSE"))
+        conn.execute(text("ALTER TABLE reviews ADD COLUMN IF NOT EXISTS admin_reply TEXT"))
+        conn.execute(text("UPDATE reviews SET rejected = FALSE WHERE rejected IS NULL"))
+        conn.commit()
+except Exception as e:
+    logger.warning(f"reviews rejected/admin_reply column migration skipped or already applied: {e}")
 
 # One-time migration: add status/error_message columns to stems table if they
 # don't exist yet, backfilling old rows as "done" so they still show up
@@ -412,6 +431,7 @@ def get_me(token: str = None, db: Session = Depends(get_db)):
     return {
         "email": user.email,
         "is_premium": premium,
+        "is_admin": is_admin_user(db, user.id),
         "show_ads": not premium,
         "splits_used_this_period": splits_used,
         "splits_limit": None if premium else FREE_SPLITS_PER_PERIOD,
@@ -669,6 +689,7 @@ def submit_review(body: ReviewRequest, token: str = None, db: Session = Depends(
         stars=body.stars,
         comment=comment,
         approved=False,
+        rejected=False,
     )
     db.add(review)
     db.commit()
@@ -678,6 +699,7 @@ def submit_review(body: ReviewRequest, token: str = None, db: Session = Depends(
 @app.get("/api/v1/reviews")
 def list_public_reviews(db: Session = Depends(get_db)):
     # Public endpoint — only ever returns approved reviews, newest first.
+    # Rejected reviews have approved = False, so they never show up here.
     reviews = db.query(Review).filter(Review.approved == True).order_by(Review.created_at.desc()).all()
     return [
         {
@@ -690,12 +712,74 @@ def list_public_reviews(db: Session = Depends(get_db)):
         for r in reviews
     ]
 
-@app.get("/api/v1/admin/reviews/pending")
-def list_pending_reviews(token: str = None, db: Session = Depends(get_db)):
+# ─── ADMIN: REVIEW QUEUE ────────────────────────────────────────────────
+class ReviewActionRequest(BaseModel):
+    # Optional private reply, saved next to the review. If it is left out
+    # (None) the saved reply is untouched; an empty string clears it.
+    reply: Optional[str] = None
+
+def review_status(r: "Review") -> str:
+    if r.approved:
+        return "approved"
+    if r.rejected:
+        return "rejected"
+    return "pending"
+
+def admin_review_dict(r: "Review") -> dict:
+    return {
+        "id": r.id,
+        "display_name": r.display_name,
+        "stars": r.stars,
+        "comment": r.comment,
+        "created_at": r.created_at.isoformat() if r.created_at else None,
+        "admin_reply": r.admin_reply,
+        "status": review_status(r),
+    }
+
+def apply_admin_reply(review: "Review", reply: Optional[str]):
+    if reply is None:
+        return
+    reply = reply.strip()
+    if len(reply) > 2000:
+        raise HTTPException(status_code=400, detail="Reply must be 2000 characters or fewer.")
+    review.admin_reply = reply or None
+
+def require_admin(token: str, db: Session) -> int:
     user_id = get_current_user(token)
     if not is_admin_user(db, user_id):
         raise HTTPException(status_code=403, detail="Admin only.")
-    reviews = db.query(Review).filter(Review.approved == False).order_by(Review.created_at.asc()).all()
+    return user_id
+
+def find_review_or_404(review_id: int, db: Session) -> "Review":
+    review = db.query(Review).filter(Review.id == review_id).first()
+    if not review:
+        raise HTTPException(status_code=404, detail="Review not found.")
+    return review
+
+@app.get("/api/v1/admin/reviews")
+def list_admin_reviews(status: str = "pending", token: str = None, db: Session = Depends(get_db)):
+    require_admin(token, db)
+    if status not in ("pending", "approved", "rejected"):
+        raise HTTPException(status_code=400, detail="Status must be pending, approved, or rejected.")
+    base = db.query(Review)
+    if status == "approved":
+        query = base.filter(Review.approved == True).order_by(Review.created_at.desc())
+    elif status == "rejected":
+        query = base.filter(Review.approved == False, Review.rejected == True).order_by(Review.created_at.desc())
+    else:
+        query = base.filter(Review.approved == False, Review.rejected.isnot(True)).order_by(Review.created_at.asc())
+    reviews = query.all()
+    counts = {
+        "pending": db.query(Review).filter(Review.approved == False, Review.rejected.isnot(True)).count(),
+        "approved": db.query(Review).filter(Review.approved == True).count(),
+        "rejected": db.query(Review).filter(Review.approved == False, Review.rejected == True).count(),
+    }
+    return {"status": status, "counts": counts, "reviews": [admin_review_dict(r) for r in reviews]}
+
+@app.get("/api/v1/admin/reviews/pending")
+def list_pending_reviews(token: str = None, db: Session = Depends(get_db)):
+    require_admin(token, db)
+    reviews = db.query(Review).filter(Review.approved == False, Review.rejected.isnot(True)).order_by(Review.created_at.asc()).all()
     return [
         {
             "id": r.id,
@@ -708,36 +792,415 @@ def list_pending_reviews(token: str = None, db: Session = Depends(get_db)):
     ]
 
 @app.post("/api/v1/admin/reviews/{review_id}/approve")
-def approve_review(review_id: int, token: str = None, db: Session = Depends(get_db)):
-    user_id = get_current_user(token)
-    if not is_admin_user(db, user_id):
-        raise HTTPException(status_code=403, detail="Admin only.")
-    review = db.query(Review).filter(Review.id == review_id).first()
-    if not review:
-        raise HTTPException(status_code=404, detail="Review not found.")
+def approve_review(review_id: int, body: Optional[ReviewActionRequest] = None, token: str = None, db: Session = Depends(get_db)):
+    require_admin(token, db)
+    review = find_review_or_404(review_id, db)
     review.approved = True
+    review.rejected = False
+    apply_admin_reply(review, body.reply if body else None)
     db.commit()
     return {"id": review.id, "status": "approved"}
 
+@app.post("/api/v1/admin/reviews/{review_id}/reject")
+def reject_review(review_id: int, body: Optional[ReviewActionRequest] = None, token: str = None, db: Session = Depends(get_db)):
+    # Keeps the review on file (hidden from the public) instead of deleting
+    # it, so your reply stays next to it. Use DELETE to remove it for good.
+    require_admin(token, db)
+    review = find_review_or_404(review_id, db)
+    review.approved = False
+    review.rejected = True
+    apply_admin_reply(review, body.reply if body else None)
+    db.commit()
+    return {"id": review.id, "status": "rejected"}
+
+@app.post("/api/v1/admin/reviews/{review_id}/restore")
+def restore_review(review_id: int, body: Optional[ReviewActionRequest] = None, token: str = None, db: Session = Depends(get_db)):
+    # Puts an approved or rejected review back in the pending queue.
+    require_admin(token, db)
+    review = find_review_or_404(review_id, db)
+    review.approved = False
+    review.rejected = False
+    apply_admin_reply(review, body.reply if body else None)
+    db.commit()
+    return {"id": review.id, "status": "pending"}
+
+@app.post("/api/v1/admin/reviews/{review_id}/reply")
+def save_review_reply(review_id: int, body: ReviewActionRequest, token: str = None, db: Session = Depends(get_db)):
+    require_admin(token, db)
+    review = find_review_or_404(review_id, db)
+    apply_admin_reply(review, body.reply if body.reply is not None else "")
+    db.commit()
+    return {"id": review.id, "admin_reply": review.admin_reply}
+
 @app.delete("/api/v1/admin/reviews/{review_id}")
-def reject_review(review_id: int, token: str = None, db: Session = Depends(get_db)):
-    user_id = get_current_user(token)
-    if not is_admin_user(db, user_id):
-        raise HTTPException(status_code=403, detail="Admin only.")
-    review = db.query(Review).filter(Review.id == review_id).first()
-    if not review:
-        raise HTTPException(status_code=404, detail="Review not found.")
+def delete_review(review_id: int, token: str = None, db: Session = Depends(get_db)):
+    require_admin(token, db)
+    review = find_review_or_404(review_id, db)
     db.delete(review)
     db.commit()
-    return {"id": review_id, "status": "rejected"}
+    return {"id": review_id, "status": "deleted"}
+
+ADMIN_REVIEWS_HTML = r"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Review queue - Stemline101</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil:wght@800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void: #0B0B0D;
+    --concrete: #17171A;
+    --concrete-hi: #1F2024;
+    --line: rgba(216,220,226,0.14);
+    --chrome: #D8DCE2;
+    --dim: rgba(216,220,226,0.62);
+    --ember: #B8562E;
+    --amber: #E7A33E;
+    --green: #6FA97E;
+    --red: #C4453A;
+    --glow: #3CFDE0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--void); color: var(--chrome);
+    font-family: 'Inter', system-ui, sans-serif; line-height: 1.5;
+    padding: 1.5rem 1.2rem 4rem;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  a { color: var(--glow); }
+  .back { display: inline-block; margin-bottom: 1.4rem; text-decoration: none; font-size: 0.9rem; color: var(--dim); }
+  .back:hover { color: var(--chrome); }
+  h1 {
+    font-family: 'Big Shoulders Stencil', sans-serif; font-weight: 800;
+    font-size: clamp(2rem, 6vw, 2.8rem); letter-spacing: 0.02em; line-height: 1.05;
+    margin-bottom: 0.3rem;
+  }
+  .lede { color: var(--dim); font-size: 0.95rem; margin-bottom: 1.6rem; max-width: 56ch; }
+
+  .tabs { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.2rem; }
+  .tab {
+    font-family: inherit; font-size: 0.92rem; font-weight: 500; color: var(--dim);
+    background: var(--concrete); border: 1px solid var(--line); border-radius: 999px;
+    padding: 0.5rem 1rem; cursor: pointer;
+  }
+  .tab:hover { color: var(--chrome); }
+  .tab[aria-selected="true"] { color: #10110f; background: var(--chrome); border-color: var(--chrome); }
+  .tab .count { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; margin-left: 0.4rem; opacity: 0.75; }
+
+  .status { min-height: 1.4rem; margin-bottom: 0.8rem; font-size: 0.9rem; color: var(--green); }
+  .status.error { color: var(--red); }
+
+  .review {
+    background: var(--concrete); border: 1px solid var(--line);
+    border-left: 4px solid var(--amber); border-radius: 4px;
+    padding: 1.1rem 1.2rem 1.2rem; margin-bottom: 1rem;
+  }
+  .review.approved { border-left-color: var(--green); }
+  .review.rejected { border-left-color: var(--red); }
+  .review-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem 0.9rem; margin-bottom: 0.6rem; }
+  .stars { color: var(--amber); font-size: 1.05rem; letter-spacing: 0.08em; }
+  .stars .off { color: rgba(216,220,226,0.25); }
+  .name { font-weight: 600; }
+  .date { margin-left: auto; font-size: 0.82rem; color: var(--dim); font-family: 'JetBrains Mono', monospace; }
+  .comment { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 68ch; margin-bottom: 1rem; }
+
+  label.reply-label { display: block; font-size: 0.85rem; color: var(--dim); margin-bottom: 0.35rem; }
+  textarea {
+    width: 100%; min-height: 4.2rem; resize: vertical;
+    background: var(--void); color: var(--chrome); border: 1px solid var(--line); border-radius: 3px;
+    font-family: inherit; font-size: 0.92rem; line-height: 1.45; padding: 0.6rem 0.7rem;
+  }
+  textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid var(--glow); outline-offset: 2px; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.8rem; }
+  .btn {
+    font-family: inherit; font-size: 0.9rem; font-weight: 600; cursor: pointer;
+    border-radius: 3px; padding: 0.55rem 1.1rem; border: 1px solid var(--line);
+    background: var(--concrete-hi); color: var(--chrome);
+  }
+  .btn:hover { border-color: var(--chrome); }
+  .btn:disabled { opacity: 0.5; cursor: wait; }
+  .btn.approve { background: var(--green); border-color: var(--green); color: #0d1a11; }
+  .btn.reject { background: transparent; border-color: var(--red); color: #f08a80; }
+  .btn.delete { margin-left: auto; background: transparent; border-color: transparent; color: var(--dim); text-decoration: underline; font-weight: 500; }
+  .btn.delete:hover { color: var(--red); }
+
+  .empty, .notice {
+    background: var(--concrete); border: 1px dashed var(--line); border-radius: 4px;
+    padding: 1.6rem 1.3rem; color: var(--dim);
+  }
+  .notice a { font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/">&larr; Back to Stemline101</a>
+  <h1>Review queue</h1>
+  <p class="lede">New reviews wait here until you approve them. Only approved reviews appear on the public Reviews page.</p>
+
+  <div class="tabs" role="tablist" id="tabs">
+    <button class="tab" role="tab" data-tab="pending" aria-selected="true">Pending <span class="count" id="count-pending">0</span></button>
+    <button class="tab" role="tab" data-tab="approved" aria-selected="false">Approved <span class="count" id="count-approved">0</span></button>
+    <button class="tab" role="tab" data-tab="rejected" aria-selected="false">Rejected <span class="count" id="count-rejected">0</span></button>
+  </div>
+
+  <div class="status" id="status" role="status" aria-live="polite"></div>
+  <div id="list"></div>
+</div>
+
+<script>
+(function () {
+  var TOKEN = localStorage.getItem('soundlounge101_token');
+  var currentTab = 'pending';
+  var listEl = document.getElementById('list');
+  var statusEl = document.getElementById('status');
+
+  function el(tag, cls, txt) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (txt != null) e.textContent = txt;
+    return e;
+  }
+
+  function say(msg, isError) {
+    statusEl.textContent = msg || '';
+    statusEl.className = 'status' + (isError ? ' error' : '');
+  }
+
+  function showNotice(html) {
+    listEl.innerHTML = '';
+    var n = el('div', 'notice');
+    n.innerHTML = html;
+    listEl.appendChild(n);
+  }
+
+  async function api(path, method, body) {
+    var sep = path.indexOf('?') === -1 ? '?' : '&';
+    var opts = { method: method || 'GET' };
+    if (body !== undefined) {
+      opts.headers = { 'Content-Type': 'application/json' };
+      opts.body = JSON.stringify(body);
+    }
+    var res = await fetch(path + sep + 'token=' + encodeURIComponent(TOKEN), opts);
+    var data = null;
+    try { data = await res.json(); } catch (e) {}
+    if (!res.ok) {
+      var err = new Error((data && typeof data.detail === 'string') ? data.detail : 'Something went wrong.');
+      err.status = res.status;
+      throw err;
+    }
+    return data;
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return '';
+    var d = new Date(/(Z|[+-]\d\d:?\d\d)$/.test(iso) ? iso : iso + 'Z');
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+
+  function starsEl(n) {
+    var s = el('span', 'stars');
+    s.setAttribute('aria-label', n + ' out of 5 stars');
+    for (var i = 1; i <= 5; i++) {
+      var star = el('span', i <= n ? '' : 'off', '\u2605');
+      s.appendChild(star);
+    }
+    return s;
+  }
+
+  function button(label, cls, onClick) {
+    var b = el('button', 'btn ' + (cls || ''), label);
+    b.type = 'button';
+    b.addEventListener('click', onClick);
+    return b;
+  }
+
+  function card(r) {
+    var c = el('article', 'review ' + r.status);
+    var head = el('div', 'review-head');
+    head.appendChild(starsEl(r.stars));
+    head.appendChild(el('span', 'name', r.display_name));
+    head.appendChild(el('span', 'date', fmtDate(r.created_at)));
+    c.appendChild(head);
+    c.appendChild(el('p', 'comment', r.comment));
+
+    var lab = el('label', 'reply-label', 'Your reply. Saved with this review, not sent to the reviewer.');
+    var ta = el('textarea');
+    ta.id = 'reply-' + r.id;
+    ta.maxLength = 2000;
+    ta.value = r.admin_reply || '';
+    lab.htmlFor = ta.id;
+    c.appendChild(lab);
+    c.appendChild(ta);
+
+    var actions = el('div', 'actions');
+    var all = [];
+    function run(btn, label, path, method, withReply, doneMsg) {
+      var b = button(label, btn, async function () {
+        all.forEach(function (x) { x.disabled = true; });
+        say('');
+        try {
+          await api(path, method, withReply ? { reply: ta.value } : undefined);
+          say(doneMsg);
+          await load();
+        } catch (e) {
+          say(e.message, true);
+          all.forEach(function (x) { x.disabled = false; });
+        }
+      });
+      all.push(b);
+      return b;
+    }
+
+    var base = '/api/v1/admin/reviews/' + r.id;
+    if (r.status === 'pending') {
+      actions.appendChild(run('approve', 'Approve', base + '/approve', 'POST', true, 'Approved. It is now on the public Reviews page.'));
+      actions.appendChild(run('reject', 'Reject', base + '/reject', 'POST', true, 'Rejected. It stays here, hidden from the public.'));
+    } else if (r.status === 'approved') {
+      actions.appendChild(run('', 'Move back to pending', base + '/restore', 'POST', true, 'Moved back to pending. It is no longer public.'));
+    } else {
+      actions.appendChild(run('', 'Move back to pending', base + '/restore', 'POST', true, 'Moved back to pending.'));
+    }
+    actions.appendChild(run('', 'Save reply', base + '/reply', 'POST', true, 'Reply saved.'));
+
+    var del = button('Delete forever', 'delete', async function () {
+      if (!window.confirm('Delete this review forever? This cannot be undone.')) return;
+      all.forEach(function (x) { x.disabled = true; });
+      try {
+        await api(base, 'DELETE');
+        say('Deleted.');
+        await load();
+      } catch (e) {
+        say(e.message, true);
+        all.forEach(function (x) { x.disabled = false; });
+      }
+    });
+    all.push(del);
+    actions.appendChild(del);
+
+    c.appendChild(actions);
+    return c;
+  }
+
+  function setCounts(counts) {
+    ['pending', 'approved', 'rejected'].forEach(function (k) {
+      document.getElementById('count-' + k).textContent = counts[k];
+    });
+  }
+
+  var EMPTY = {
+    pending: 'No pending reviews. New ones show up here as soon as someone submits.',
+    approved: 'No approved reviews yet.',
+    rejected: 'Nothing rejected.'
+  };
+
+  async function load() {
+    try {
+      var data = await api('/api/v1/admin/reviews?status=' + currentTab);
+      setCounts(data.counts);
+      listEl.innerHTML = '';
+      if (!data.reviews.length) {
+        listEl.appendChild(el('div', 'empty', EMPTY[currentTab]));
+        return;
+      }
+      data.reviews.forEach(function (r) { listEl.appendChild(card(r)); });
+    } catch (e) {
+      if (e.status === 401) {
+        showNotice('Your login has expired. <a href="/">Log in on the main site</a>, then reload this page.');
+      } else if (e.status === 403) {
+        showNotice('This account is not the admin account. <a href="/">Log in as the admin</a> to see the queue.');
+      } else {
+        showNotice('Could not load reviews: ' + e.message);
+      }
+    }
+  }
+
+  document.querySelectorAll('.tab').forEach(function (t) {
+    t.addEventListener('click', function () {
+      currentTab = t.dataset.tab;
+      document.querySelectorAll('.tab').forEach(function (x) {
+        x.setAttribute('aria-selected', x === t ? 'true' : 'false');
+      });
+      say('');
+      load();
+    });
+  });
+
+  if (!TOKEN) {
+    showNotice('You are not logged in here. <a href="/">Log in on the main site</a> with your admin account, then come back to this page.');
+  } else {
+    load();
+  }
+})();
+</script>
+</body>
+</html>
+"""
+
+@app.get("/admin/reviews", response_class=HTMLResponse)
+def admin_reviews_page():
+    # The page itself is just HTML and shows nothing on its own. Every
+    # review it displays comes from the admin API above, which checks the
+    # logged-in account is the admin.
+    return HTMLResponse(content=ADMIN_REVIEWS_HTML, headers={"Cache-Control": "no-store"})
+
+# ─── LANDING PAGE (with admin-only shortcut button) ─────────────────────
+LANDING_PAGE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stemline101_landing_page.html")
+
+# Added to the landing page when it is served. It asks the API whether the
+# logged-in account is the admin, and only then adds a "Reviews admin"
+# button to the top nav. Everyone else sees nothing different.
+ADMIN_SHORTCUT_SNIPPET = r"""
+<script>
+(function () {
+  try {
+    var t = localStorage.getItem('soundlounge101_token');
+    if (!t) return;
+    fetch('/api/v1/me?token=' + encodeURIComponent(t))
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d || !d.is_admin) return;
+        var group = document.getElementById('navAccountGroup');
+        if (!group || document.getElementById('navAdminReviewsBtn')) return;
+        var a = document.createElement('a');
+        a.id = 'navAdminReviewsBtn';
+        a.href = '/admin/reviews';
+        a.className = 'nav-cta';
+        a.textContent = 'Review queue';
+        a.style.cssText = 'text-decoration:none;background:#2A4E4B;';
+        group.insertBefore(a, group.firstChild);
+      })
+      .catch(function () {});
+  } catch (e) {}
+})();
+</script>
+"""
+
+def serve_landing_page():
+    try:
+        with open(LANDING_PAGE_FILE, "r", encoding="utf-8") as f:
+            html = f.read()
+    except Exception as e:
+        logger.error(f"Could not read landing page for injection, serving as-is: {e}")
+        return FileResponse("stemline101_landing_page.html", media_type="text/html")
+    idx = html.rfind("</body>")
+    if idx == -1:
+        html = html + ADMIN_SHORTCUT_SNIPPET
+    else:
+        html = html[:idx] + ADMIN_SHORTCUT_SNIPPET + html[idx:]
+    return HTMLResponse(content=html)
 
 @app.get("/")
 def root():
-    return FileResponse("stemline101_landing_page.html", media_type="text/html")
+    return serve_landing_page()
 
 @app.get("/reset-password")
 def reset_password_page():
-    return FileResponse("stemline101_landing_page.html", media_type="text/html")
+    return serve_landing_page()
 
 @app.get("/favicon.ico")
 def favicon_ico():
