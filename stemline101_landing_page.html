@@ -3119,7 +3119,7 @@ function renderStemSampleRegions(stem) {
     };
     place();
     el.title = region.label + ' — ' + formatMarkerTime(region.start) + ' to ' + formatMarkerTime(region.end)
-      + ' — click to play, drag edges to trim, double-click to rename, right-click to remove';
+      + ' — click to play, drag to move, drag edges to trim, double-click to rename, right-click to remove';
 
     const playBtn = document.createElement('button');
     playBtn.type = 'button';
@@ -3173,8 +3173,37 @@ function renderStemSampleRegions(stem) {
     wireHandle(startHandle, 'start');
     wireHandle(endHandle, 'end');
 
+    // Drag the whole chopped piece left/right (edges still trim it)
+    el.style.cursor = 'grab';
+    let bodyDrag = false, bmoved = false, bx0 = 0, bs0 = 0, be0 = 0;
+    el.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      e.stopPropagation();
+      bodyDrag = true; bmoved = false; bx0 = e.clientX; bs0 = region.start; be0 = region.end;
+      try { el.setPointerCapture(e.pointerId); } catch (err) {}
+    });
+    el.addEventListener('pointermove', (e) => {
+      if (!bodyDrag) return;
+      const dx = e.clientX - bx0;
+      if (Math.abs(dx) > 3) bmoved = true;
+      if (!bmoved) return;
+      const len = be0 - bs0;
+      const ns = Math.max(0, Math.min(stemDur - len, bs0 + dx * (stemDur / canvasRect.width)));
+      region.start = ns; region.end = ns + len;
+      place();
+    });
+    const endBodyDrag = (e) => {
+      if (!bodyDrag) return;
+      bodyDrag = false;
+      try { el.releasePointerCapture(e.pointerId); } catch (err) {}
+      if (bmoved) { el._justMoved = true; stemSampleRegions[stem].sort((a, b) => a.start - b.start); }
+    };
+    el.addEventListener('pointerup', endBodyDrag);
+    el.addEventListener('pointercancel', endBodyDrag);
+
     el.addEventListener('click', (e) => {
       e.stopPropagation();
+      if (el._justMoved) { el._justMoved = false; return; }
       triggerStemSampleRegion(stem, region.id);
     });
     el.addEventListener('dblclick', (e) => { e.stopPropagation(); renameStemSampleRegion(stem, region.id); });
