@@ -776,10 +776,11 @@
   .sampler-pad.has-sample { border-color: color-mix(in srgb, var(--pc) 55%, transparent); }
   .sampler-pad.lit { background: var(--pc); border-color: var(--pc); box-shadow: 0 0 14px var(--pc), 0 0 4px var(--pc); }
   .sampler-pad.lit span { color: #000; opacity: 0.8; }
+  .sampler-pad.flash { background: var(--pc); border-color: var(--pc); box-shadow: 0 0 14px var(--pc), 0 0 4px var(--pc); }
   .pad-hp {
     width: 20px; height: auto; padding: 0; border-radius: 4px; cursor: pointer;
-    font: 700 0.45rem 'JetBrains Mono', monospace; color: rgba(216,220,226,0.55);
-    background: rgba(255,255,255,0.04); border: 1px solid rgba(216,220,226,0.25);
+    font: 700 0.5rem 'JetBrains Mono', monospace; color: rgba(237,227,206,0.85);
+    background: rgba(255,255,255,0.14); border: 1px solid rgba(237,227,206,0.4);
   }
   .pad-hp.on { color: #000; background: #3CFDE0; border-color: #3CFDE0; }
   #sampleLibList { display: none; flex-direction: column; gap: 8px; padding: 6px; overflow-y: auto; max-height: 100%; }
@@ -5129,6 +5130,12 @@ document.addEventListener('DOMContentLoaded', () => {
   async function firePad(stem) {
     const a = getAssign(); const it = a[stem] && itemById(a[stem]);
     const p = padEl(stem);
+    // Always give a quick visible flash on click, even on an empty pad,
+    // so clicking never looks like nothing happened.
+    if (p) {
+      p.classList.add('flash');
+      setTimeout(() => p.classList.remove('flash'), 180);
+    }
     if (!it) { toast('Empty pad: cut a region, right-click, Save sample'); return; }
     const hp = document.querySelector('.pad-hp[data-hp="' + stem + '"]');
     const dest = hp && hp.classList.contains('on') ? 'cue' : 'main';
