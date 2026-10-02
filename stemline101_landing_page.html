@@ -3113,14 +3113,14 @@ function renderStemSampleRegions(stem) {
   wrap.querySelectorAll('.wave-sample-region').forEach(el => el.remove());
   const canvasRect = canvas.getBoundingClientRect();
   const stemDur = (stemBuffers[stem] && stemBuffers[stem].duration) || LOOP_DUR;
-  const color = WAVE_COLORS[stem] || '#3CFDE0';
+  const color = '#FFD23C'; // fixed bright selection color so it never blends into the stem's own waveform color
 
   (stemSampleRegions[stem] || []).forEach(region => {
     const el = document.createElement('div');
     el.className = 'wave-sample-region';
     el.dataset.label = region.label;
     el.style.setProperty('--region-color', color);
-    el.style.background = hexToRgba(color, 0.42);
+    el.style.background = hexToRgba(color, 0.32);
 
     const place = () => {
       const x1 = (region.start / stemDur) * canvasRect.width;
