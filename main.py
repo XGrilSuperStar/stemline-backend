@@ -999,7 +999,7 @@ ADMIN_REVIEWS_HTML = r"""
   function fmtDate(iso) {
     if (!iso) return '';
     var d = new Date(/(Z|[+-]\d\d:?\d\d)$/.test(iso) ? iso : iso + 'Z');
-    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) + ' · ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
   }
 
   function starsEl(n) {
