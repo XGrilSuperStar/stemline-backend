@@ -160,7 +160,7 @@
       radial-gradient(ellipse at 30% 0%, rgba(255,255,255,0.06), transparent 62%),
       linear-gradient(180deg, #24262A 0%, #141518 55%, #0D0E10 100%);
     border-radius: 8px;
-    padding: 1.4rem 1.4rem 1.4rem;
+    padding: 1.4rem 1.4rem 0.9rem;
     box-shadow: 0 28px 60px -18px rgba(0,0,0,0.85), inset 0 1px 0 rgba(255,255,255,0.09);
     border: 1px solid #2E3034;
     position: relative;
@@ -1221,8 +1221,10 @@
     display: inline-flex; align-items: center; justify-content: center;
   }
   .sample-help-btn:hover { background: rgba(18,18,20,0.18); }
+  .sample-help-wrap { position: relative; text-align: center; margin: 0.3rem 0 0; }
+  .sample-help-wrap .sample-help-pill { display: inline-block; margin: 0; }
   .sample-help-pop {
-    position: absolute; top: 2.4rem; right: 1.6rem; z-index: 20;
+    position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); z-index: 50; text-align: left;
     width: 240px; background: #1c1815; border: 1px solid #0d0b09; border-radius: 8px;
     padding: 0.9rem 1rem 0.8rem; box-shadow: 0 16px 34px -10px rgba(0,0,0,0.7);
   }
@@ -1432,16 +1434,7 @@
     <div class="studio-label mono">
       <span><span class="rec-dot"></span>LIVE ROOM — IN USE</span>
       </div>
-    <div class="sample-help-pop" id="sampleHelpPop" style="display:none;">
-      <button type="button" class="sample-help-close" id="sampleHelpClose" aria-label="Close">&#10005;</button>
-      <div class="sample-help-title">HOW TO SAMPLE</div>
-      <ol class="sample-help-steps">
-        <li>Hold Shift and drag across any track's waveform to grab a piece of it.</li>
-        <li>Right-click your selection and choose Save Sample.</li>
-        <li>Click that track's colored square to play the sample back.</li>
-        <li>The HP button next to the square sends it to headphones only.</li>
-      </ol>
-    </div>
+    
     <div class="rack-screw tl" style="width:9px;height:9px;"></div>
     <div class="rack-screw tr" style="width:9px;height:9px;"></div>
     <div class="rack-screw bl" style="width:9px;height:9px;"></div>
@@ -1818,15 +1811,21 @@
       
 
       <div class="wood-trim"></div>
-      <button type="button" class="sample-help-pill" id="sampleHelpBtn">HOW TO SAMPLE</button>
+      <div class="sample-help-wrap"><button type="button" class="sample-help-pill" id="sampleHelpBtn">HOW TO SAMPLE</button><div class="sample-help-pop" id="sampleHelpPop" style="display:none;">
+      <button type="button" class="sample-help-close" id="sampleHelpClose" aria-label="Close">&#10005;</button>
+      <div class="sample-help-title">HOW TO SAMPLE</div>
+      <ol class="sample-help-steps">
+        <li>Hold Shift and drag across any track's waveform to grab a piece of it.</li>
+        <li>Right-click your selection and choose Save Sample.</li>
+        <li>Click that track's colored square to play the sample back.</li>
+        <li>The HP button next to the square sends it to headphones only.</li>
+      </ol>
+    </div></div>
     </div>
   </div>
 </section>
 
 
-
-<div class="ad-slot ad-slot-top" id="adSlotTop" data-ad-slot="top-banner">
-</div>
 
 <div id="authModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:1000;align-items:center;justify-content:center;">
   <div style="background:var(--concrete);border:1px solid var(--concrete-line);padding:2rem;width:90%;max-width:360px;box-shadow:0 30px 70px -20px rgba(0,0,0,0.85);font-family:'JetBrains Mono',monospace;position:relative;">
