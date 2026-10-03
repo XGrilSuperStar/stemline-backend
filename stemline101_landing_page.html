@@ -2708,9 +2708,16 @@ function updatePlayheadPosition() {
   const firstWrap = document.querySelector('.wave-row .wave-canvas-wrap');
   if (!firstWrap) return;
   const wrapRect = firstWrap.getBoundingClientRect();
-  const rowsRect = document.getElementById('waveformRows').getBoundingClientRect();
-  const wrapLeftInRows = wrapRect.left - rowsRect.left;
-  const x = wrapLeftInRows + progress * wrapRect.width;
+  const rowsEl = document.getElementById('waveformRows');
+  const rowsRect = rowsEl.getBoundingClientRect();
+  // ROOT-CAUSE FIX: the whole .hero is shrunk with transform: scale(...) to
+  // fit the window height (see fitHero). getBoundingClientRect() returns
+  // on-screen (scaled) pixels, but style.left is in unscaled layout pixels
+  // that then get scaled again -- so the playhead covered only `scale` of
+  // the track (stopped ~18% short of the end and drifted away from the
+  // mouse while dragging). Convert screen pixels back to layout pixels.
+  const scaleX = (rowsEl.offsetWidth > 0 && rowsRect.width > 0) ? (rowsRect.width / rowsEl.offsetWidth) : 1;
+  const x = ((wrapRect.left - rowsRect.left) + progress * wrapRect.width) / scaleX;
   playhead.style.left = x + 'px';
 }
 
@@ -3085,9 +3092,11 @@ function renderStemMarkers(stem) {
   const canvasRect = canvas.getBoundingClientRect();
   const rowRect = row.getBoundingClientRect();
   const canvasLeftInRow = canvasRect.left - rowRect.left;
+  // Screen px -> layout px (the hero is scaled with CSS transform; see fitHero)
+  const layoutK = (canvas.offsetWidth > 0 && canvasRect.width > 0) ? (canvasRect.width / canvas.offsetWidth) : 1;
   (stemMarkers[stem] || []).forEach(marker => {
     const stemDur = (stemBuffers[stem] && stemBuffers[stem].duration) || LOOP_DUR;
-    const x = canvasLeftInRow + (marker.time / stemDur) * canvasRect.width;
+    const x = (canvasLeftInRow + (marker.time / stemDur) * canvasRect.width) / layoutK;
     const el = document.createElement('div');
     el.className = 'wave-marker' + (marker.active ? ' active' : '');
     el.style.left = x + 'px';
@@ -3110,7 +3119,7 @@ function renderStemMarkers(stem) {
       if (Math.abs(dx) > 2) moved = true;
       const secPerPx = stemDur / canvasRect.width;
       marker.time = Math.max(0, Math.min(stemDur, startTime + dx * secPerPx));
-      el.style.left = (canvasLeftInRow + (marker.time / stemDur) * canvasRect.width) + 'px';
+      el.style.left = ((canvasLeftInRow + (marker.time / stemDur) * canvasRect.width) / layoutK) + 'px';
       el.title = marker.label + ' — ' + formatMarkerTime(marker.time);
     });
     const endDrag = (e) => {
@@ -3209,6 +3218,7 @@ function renderStemSampleRegions(stem) {
   if (!row || !wrap || !canvas) return;
   wrap.querySelectorAll('.wave-sample-region').forEach(el => el.remove());
   const canvasRect = canvas.getBoundingClientRect();
+  const regionK = (canvas.offsetWidth > 0 && canvasRect.width > 0) ? (canvasRect.width / canvas.offsetWidth) : 1;
   const stemDur = (stemBuffers[stem] && stemBuffers[stem].duration) || LOOP_DUR;
   const color = '#FFD23C'; // fixed bright selection color so it never blends into the stem's own waveform color
 
@@ -3220,8 +3230,8 @@ function renderStemSampleRegions(stem) {
     el.style.background = hexToRgba(color, 0.32);
 
     const place = () => {
-      const x1 = (region.start / stemDur) * canvasRect.width;
-      const x2 = (region.end / stemDur) * canvasRect.width;
+      const x1 = ((region.start / stemDur) * canvasRect.width) / regionK;
+      const x2 = ((region.end / stemDur) * canvasRect.width) / regionK;
       el.style.left = x1 + 'px';
       el.style.width = Math.max(2, x2 - x1) + 'px';
     };
@@ -5650,6 +5660,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
       hero.style.transform = 'scale(' + scale + ')';
       hero.style.marginBottom = (contentHeight * (scale - 1)) + 'px';
+      // Scale changed, so re-place the playhead / markers against it.
+      try {
+        if (typeof updatePlayheadPosition === 'function') updatePlayheadPosition();
+        if (typeof renderAllStemMarkers === 'function') renderAllStemMarkers();
+        if (typeof renderAllStemSampleRegions === 'function') renderAllStemSampleRegions();
+      } catch (e) {}
     }
 
     window.addEventListener('load', fitHero);
