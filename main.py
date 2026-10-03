@@ -1675,7 +1675,7 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
 
 
 @app.post("/api/v1/split")
-def split_stem(file: UploadFile = File(...), token: str = None, stems: str = Form("6"), db: Session = Depends(get_db)):
+def split_stem(file: UploadFile = File(...), token: str = None, stems: str = Form("6"), client_size: int = Form(None), db: Session = Depends(get_db)):
     logger.info(f"Split request received: {file.filename} (stems={stems})")
     user_id = get_current_user(token)
 
@@ -1711,6 +1711,22 @@ def split_stem(file: UploadFile = File(...), token: str = None, stems: str = For
     logger.info(f"Saving uploaded file to: {file_path}")
     with open(file_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
+
+    # Songs have been coming out as exactly 60s of stems. Compare what the
+    # browser says it sent with what actually landed on disk, so a cut-short
+    # upload is caught here (and refunded) instead of silently split.
+    saved_size = os.path.getsize(file_path)
+    logger.info(f"Upload saved: {saved_size} bytes (browser reported {client_size}, UploadFile.size={getattr(file, 'size', None)})")
+    if client_size and saved_size != client_size:
+        logger.error(f"Upload truncated: saved {saved_size} of {client_size} bytes for {file.filename}")
+        shutil.rmtree(upload_dir, ignore_errors=True)
+        try:
+            if requesting_user and not effective_is_premium(db, requesting_user) and requesting_user.splits_this_period:
+                requesting_user.splits_this_period -= 1
+                db.commit()
+        except Exception:
+            pass
+        raise HTTPException(status_code=400, detail="Your upload was cut short before it finished. Please try again.")
 
     # Create the DB row up front in "processing" state, then hand the actual
     # Demucs run off to a background thread and return right away. Demucs
