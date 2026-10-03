@@ -3256,9 +3256,12 @@ function renderAllStemSampleRegions() {
   };
 
   rowsEl.addEventListener('pointerdown', (e) => {
-    const rowsRect = rowsEl.getBoundingClientRect();
-    const xInRows = e.clientX - rowsRect.left;
-    if (Math.abs(xInRows - playheadX()) > GRAB_PX) return;
+    // Measure against the yellow line's real on-screen position so the
+    // grab zone sits exactly on it.
+    const ph = document.getElementById('wavePlayhead');
+    if (!ph) return;
+    const phRect = ph.getBoundingClientRect();
+    if (Math.abs(e.clientX - (phRect.left + phRect.width / 2)) > GRAB_PX) return;
     scrubbing = true;
     beginScrub();
     rowsEl.classList.add('scrubbing');
@@ -3272,15 +3275,17 @@ function renderAllStemSampleRegions() {
     scrubTo(e.clientX);
   });
 
-  const endScrub = (e) => {
+  // Was named endScrub, which shadowed the global endScrub() and called
+  // itself, so the release step (restart audio, clear the hold) never ran.
+  const endPlayheadScrub = (e) => {
     if (!scrubbing) return;
     scrubbing = false;
     endScrub();
     rowsEl.classList.remove('scrubbing');
     try { rowsEl.releasePointerCapture(e.pointerId); } catch (err) {}
   };
-  rowsEl.addEventListener('pointerup', endScrub);
-  rowsEl.addEventListener('pointercancel', endScrub);
+  rowsEl.addEventListener('pointerup', endPlayheadScrub);
+  rowsEl.addEventListener('pointercancel', endPlayheadScrub);
 })();
 
 document.addEventListener('DOMContentLoaded', () => {
