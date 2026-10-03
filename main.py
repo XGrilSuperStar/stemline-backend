@@ -624,7 +624,6 @@ def create_checkout(body: CheckoutRequest, token: str = None, db: Session = Depe
         raise HTTPException(status_code=400, detail="Invalid plan.")
 
     session = stripe.checkout.Session.create(
-        payment_method_types=["card"],
         line_items=[{"price": price_id, "quantity": 1}],
         mode="subscription",
         customer_email=user.email,
