@@ -787,6 +787,9 @@
   .pad-hp.flash { background: rgba(231,163,62,0.5); border-color: #E7A33E; }
   #sampleLibList { display: none; flex-direction: column; gap: 8px; padding: 6px; overflow-y: auto; max-height: 100%; }
   .lib-empty { color: rgba(216,220,226,0.55); font-size: 0.7rem; padding: 14px; }
+  .mix-bar { display: flex; }
+  .mix-save { flex: 1; font-size: 0.65rem; font-weight: 700; color: #06201C; background: #3CFDE0; border: 0; border-radius: 4px; padding: 7px 10px; cursor: pointer; letter-spacing: 0.04em; }
+  .mix-save:disabled { opacity: 0.6; cursor: wait; }
   .lib-item { --pc: #888; border: 1px solid color-mix(in srgb, var(--pc) 45%, transparent); border-radius: 6px; padding: 6px; background: rgba(0,0,0,0.25); }
   .lib-top { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
   .lib-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--pc); box-shadow: 0 0 6px var(--pc); flex-shrink: 0; }
@@ -5085,6 +5088,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const PAD_KEY = 'stemline_pad_assign';
   const PAD_PAD = 2; // seconds of extra audio kept each side for retrimming
   let lib = [];
+  let mixes = [];
+  let mixBusy = false;
+  let mixAudio = null, mixAudioId = null;
   const playing = {}; // padStem -> {src}
   let libPlaying = null;
 
@@ -5094,8 +5100,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (dbp) return dbp;
     dbp = new Promise((res, rej) => {
       try {
-        const rq = indexedDB.open('stemline_samples', 1);
-        rq.onupgradeneeded = () => rq.result.createObjectStore('samples', { keyPath: 'id' });
+        const rq = indexedDB.open('stemline_samples', 2);
+        rq.onupgradeneeded = () => {
+          const d = rq.result;
+          if (!d.objectStoreNames.contains('samples')) d.createObjectStore('samples', { keyPath: 'id' });
+          if (!d.objectStoreNames.contains('mixes')) d.createObjectStore('mixes', { keyPath: 'id' });
+        };
         rq.onsuccess = () => res(rq.result);
         rq.onerror = () => rej(rq.error);
       } catch (e) { rej(e); }
@@ -5106,6 +5116,12 @@ document.addEventListener('DOMContentLoaded', () => {
   async function idbDel(id) { try { const d = await db(); d.transaction('samples','readwrite').objectStore('samples').delete(id); } catch (e) {} }
   async function idbAll() {
     try { const d = await db(); return await new Promise((res, rej) => { const r = d.transaction('samples').objectStore('samples').getAll(); r.onsuccess = () => res(r.result || []); r.onerror = () => rej(r.error); }); }
+    catch (e) { return []; }
+  }
+  async function mixPut(item) { try { const d = await db(); d.transaction('mixes','readwrite').objectStore('mixes').put(item); } catch (e) { console.warn('mix save failed', e); } }
+  async function mixDel(id) { try { const d = await db(); d.transaction('mixes','readwrite').objectStore('mixes').delete(id); } catch (e) {} }
+  async function mixAll() {
+    try { const d = await db(); return await new Promise((res, rej) => { const r = d.transaction('mixes').objectStore('mixes').getAll(); r.onsuccess = () => res(r.result || []); r.onerror = () => rej(r.error); }); }
     catch (e) { return []; }
   }
   function getAssign() { try { return JSON.parse(localStorage.getItem(PAD_KEY)) || {}; } catch (e) { return {}; } }
@@ -5263,6 +5279,125 @@ document.addEventListener('DOMContentLoaded', () => {
     toast('Saved to ' + stem + ' pad');
   }
 
+  /* ---------- save mix (render current mix -> MP3, kept in library) ---------- */
+  async function renderMixBuffer() {
+    const real = hasRealSong();
+    const anySolo = Object.values(stemNodes).some(n => n.solo);
+    const plans = [];
+    let outDur = 0;
+    Object.keys(stemBuffers).forEach(name => {
+      const n = stemNodes[name], buffer = stemBuffers[name];
+      if (!n || !buffer || (real && !currentStemMeta[name])) return;
+      if (n.muted || (anySolo && !n.solo)) return;
+      const marker = (stemMarkers[name] || []).find(m => m.active);
+      const eff = Math.max(0, (marker ? marker.time : 0) + (stemNudge[name] || 0));
+      if (eff >= buffer.duration) return;
+      const rate = tempoRatio * (stemAutoStretch[name] || 1);
+      const shift = keySemitones + (keyLockOn ? -tempoInducedSemitonesFor(name) : 0);
+      plans.push({ n, buffer, eff, rate, shift });
+      outDur = Math.max(outDur, (buffer.duration - eff) / rate);
+    });
+    if (!plans.length) return null;
+
+    const sr = audioCtx.sampleRate;
+    const build = (ctx, pitch) => {
+      const master = ctx.createGain(); master.gain.value = masterVolPct / 100; master.connect(ctx.destination);
+      plans.forEach(p => {
+        const n = p.n;
+        const src = ctx.createBufferSource(); src.buffer = p.buffer; src.playbackRate.value = p.rate;
+        const trim = ctx.createGain(); trim.gain.value = dbToGain(n.trimDb);
+        const eqL = ctx.createBiquadFilter(); eqL.type = 'lowshelf'; eqL.frequency.value = 320; eqL.gain.value = n.eqLowDb;
+        const eqM = ctx.createBiquadFilter(); eqM.type = 'peaking'; eqM.frequency.value = 1000; eqM.Q.value = 1; eqM.gain.value = n.eqMidDb;
+        const eqH = ctx.createBiquadFilter(); eqH.type = 'highshelf'; eqH.frequency.value = 3200; eqH.gain.value = n.eqHighDb;
+        const comp = ctx.createDynamicsCompressor();
+        comp.threshold.value = -24; comp.knee.value = 6; comp.ratio.value = 3; comp.attack.value = 0.01; comp.release.value = 0.2;
+        const g = ctx.createGain(); g.gain.value = n.volPct / 100;
+        src.connect(trim); trim.connect(eqL); eqL.connect(eqM); eqM.connect(eqH);
+        if (pitch && Math.abs(p.shift) > 0.25) {
+          const ps = new Tone.PitchShift({ pitch: p.shift, windowSize: 0.18 });
+          Tone.connect(eqH, ps); Tone.connect(ps, comp);
+        } else {
+          eqH.connect(comp);
+        }
+        comp.connect(g); g.connect(master);
+        src.start(0, p.eff);
+      });
+    };
+
+    const needsPitch = plans.some(p => Math.abs(p.shift) > 0.25);
+    const seconds = outDur + 0.5;
+    if (needsPitch && window.Tone && Tone.Offline) {
+      try {
+        const tb = await Tone.Offline(() => { build(Tone.getContext().rawContext, true); }, seconds, 2, sr);
+        return { buffer: tb.get ? tb.get() : tb, pitchSkipped: false };
+      } catch (e) { console.warn('Key-shifted render failed, rendering without key shift', e); }
+    }
+    const oc = new OfflineAudioContext(2, Math.ceil(seconds * sr), sr);
+    build(oc, false);
+    return { buffer: await oc.startRendering(), pitchSkipped: needsPitch };
+  }
+
+  async function loadLame() {
+    if (window.lamejs) return;
+    await new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js';
+      s.onload = res; s.onerror = () => rej(new Error('MP3 encoder failed to load'));
+      document.head.appendChild(s);
+    });
+  }
+
+  async function encodeMp3(buf) {
+    await loadLame();
+    const L = buf.getChannelData(0), R = buf.numberOfChannels > 1 ? buf.getChannelData(1) : L;
+    const enc = new lamejs.Mp3Encoder(2, buf.sampleRate, 192);
+    const toI16 = (f) => { const o = new Int16Array(f.length); for (let i = 0; i < f.length; i++) { const s = Math.max(-1, Math.min(1, f[i])); o[i] = s < 0 ? s * 32768 : s * 32767; } return o; };
+    const parts = [], block = 1152;
+    for (let i = 0, k = 0; i < L.length; i += block, k++) {
+      const out = enc.encodeBuffer(toI16(L.subarray(i, i + block)), toI16(R.subarray(i, i + block)));
+      if (out.length) parts.push(new Uint8Array(out));
+      if (k % 200 === 0) await new Promise(r => setTimeout(r, 0));
+    }
+    const end = enc.flush(); if (end.length) parts.push(new Uint8Array(end));
+    return new Blob(parts, { type: 'audio/mpeg' });
+  }
+
+  async function saveMix() {
+    if (mixBusy) return;
+    if (!audioCtx || !hasRealSong()) { toast('Load a song first'); return; }
+    const name = (window.prompt('Name your mix:', 'My Mix') || '').trim();
+    if (!name) return;
+    mixBusy = true; renderLibrary(); toast('Rendering your mix...');
+    try {
+      const r = await renderMixBuffer();
+      if (!r) { toast('Nothing audible to save (all channels muted?)'); return; }
+      const blob = await encodeMp3(r.buffer);
+      const item = { id: 'm' + Date.now() + Math.floor(Math.random() * 1000), name, blob, dur: r.buffer.duration, created: Date.now() };
+      mixes.push(item); await mixPut(item);
+      toast(r.pitchSkipped ? 'Mix saved (key shift not applied)' : 'Mix saved - hit download in the library');
+    } catch (e) {
+      console.warn('save mix failed', e); toast('Could not save mix');
+    } finally { mixBusy = false; renderLibrary(); }
+  }
+
+  function downloadMix(item) {
+    const url = URL.createObjectURL(item.blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = (item.name.replace(/[\\/:*?"<>|]+/g, '').trim() || 'mix') + '.mp3';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+
+  function toggleMixPlay(item) {
+    if (mixAudio) { mixAudio.pause(); URL.revokeObjectURL(mixAudio.src); mixAudio = null; }
+    if (mixAudioId === item.id) { mixAudioId = null; renderLibrary(); return; }
+    if (songPlaying()) { toast('Stop the song first'); return; }
+    mixAudio = new Audio(URL.createObjectURL(item.blob)); mixAudioId = item.id;
+    mixAudio.onended = () => { mixAudioId = null; mixAudio = null; renderLibrary(); };
+    mixAudio.play().catch(() => {});
+    renderLibrary();
+  }
+
   /* ---------- library ---------- */
   function drawWave(canvas, item) {
     const w = canvas.clientWidth || 300, h = canvas.clientHeight || 54;
@@ -5285,6 +5420,35 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderLibrary() {
     const root = document.getElementById('sampleLibList'); if (!root) return;
     root.innerHTML = '';
+    const bar = document.createElement('div'); bar.className = 'mix-bar';
+    const sb = document.createElement('button'); sb.type = 'button'; sb.className = 'mix-save mono';
+    sb.textContent = mixBusy ? 'RENDERING...' : 'SAVE MIX (MP3)'; sb.disabled = mixBusy;
+    sb.title = 'Render your current mix, name it, and keep it in your library';
+    sb.onclick = saveMix;
+    bar.appendChild(sb); root.appendChild(bar);
+    mixes.slice().sort((x, y) => y.created - x.created).forEach(item => {
+      const row = document.createElement('div'); row.className = 'lib-item mix-item';
+      row.style.setProperty('--pc', '#3CFDE0');
+      const top = document.createElement('div'); top.className = 'lib-top'; top.style.marginBottom = '0';
+      const dot = document.createElement('span'); dot.className = 'lib-dot';
+      const nm = document.createElement('span'); nm.className = 'lib-name mono'; nm.textContent = item.name; nm.title = 'Click to rename';
+      nm.onclick = async () => { const v = (prompt('Rename mix:', item.name) || '').trim(); if (v) { item.name = v; await mixPut(item); renderLibrary(); } };
+      const tag = document.createElement('span'); tag.className = 'lib-stem mono';
+      const m = Math.floor(item.dur / 60), s = Math.floor(item.dur % 60);
+      tag.textContent = 'mix ' + m + ':' + String(s).padStart(2, '0');
+      const play = document.createElement('button'); play.type = 'button'; play.textContent = mixAudioId === item.id ? '■' : '▶'; play.title = 'Listen';
+      play.onclick = () => toggleMixPlay(item);
+      const dl = document.createElement('button'); dl.type = 'button'; dl.textContent = 'DOWNLOAD'; dl.className = 'on'; dl.title = 'Save this mix to your device as an MP3';
+      dl.onclick = () => downloadMix(item);
+      const del = document.createElement('button'); del.type = 'button'; del.textContent = '✕'; del.title = 'Delete';
+      del.onclick = async () => {
+        if (!confirm('Delete "' + item.name + '"?')) return;
+        if (mixAudioId === item.id && mixAudio) { mixAudio.pause(); mixAudio = null; mixAudioId = null; }
+        mixes = mixes.filter(x => x !== item); await mixDel(item.id); renderLibrary();
+      };
+      top.append(dot, nm, tag, play, dl, del);
+      row.appendChild(top); root.appendChild(row);
+    });
     if (!lib.length) {
       const e = document.createElement('div'); e.className = 'lib-empty mono';
       e.textContent = 'No samples yet. Cut a region on a waveform, right-click it, Save sample.';
@@ -5347,6 +5511,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (inited) return; inited = true;
     wirePads();
     lib = await idbAll();
+    mixes = await mixAll();
     refreshPads(); renderLibrary();
   }
 })();
