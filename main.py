@@ -1354,6 +1354,19 @@ def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_db)):
 SEPARATION_ENGINE = os.getenv("SEPARATION_ENGINE", "demucs")
 
 
+def _probe_duration(path: str):
+    """Length of an audio file in seconds via ffprobe, or None if unknown."""
+    try:
+        r = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=nw=1:nk=1", path],
+            capture_output=True, text=True, timeout=30,
+        )
+        return float(r.stdout.strip())
+    except Exception:
+        return None
+
+
 def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str, filename: str, stem_count: str = "6"):
     """
     Runs the separation engine (Demucs or BS-RoFormer, see SEPARATION_ENGINE)
@@ -1465,20 +1478,48 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
             # to 6-stem.
             model_name = "htdemucs_ft" if stem_count == "4" else "htdemucs_6s"
 
+            # Every split so far has come out as exactly 60 seconds of stems
+            # (identical 5,767,428-byte zips for different songs), so the song
+            # was being cut short before/inside Demucs. Decode the upload to a
+            # full-length WAV ourselves first, and log the lengths at each
+            # step so any remaining cut shows up in the logs.
+            demucs_input = file_path
+            in_dur = _probe_duration(file_path)
+            logger.info(f"[job {request_id}] Uploaded file duration: {in_dur}s")
+            try:
+                wav_dir = os.path.join(upload_dir, "decoded_input")
+                os.makedirs(wav_dir, exist_ok=True)
+                wav_path = os.path.join(
+                    wav_dir, os.path.splitext(os.path.basename(file_path))[0] + ".wav"
+                )
+                dec = subprocess.run(
+                    ["ffmpeg", "-y", "-i", file_path, "-vn", "-ar", "44100",
+                     "-ac", "2", "-c:a", "pcm_s16le", wav_path],
+                    capture_output=True, text=True, timeout=300,
+                )
+                wav_dur = _probe_duration(wav_path) if dec.returncode == 0 else None
+                logger.info(f"[job {request_id}] Decoded WAV duration: {wav_dur}s (ffmpeg rc={dec.returncode})")
+                if dec.returncode == 0 and wav_dur and (in_dur is None or wav_dur >= in_dur - 2):
+                    demucs_input = wav_path
+                else:
+                    logger.warning(f"[job {request_id}] WAV decode short/failed, using original upload. stderr: {dec.stderr[-500:]}")
+            except Exception as dec_err:
+                logger.warning(f"[job {request_id}] WAV pre-decode failed, using original upload: {dec_err}")
+
             cmd = [
                 "demucs", "-n", model_name,
                 "-j", str(jobs),
                 "--shifts", str(shifts),
                 "--overlap", overlap,
                 "--mp3", "--mp3-bitrate", "192",
-                "-o", output_dir, file_path,
+                "-o", output_dir, demucs_input,
             ]
             logger.info(f"[job {request_id}] Running: {' '.join(cmd)}")
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=600
+                timeout=1800
             )
 
             logger.info(f"[job {request_id}] Demucs stdout: {result.stdout}")
@@ -1499,6 +1540,9 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
 
         if not stem_dir:
             raise Exception("No stem files generated")
+
+        for _f in sorted(os.listdir(stem_dir)):
+            logger.info(f"[job {request_id}] Stem {_f} duration: {_probe_duration(os.path.join(stem_dir, _f))}s")
 
         # Post-separation EQ + compression pass. Separation models leave
         # bleed and imbalance on certain stems — this nudges each stem
