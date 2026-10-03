@@ -1900,13 +1900,13 @@
       <div style="text-transform:uppercase;letter-spacing:0.02em;font-size:0.8rem;">Premium Monthly</div>
       <div style="font-size:1.4rem;font-weight:700;margin:0.4rem 0;">$5.99<span style="font-size:0.8rem;font-weight:400;">/mo</span></div>
       <div style="color:var(--chrome-dim);font-size:0.78rem;line-height:1.5;">Unlimited splits<br>All 6 stems every split<br>No ads</div>
-      <button type="button" style="margin-top:0.9rem;width:100%;padding:0.6rem;border:1px solid var(--chrome-dim);background:none;color:inherit;cursor:pointer;font-family:inherit;text-transform:uppercase;letter-spacing:0.04em;font-size:0.75rem;" onclick="document.getElementById('navUpgradeBtn').click()">Go Premium</button>
+      <button type="button" id="sectionMonthlyBtn" style="margin-top:0.9rem;width:100%;padding:0.6rem;border:1px solid var(--chrome-dim);background:none;color:inherit;cursor:pointer;font-family:inherit;text-transform:uppercase;letter-spacing:0.04em;font-size:0.75rem;">Go Premium</button>
     </div>
     <div style="border:1px solid var(--concrete-line);background:var(--concrete);padding:1.1rem;text-align:left;border-color:var(--chrome-dim);">
       <div style="text-transform:uppercase;letter-spacing:0.02em;font-size:0.8rem;">Premium Annual <span style="font-size:0.7rem;color:#3CFDE0;">save 44%</span></div>
       <div style="font-size:1.4rem;font-weight:700;margin:0.4rem 0;">$39.99<span style="font-size:0.8rem;font-weight:400;">/yr</span></div>
       <div style="color:var(--chrome-dim);font-size:0.78rem;line-height:1.5;">Unlimited splits<br>All 6 stems every split<br>No ads</div>
-      <button type="button" style="margin-top:0.9rem;width:100%;padding:0.6rem;border:1px solid var(--chrome-dim);background:none;color:inherit;cursor:pointer;font-family:inherit;text-transform:uppercase;letter-spacing:0.04em;font-size:0.75rem;" onclick="document.getElementById('navUpgradeBtn').click()">Go Premium</button>
+      <button type="button" id="sectionAnnualBtn" style="margin-top:0.9rem;width:100%;padding:0.6rem;border:1px solid var(--chrome-dim);background:none;color:inherit;cursor:pointer;font-family:inherit;text-transform:uppercase;letter-spacing:0.04em;font-size:0.75rem;">Go Premium</button>
     </div>
   </div>
 </section>
@@ -3893,6 +3893,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   pricingMonthlyBtn.addEventListener('click', () => startCheckout('monthly'));
   pricingAnnualBtn.addEventListener('click', () => startCheckout('annual'));
+
+  // Pricing section buttons: logged in -> straight to card payment; logged out -> signup
+  function sectionCheckout(plan) {
+    if (!getToken()) { openAuthModal('signup'); return; }
+    startCheckout(plan);
+  }
+  document.getElementById('sectionMonthlyBtn').addEventListener('click', () => sectionCheckout('monthly'));
+  document.getElementById('sectionAnnualBtn').addEventListener('click', () => sectionCheckout('annual'));
 
   (function handleSubscribedRedirect() {
     const params = new URLSearchParams(window.location.search);
