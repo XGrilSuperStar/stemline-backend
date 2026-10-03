@@ -1335,6 +1335,29 @@
     #pricingModal { max-height: 90vh; overflow-y: auto; padding: 1.4rem; }
     #pricing { padding-left: 1rem !important; padding-right: 1rem !important; }
     footer { padding: 2rem 1rem; }
+
+    /* headline: solid, high-contrast text instead of the dark-banded chrome gradient */
+    h1.stencil { background: none; -webkit-text-fill-color: #F4F6F8; color: #F4F6F8; filter: none; text-shadow: 0 1px 0 rgba(0,0,0,0.5); }
+    h1.stencil .accent { background: none; -webkit-text-fill-color: #F08A55; color: #F08A55; }
+    .eyebrow { color: rgba(216,220,226,0.9); }
+    .hero p.sub { color: rgba(216,220,226,0.85); }
+
+    /* compact drop zone */
+    .drop-zone { margin-top: 0.6rem; padding: 0.55rem 0.8rem !important; font-size: 0.72rem !important; }
+
+    /* compact channel strips */
+    .channels { gap: 6px; }
+    .channel { padding: 0.45rem 0.3rem 0.5rem; gap: 0.3rem; }
+    .channel .name { font-size: 0.62rem; }
+    .knob { width: 30px; height: 30px; }
+    .ch-pitch-btn, .mute-btn, .cue-btn { width: 38px; height: 30px; }
+    .ch-browse, .ch-save, .ch-clear { min-height: 30px; }
+    .fader-slot { height: 72px; }
+    .fader-cap { width: 26px; height: 13px; }
+    .meter { height: 40px; }
+    .sampler-pad { height: 36px; }
+    .sampler-pad .pad-label { font-size: 0.6rem; }
+    .pad-hp { width: 24px; }
   }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
