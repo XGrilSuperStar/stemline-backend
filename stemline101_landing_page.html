@@ -1352,10 +1352,13 @@
     .knob { width: 30px; height: 30px; }
     .ch-pitch-btn, .mute-btn, .cue-btn { width: 38px; height: 30px; }
     .ch-browse, .ch-save, .ch-clear { min-height: 30px; }
-    .fader-slot { height: 72px; }
-    .fader-cap { width: 26px; height: 13px; }
-    .meter { height: 40px; }
-    .sampler-pad { height: 36px; }
+    /* meter + fader share one row, same height, centered (was stacked, leaving a big empty box) */
+    .channel { display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem 0; }
+    .channel > * { grid-column: 1 / -1; }
+    .channel > .meter { grid-column: 1; justify-self: end; margin-right: 8px; height: 88px; width: 12px; }
+    .channel > .fader-slot { grid-column: 2; justify-self: start; margin-left: 8px; height: 88px; width: 26px; }
+    .fader-cap { width: 34px; height: 16px; }
+    .sampler-pad { height: 30px; }
     .sampler-pad .pad-label { font-size: 0.6rem; }
     .pad-hp { width: 24px; }
   }
@@ -1975,16 +1978,14 @@
 </section>
 
 <footer>
-  STEMLINE 101 — SPLIT THE MIX
-  <div style="margin-top: 0.8rem; display: flex; gap: 1.2rem; justify-content: center; flex-wrap: wrap;">
+  <div style="display: flex; gap: 1.2rem; justify-content: center; flex-wrap: wrap;">
     <a href="/privacy" style="color: inherit; text-decoration: underline;">Privacy Policy</a>
     <a href="/terms" style="color: inherit; text-decoration: underline;">Terms of Service</a>
     <a href="/about" style="color: inherit; text-decoration: underline;">About</a>
     <a href="/faq" style="color: inherit; text-decoration: underline;">FAQ</a>
     <a href="/reviews" style="color: inherit; text-decoration: underline;">Reviews</a>
   </div>
-  <div style="margin-top: 0.8rem;">&copy; 2026 Stemline101. All rights reserved.</div>
-  <div style="margin-top: 0.3rem;">stemline.com</div>
+  <div style="margin-top: 0.8rem;">&copy; 2026 stemline101.com. All rights reserved.</div>
 </footer>
 
 
