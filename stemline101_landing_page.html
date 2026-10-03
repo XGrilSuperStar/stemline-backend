@@ -3301,7 +3301,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.wave-canvas').forEach(canvas => {
     canvas.addEventListener('click', (e) => {
       if (canvas._suppressClick) { canvas._suppressClick = false; return; }
-      const rect = canvas.getBoundingClientRect();
+      // Use the same reference box as the playhead (wave-canvas-wrap) so a
+      // click lands exactly on the yellow line instead of an inch off.
+      const rect = (document.querySelector('.wave-row .wave-canvas-wrap') || canvas).getBoundingClientRect();
       const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
       seekTo(fraction * getMasterDuration());
     });
@@ -3354,7 +3356,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let moved = false;
 
     const scrubFromEvent = (e) => {
-      const rect = canvas.getBoundingClientRect();
+      const rect = (document.querySelector('.wave-row .wave-canvas-wrap') || canvas).getBoundingClientRect();
       const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
       scrubMove(fraction * getMasterDuration());
     };
