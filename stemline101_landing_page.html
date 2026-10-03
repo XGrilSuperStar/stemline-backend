@@ -1301,6 +1301,41 @@
     border-top: 1px solid rgba(237,227,206,0.08);
     font-family: 'JetBrains Mono', monospace;
   }
+
+  /* ===== PHONE LAYOUT (<=700px only — desktop untouched) ===== */
+  @media (max-width: 700px) {
+    html { -webkit-text-size-adjust: 100%; }
+    nav { padding: 0.8rem 1rem; row-gap: 0.6rem; }
+    .logo-text { font-size: 1.05rem; }
+    .nav-cta { padding: 0.55rem 0.9rem; }
+
+    .hero { padding: 0.8rem 0.5rem 1rem; gap: 0.8rem; }
+    .hero > div:first-child { padding: 0 0.4rem; }
+    .hero p.sub { font-size: 0.85rem; max-width: 100%; }
+    .steps-six { gap: 0.4rem; }
+    .steps-six .step { padding: 0.5rem 0.65rem; }
+    .steps-six .step .num { display: none; }
+    .steps-six .step h3 { font-size: 0.8rem; }
+    .steps-six .step p { font-size: 0.7rem; line-height: 1.3; }
+
+    /* wider usable mixer: slim the chrome rails and drop the 3D tilt */
+    .studio-room { padding: 1.9rem 0.35rem 0.8rem; border-radius: 8px; }
+    .deck { margin: 0; padding: 0.7rem 0.35rem 0.6rem; transform: none; }
+    .screen-panel { margin: 0.2rem 0 0.9rem; padding: 0.5rem; }
+    .screen-topline { flex-wrap: wrap; row-gap: 0.4rem; }
+    .screen-tab { padding: 0.4rem 0.5rem; font-size: 0.55rem; }
+    .wave-hint { font-size: 0.5rem; line-height: 1.35; }
+    .add-marker-btn { min-height: 26px; }
+
+    /* bigger touch targets on the channel strips */
+    .ch-pitch-btn, .mute-btn, .cue-btn { width: 40px; height: 34px; }
+    .ch-browse, .ch-save, .ch-clear { min-height: 34px; }
+    .knob { width: 36px; height: 36px; }
+
+    #pricingModal { max-height: 90vh; overflow-y: auto; padding: 1.4rem; }
+    #pricing { padding-left: 1rem !important; padding-right: 1rem !important; }
+    footer { padding: 2rem 1rem; }
+  }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1970454477202193"
@@ -5552,6 +5587,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function fitHero() {
       hero.style.transform = 'none';
       hero.style.transformOrigin = 'top center';
+
+      // Phones: page scrolls normally, so don't shrink the hero to fit one screen
+      if (window.innerWidth <= 700) { hero.style.marginBottom = '0px'; return; }
 
       var navHeight = nav ? nav.getBoundingClientRect().height : 0;
       var available = window.innerHeight - navHeight;
