@@ -1675,7 +1675,7 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
 
 
 @app.post("/api/v1/split")
-def split_stem(file: UploadFile = File(...), token: str = None, stems: str = Form("6"), client_size: int = Form(None), db: Session = Depends(get_db)):
+def split_stem(file: UploadFile = File(...), token: str = None, stems: str = Form("6"), client_size: int = Form(None), client_duration: float = Form(None), db: Session = Depends(get_db)):
     logger.info(f"Split request received: {file.filename} (stems={stems})")
     user_id = get_current_user(token)
 
@@ -1716,7 +1716,7 @@ def split_stem(file: UploadFile = File(...), token: str = None, stems: str = For
     # browser says it sent with what actually landed on disk, so a cut-short
     # upload is caught here (and refunded) instead of silently split.
     saved_size = os.path.getsize(file_path)
-    logger.info(f"Upload saved: {saved_size} bytes (browser reported {client_size}, UploadFile.size={getattr(file, 'size', None)})")
+    logger.info(f"Upload saved: {saved_size} bytes (browser reported {client_size}, UploadFile.size={getattr(file, 'size', None)}, browser-measured duration={client_duration}s)")
     if client_size and saved_size != client_size:
         logger.error(f"Upload truncated: saved {saved_size} of {client_size} bytes for {file.filename}")
         shutil.rmtree(upload_dir, ignore_errors=True)

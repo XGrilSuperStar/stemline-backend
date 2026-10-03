@@ -4270,13 +4270,37 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function probeDuration(file) {
+    return new Promise(resolve => {
+      let done = false;
+      const finish = (v) => { if (!done) { done = true; resolve(v); } };
+      try {
+        const a = new Audio();
+        const url = URL.createObjectURL(file);
+        a.preload = 'metadata';
+        a.onloadedmetadata = () => { URL.revokeObjectURL(url); finish(isFinite(a.duration) ? a.duration : null); };
+        a.onerror = () => { URL.revokeObjectURL(url); finish(null); };
+        a.src = url;
+        setTimeout(() => finish(null), 4000);
+      } catch (e) { finish(null); }
+    });
+  }
+
+  function fmtDuration(sec) {
+    const s = Math.round(sec);
+    return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  }
+
   async function startUpload(file) {
+    const clientDur = await probeDuration(file);
+    const fileInfo = file.name + ' — ' + (file.size / 1048576).toFixed(1) + ' MB' + (clientDur ? ' — ' + fmtDuration(clientDur) : '');
     dropZoneLabel.textContent = 'Uploading ' + file.name + '…';
-    showStatus('Uploading…', false);
+    showStatus('Uploading ' + fileInfo + '…', false);
     try {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('client_size', String(file.size));
+      if (clientDur) formData.append('client_duration', String(clientDur));
       formData.append('stems', window.innerWidth <= 700 ? '4' : '6');
       setTimeout(() => {
         dropZoneLabel.textContent = 'Splitting ' + file.name + '…';
@@ -4316,7 +4340,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const previewLabelEl = document.getElementById('previewLabel');
         if (previewLabelEl && loadedCount > 0) previewLabelEl.textContent = trackLabel;
         uploadStatus.innerHTML = loadedCount === channelsToLoad.length
-          ? 'Done! Stems loaded into the mixer. <a href="' + dlUrl + '" style="color:var(--vu-amber);">Download</a>'
+          ? 'Done! ' + fileInfo + ' — stems loaded into the mixer. <a href="' + dlUrl + '" style="color:var(--vu-amber);">Download</a>'
           : 'Done, but only ' + loadedCount + '/' + channelsToLoad.length + ' stems loaded. <a href="' + dlUrl + '" style="color:var(--vu-amber);">Download</a>';
       } else {
         uploadStatus.innerHTML = 'Done! <a href="' + dlUrl + '" style="color:var(--vu-amber);">Download your stems</a>';
