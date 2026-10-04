@@ -1178,6 +1178,8 @@
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 0 8px rgba(111,169,126,0.4), 0 0 16px rgba(111,169,126,0.18);
   }
   .tp-play:hover { color: var(--vu-green); box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 0 12px rgba(111,169,126,0.6), 0 0 24px rgba(111,169,126,0.3); }
+  .tp-dl:hover { color: var(--vu-teal, #3CFDE0); }
+  .tp-dl.active { color: var(--vu-teal, #3CFDE0); border-color: rgba(60,253,224,0.55); box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 0 10px rgba(60,253,224,0.45), 0 0 20px rgba(60,253,224,0.2); }
   .tp-source {
     font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase;
     color: rgba(216,220,226,0.5); margin-left: auto; padding-right: 0.4rem;
@@ -1533,6 +1535,9 @@
             </button>
             <button type="button" class="tp-btn tp-stop" id="stopBtn" title="Stop" aria-label="Stop">
               <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><rect x="5" y="5" width="14" height="14" fill="currentColor"/></svg>
+            </button>
+            <button type="button" class="tp-btn tp-dl" id="downloadMixBtn" title="Save all six stems to your computer as one MP3 (Premium)" aria-label="Save all six stems to your computer as one MP3 (Premium)">
+              <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M5 20h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
             <span class="tp-source mono" id="previewLabel">no track loaded</span>
           </div>
@@ -5495,6 +5500,43 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => URL.revokeObjectURL(url), 4000);
   }
 
+  /* ---------- transport download button: premium-only, mix -> MP3 -> your computer ---------- */
+  async function planStatus() {
+    const tok = window.getToken && window.getToken();
+    if (!tok) return { loggedIn: false, premium: false };
+    try {
+      const res = await fetch(window.API_BASE + '/api/v1/me?token=' + encodeURIComponent(tok));
+      if (!res.ok) return null;
+      const d = await res.json();
+      return { loggedIn: true, premium: !!d.is_premium };
+    } catch (e) { return null; }
+  }
+
+  async function downloadMixNow() {
+    if (mixBusy) return;
+    const btn = document.getElementById('downloadMixBtn');
+    if (!audioCtx || !hasRealSong()) { toast('Load a song first'); return; }
+    const plan = await planStatus();
+    if (!plan) { toast("Couldn't check your plan - try again"); return; }
+    if (!plan.premium) {
+      toast(plan.loggedIn ? 'Downloading to your computer is a Premium feature' : 'Sign up to unlock downloads');
+      const up = document.getElementById('navUpgradeBtn'); if (up) up.click();
+      return;
+    }
+    const name = (window.prompt('Name your download:', 'My Mix') || '').trim();
+    if (!name) return;
+    mixBusy = true; if (btn) btn.classList.add('active'); renderLibrary(); toast('Rendering your mix...');
+    try {
+      const r = await renderMixBuffer();
+      if (!r) { toast('Nothing audible to save (all channels muted?)'); return; }
+      const blob = await encodeMp3(r.buffer);
+      downloadMix({ name, blob });
+      toast(r.pitchSkipped ? 'Downloaded (key shift not applied)' : 'Downloaded to your computer');
+    } catch (e) {
+      console.warn('download mix failed', e); toast('Could not download mix');
+    } finally { mixBusy = false; if (btn) btn.classList.remove('active'); renderLibrary(); }
+  }
+
   function toggleMixPlay(item) {
     if (mixAudio) { mixAudio.pause(); URL.revokeObjectURL(mixAudio.src); mixAudio = null; }
     if (mixAudioId === item.id) { mixAudioId = null; renderLibrary(); return; }
@@ -5617,6 +5659,8 @@ document.addEventListener('DOMContentLoaded', () => {
   async function init() {
     if (inited) return; inited = true;
     wirePads();
+    const dlBtn = document.getElementById('downloadMixBtn');
+    if (dlBtn) dlBtn.addEventListener('click', downloadMixNow);
     lib = await idbAll();
     mixes = await mixAll();
     refreshPads(); renderLibrary();
