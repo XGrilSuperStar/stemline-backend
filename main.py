@@ -1353,6 +1353,24 @@ def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_db)):
 # these until their actual speed/quality here has been measured.
 SEPARATION_ENGINE = os.getenv("SEPARATION_ENGINE", "demucs")
 
+# Gentle noise gate run on selected stems right after separation, BEFORE the
+# EQ/compressor chain. The compressor below uses makeup gain, which lifts the
+# whole stem, quiet bleed included — gating first stops that bleed from being
+# boosted. The gate only turns quiet passages down by a few dB (it never
+# mutes), so real audio is left alone.
+#   STEM_GATE            "on" (default) / "off" — master switch
+#   STEM_GATE_STEMS      comma list of stem names to gate (default: drums).
+#                        Sustained stems (pads, vocals) can sound chopped,
+#                        so add others only after listening.
+#   STEM_GATE_OFFSET_DB  gate threshold sits this many dB below each stem's
+#                        own loudest peak (default 28)
+#   STEM_GATE_RANGE      gain left when the gate is closed, linear 0-1
+#                        (default 0.35 = about -9 dB)
+STEM_GATE = os.getenv("STEM_GATE", "on").strip().lower() not in ("0", "off", "false", "no")
+STEM_GATE_STEMS = {s.strip().lower() for s in os.getenv("STEM_GATE_STEMS", "drums").split(",") if s.strip()}
+STEM_GATE_OFFSET_DB = float(os.getenv("STEM_GATE_OFFSET_DB", "28"))
+STEM_GATE_RANGE = float(os.getenv("STEM_GATE_RANGE", "0.35"))
+
 
 def _probe_duration(path: str):
     """Length of an audio file in seconds via ffprobe, or None if unknown."""
@@ -1365,6 +1383,35 @@ def _probe_duration(path: str):
         return float(r.stdout.strip())
     except Exception:
         return None
+
+
+def _stem_peak_db(path: str):
+    """Loudest peak of an audio file in dB (ffmpeg volumedetect), or None."""
+    try:
+        r = subprocess.run(
+            ["ffmpeg", "-hide_banner", "-nostats", "-i", path,
+             "-af", "volumedetect", "-f", "null", "-"],
+            capture_output=True, text=True, timeout=120,
+        )
+        m = re.search(r"max_volume:\s*(-?\d+(?:\.\d+)?) dB", r.stderr)
+        return float(m.group(1)) if m else None
+    except Exception:
+        return None
+
+
+def _build_gate_filter(path: str):
+    """
+    ffmpeg agate filter string for one stem, with the threshold set relative
+    to that stem's own peak level so loud and quiet songs both get a sensible
+    gate. Returns None (no gating) if the stem is silent or can't be measured.
+    """
+    peak = _stem_peak_db(path)
+    if peak is None or peak < -50:
+        return None
+    thr = 10 ** ((peak - STEM_GATE_OFFSET_DB) / 20.0)
+    thr = min(0.25, max(0.001, thr))
+    return (f"agate=threshold={thr:.5f}:ratio=2:range={STEM_GATE_RANGE}:"
+            f"attack=5:release=250:knee=3")
 
 
 def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str, filename: str, stem_count: str = "6"):
@@ -1601,9 +1648,13 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
                 if key in lower_f:
                     src_path = os.path.join(stem_dir, f)
                     tmp_path = src_path + ".eq_tmp" + os.path.splitext(f)[1]
+                    gate_filter = None
+                    if STEM_GATE and key in STEM_GATE_STEMS:
+                        gate_filter = _build_gate_filter(src_path)
+                        logger.info(f"[job {request_id}] Noise gate for {f}: {gate_filter or 'skipped (silent/unmeasurable)'}")
                     eq_cmd = [
                         "ffmpeg", "-y", "-i", src_path,
-                        "-af", filter_chain,
+                        "-af", f"{gate_filter},{filter_chain}" if gate_filter else filter_chain,
                         tmp_path,
                     ]
                     eq_result = subprocess.run(eq_cmd, capture_output=True, text=True, timeout=120)
