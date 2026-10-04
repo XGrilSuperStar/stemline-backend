@@ -1648,14 +1648,15 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
         # limiter. If ffmpeg rejects any of it, the base chain above is
         # used instead, so a stem never fails.
         STEM_FX = os.getenv("STEM_FX", "on").strip().lower() not in ("0", "off", "false", "no")
-        _mb = "mcompand=args='0.005,0.1 6 -47/-40,-34/-34,-17/-33 120 | 0.003,0.05 6 -47/-40,-34/-34,-17/-33 500 | 0.0005,0.02 6 -47/-40,-34/-34,-17/-33 4000 | 0,0.025 6 -47/-40,-34/-34,-17/-33 20000'"
+        _mc = "-80/-80,-26/-26,0/-13"
+        _mb = f"mcompand=args='0.005,0.1 6 {_mc} 120 | 0.003,0.05 6 {_mc} 500 | 0.0005,0.02 6 {_mc} 4000 | 0,0.025 6 {_mc} 20000',volume=4dB"
         _sat = "volume=1.4,asoftclip=type=tanh,volume=0.714"
         def _deq(freq, thr="0.06"):
             return f"adynamicequalizer=threshold={thr}:dfrequency={freq}:dqfactor=2:tfrequency={freq}:tqfactor=2:attack=10:release=100:ratio=2:mode=cut"
         FX_PROFILES = {
             "vocals": f"{_deq(5500)},volume=0dB",
             "drums": f"{_deq(400)},{_mb},{_sat},volume=-1dB",
-            "bass": f"{_deq(250)},{_mb},{_sat},volume=0dB",
+            "bass": f"{_deq(250)},{_sat},volume=4dB",
             "guitar": f"{_deq(3000)},{_mb},{_sat},stereotools=sbal=-0.25,volume=-2dB",
             "piano": f"{_deq(400)},{_mb},{_sat},stereotools=sbal=0.25,volume=-2dB",
             "other": f"{_deq(300)},{_mb},{_sat},stereotools=slev=1.25,volume=-3dB",
