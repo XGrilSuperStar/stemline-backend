@@ -2144,7 +2144,10 @@ const dbToGain = db => Math.pow(10, db / 20);
 // into vocals). These are just starting knob positions -- still fully
 // adjustable per channel.
 const EQ_DEFAULTS = {
-  guitar: { mid: -3, high: -2.5 }
+  guitar: { mid: -3, high: -2.5 },
+  // Vocals: separation leaves a watery/phasey shimmer in the upper mids and
+  // highs. A gentle starting cut there takes the edge off. Still adjustable.
+  vocals: { mid: -1, high: -3 }
 };
 
 function initEngine() {
