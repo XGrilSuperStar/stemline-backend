@@ -1437,9 +1437,24 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
             # gain is on bass. Auto-downloads its checkpoint (~700MB) into
             # the container's cache on first run, which will make the very
             # first split after a deploy noticeably slower than the rest.
+            # bs-roformer-infer only reads .wav files, and reads EVERY wav in
+            # --input_folder. So decode the upload to a full-length stereo
+            # 44.1k WAV inside its own clean folder and point the tool there.
+            rof_in_dir = os.path.join(upload_dir, "rof_input")
+            os.makedirs(rof_in_dir, exist_ok=True)
+            rof_wav = os.path.join(
+                rof_in_dir, os.path.splitext(os.path.basename(file_path))[0] + ".wav"
+            )
+            dec = subprocess.run(
+                ["ffmpeg", "-y", "-i", file_path, "-vn", "-ar", "44100",
+                 "-ac", "2", "-c:a", "pcm_s16le", rof_wav],
+                capture_output=True, text=True, timeout=300,
+            )
+            if dec.returncode != 0:
+                raise Exception(f"Could not decode upload to WAV: {dec.stderr[-500:]}")
             cmd = [
                 "bs-roformer-infer",
-                "--input_folder", os.path.dirname(file_path),
+                "--input_folder", rof_in_dir,
                 "--store_dir", output_dir,
             ]
             logger.info(f"[job {request_id}] Running: {' '.join(cmd)}")
@@ -1454,6 +1469,12 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
             logger.info(f"[job {request_id}] bs-roformer-infer return code: {result.returncode}")
             if result.returncode != 0:
                 raise Exception(f"BS-RoFormer processing failed: {result.stderr}")
+            # The tool also writes a *_instrumental.wav mix — not one of the
+            # six stems, so drop it before the zip is built.
+            for _root, _dirs, _files in os.walk(output_dir):
+                for _f in _files:
+                    if "_instrumental" in _f:
+                        os.remove(os.path.join(_root, _f))
         elif engine_for_this_job == "mdx23c":
             # MDX23C (ZFTurbo's MVSEP-MDX23 ensemble): 4-stem model (vocals,
             # drums, bass, other), Demucs4+MDX ensemble, 3rd place in the
