@@ -5569,12 +5569,6 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderLibrary() {
     const root = document.getElementById('sampleLibList'); if (!root) return;
     root.innerHTML = '';
-    const bar = document.createElement('div'); bar.className = 'mix-bar';
-    const sb = document.createElement('button'); sb.type = 'button'; sb.className = 'mix-save mono';
-    sb.textContent = mixBusy ? 'RENDERING...' : 'SAVE MIX (MP3)'; sb.disabled = mixBusy;
-    sb.title = 'Render your current mix, name it, and keep it in your library';
-    sb.onclick = saveMix;
-    bar.appendChild(sb); root.appendChild(bar);
     mixes.slice().sort((x, y) => y.created - x.created).forEach(item => {
       const row = document.createElement('div'); row.className = 'lib-item mix-item';
       row.style.setProperty('--pc', '#3CFDE0');
