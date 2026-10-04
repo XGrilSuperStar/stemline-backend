@@ -599,10 +599,7 @@
   .rack-screw.br { bottom: 7px; right: 7px; }
 
 
-  .channels { display: grid; grid-template-columns: repeat(4, minmax(52px, 1fr)); gap: 5px; }
-  /* 4-stem model: guitar + synth channels and waveform rows are hidden */
-  .channel[data-stem="guitar"], .channel[data-stem="piano"],
-  .wave-row[data-stem="guitar"], .wave-row[data-stem="piano"] { display: none !important; }
+  .channels { display: grid; grid-template-columns: repeat(6, minmax(52px, 1fr)); gap: 5px; }
   .channel {
     background:
       repeating-linear-gradient(90deg, rgba(255,255,255,0.022) 0px, transparent 1px, transparent 3px),
