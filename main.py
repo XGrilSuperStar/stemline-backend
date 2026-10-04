@@ -1509,7 +1509,7 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
             # running before). 2 roughly doubles split time but is the
             # standard quality tradeoff people use to cut down bleed
             # without it getting too slow to be usable.
-            shifts = int(os.getenv("DEMUCS_SHIFTS", "2"))
+            shifts = int(os.getenv("DEMUCS_SHIFTS", "1"))
 
             # --overlap controls how much adjacent processing chunks
             # overlap. Higher overlap smooths the seams between chunks
@@ -1517,7 +1517,7 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
             # smaller speed cost than shifts. Demucs' own default is 0.25;
             # bumping to 0.5 trades a bit more compute for real reduction
             # in edge artifacts.
-            overlap = os.getenv("DEMUCS_OVERLAP", "0.75")
+            overlap = os.getenv("DEMUCS_OVERLAP", "0.5")
 
             # Mobile uploads request the 4-stem model (vocals/drums/bass/
             # other) — faster and lighter than the 6-stem model, which also
