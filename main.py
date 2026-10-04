@@ -1642,6 +1642,29 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
             + (f",{EXCITER_PROFILES[key]}" if key in EXCITER_PROFILES else "")
             for key in EQ_PROFILES
         }
+        # Extra polish (STEM_FX=off disables): dynamic EQ (cuts a problem
+        # band only when it gets loud), multi-band compression, light
+        # tanh saturation, per-stem volume balance, panning, and a final
+        # limiter. If ffmpeg rejects any of it, the base chain above is
+        # used instead, so a stem never fails.
+        STEM_FX = os.getenv("STEM_FX", "on").strip().lower() not in ("0", "off", "false", "no")
+        _mb = "mcompand=args='0.005,0.1 6 -47/-40,-34/-34,-17/-33 120 | 0.003,0.05 6 -47/-40,-34/-34,-17/-33 500 | 0.0005,0.02 6 -47/-40,-34/-34,-17/-33 4000 | 0,0.025 6 -47/-40,-34/-34,-17/-33 20000'"
+        _sat = "volume=1.4,asoftclip=type=tanh,volume=0.714"
+        def _deq(freq, thr="0.06"):
+            return f"adynamicequalizer=threshold={thr}:dfrequency={freq}:dqfactor=2:tfrequency={freq}:tqfactor=2:attack=10:release=100:ratio=2:mode=cut"
+        FX_PROFILES = {
+            "vocals": f"{_deq(5500)},volume=0dB",
+            "drums": f"{_deq(400)},{_mb},{_sat},volume=-1dB",
+            "bass": f"{_deq(250)},{_mb},{_sat},volume=0dB",
+            "guitar": f"{_deq(3000)},{_mb},{_sat},stereotools=sbal=-0.25,volume=-2dB",
+            "piano": f"{_deq(400)},{_mb},{_sat},stereotools=sbal=0.25,volume=-2dB",
+            "other": f"{_deq(300)},{_mb},{_sat},stereotools=slev=1.25,volume=-3dB",
+        }
+        if STEM_FX:
+            STEM_FILTER_CHAINS = {
+                key: f"{chain},{FX_PROFILES[key]},alimiter=limit=0.95"
+                for key, chain in STEM_FILTER_CHAINS.items()
+            }
         for f in os.listdir(stem_dir):
             lower_f = f.lower()
             for key, filter_chain in STEM_FILTER_CHAINS.items():
@@ -1658,6 +1681,11 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
                         tmp_path,
                     ]
                     eq_result = subprocess.run(eq_cmd, capture_output=True, text=True, timeout=120)
+                    if eq_result.returncode != 0 and STEM_FX:
+                        logger.warning(f"[job {request_id}] FX chain failed on {f}, retrying base chain: {eq_result.stderr[-300:]}")
+                        base_chain = f"{EQ_PROFILES[key]},{COMPRESSOR_PROFILES[key]}" + (f",{EXCITER_PROFILES[key]}" if key in EXCITER_PROFILES else "")
+                        eq_cmd[eq_cmd.index("-af") + 1] = f"{gate_filter},{base_chain}" if gate_filter else base_chain
+                        eq_result = subprocess.run(eq_cmd, capture_output=True, text=True, timeout=120)
                     if eq_result.returncode == 0 and os.path.exists(tmp_path):
                         os.replace(tmp_path, src_path)
                         logger.info(f"[job {request_id}] Applied EQ+compressor ({key}) to {f}")

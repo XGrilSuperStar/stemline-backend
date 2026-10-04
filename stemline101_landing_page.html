@@ -2233,7 +2233,12 @@ function connectAnalysers() {
   }
   masterGain = audioCtx.createGain();
   masterGain.gain.value = masterVolPct / 100;
-  masterGain.connect(audioCtx.destination);
+  // Bus compressor: gentle glue on the full mix (live playback).
+  const busComp = audioCtx.createDynamicsCompressor();
+  busComp.threshold.value = -14; busComp.knee.value = 6; busComp.ratio.value = 2;
+  busComp.attack.value = 0.03; busComp.release.value = 0.25;
+  masterGain.connect(busComp);
+  busComp.connect(audioCtx.destination);
 
   masterAnalyser = audioCtx.createAnalyser();
   masterAnalyser.fftSize = 256;
@@ -5413,7 +5418,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const sr = audioCtx.sampleRate;
     const build = (ctx, pitch) => {
-      const master = ctx.createGain(); master.gain.value = masterVolPct / 100; master.connect(ctx.destination);
+      const master = ctx.createGain(); master.gain.value = masterVolPct / 100;
+      const busComp = ctx.createDynamicsCompressor();
+      busComp.threshold.value = -14; busComp.knee.value = 6; busComp.ratio.value = 2;
+      busComp.attack.value = 0.03; busComp.release.value = 0.25;
+      master.connect(busComp); busComp.connect(ctx.destination);
       plans.forEach(p => {
         const n = p.n;
         const src = ctx.createBufferSource(); src.buffer = p.buffer; src.playbackRate.value = p.rate;
