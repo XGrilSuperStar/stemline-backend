@@ -4316,7 +4316,7 @@ document.addEventListener('DOMContentLoaded', () => {
       formData.append('file', file);
       formData.append('client_size', String(file.size));
       if (clientDur) formData.append('client_duration', String(clientDur));
-      formData.append('stems', window.innerWidth <= 700 ? '4' : '6');
+      formData.append('stems', '6');
       setTimeout(() => {
         dropZoneLabel.textContent = 'Splitting ' + file.name + '…';
         startSplitLoader();
