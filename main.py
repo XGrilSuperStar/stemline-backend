@@ -1523,7 +1523,7 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
             # other) — faster and lighter than the 6-stem model, which also
             # splits out guitar/piano. Any value other than "4" falls back
             # to 6-stem.
-            model_name = "htdemucs_6s"
+            model_name = "htdemucs"  # 4-stem: vocals/drums/bass/other
 
             # Every split so far has come out as exactly 60 seconds of stems
             # (identical 5,767,428-byte zips for different songs), so the song
