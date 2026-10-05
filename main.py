@@ -10,6 +10,7 @@ import subprocess
 import zipfile
 import uuid
 import threading
+import time
 from datetime import datetime, timedelta
 import jwt
 import bcrypt
@@ -1414,6 +1415,54 @@ def _build_gate_filter(path: str):
             f"attack=5:release=250:knee=3")
 
 
+# GPU separation on Modal (see modal_separator.py): BS-Roformer vocals +
+# Demucs for the other five stems. Used when SEPARATION_ENGINE=modal.
+#   MODAL_SEPARATE_URL     base URL of the deployed Modal web service
+#   MODAL_SEPARATE_SECRET  shared secret (same value as the Modal secret)
+#   MODAL_TIMEOUT_SECONDS  give up and fall back to local Demucs after this long
+MODAL_SEPARATE_URL = os.getenv("MODAL_SEPARATE_URL", "").rstrip("/")
+MODAL_SEPARATE_SECRET = os.getenv("MODAL_SEPARATE_SECRET", "")
+MODAL_TIMEOUT_SECONDS = int(os.getenv("MODAL_TIMEOUT_SECONDS", "900"))
+
+
+def _run_modal_separation(file_path: str, output_dir: str, request_id: str):
+    """
+    Send the upload to the Modal GPU service, poll until it finishes, and
+    unpack the six stem mp3s into output_dir/modal/<track>/ (the layout the
+    rest of run_split_job already expects). Raises on any failure so the
+    caller can fall back to local Demucs.
+    """
+    if not MODAL_SEPARATE_URL or not MODAL_SEPARATE_SECRET:
+        raise Exception("MODAL_SEPARATE_URL / MODAL_SEPARATE_SECRET not set")
+    headers = {"X-Stemline-Secret": MODAL_SEPARATE_SECRET}
+    with open(file_path, "rb") as fh:
+        r = requests.post(f"{MODAL_SEPARATE_URL}/submit", data=fh, headers=headers, timeout=180)
+    r.raise_for_status()
+    call_id = r.json()["call_id"]
+    logger.info(f"[job {request_id}] Modal job submitted: {call_id}")
+
+    deadline = time.time() + MODAL_TIMEOUT_SECONDS
+    while True:
+        if time.time() > deadline:
+            raise Exception(f"Modal job timed out after {MODAL_TIMEOUT_SECONDS}s")
+        res = requests.get(f"{MODAL_SEPARATE_URL}/result/{call_id}", headers=headers, timeout=120)
+        if res.status_code == 202:
+            time.sleep(4)
+            continue
+        if res.status_code != 200:
+            raise Exception(f"Modal job failed ({res.status_code}): {res.text[:300]}")
+        break
+
+    track_dir = os.path.join(output_dir, "modal", "track")
+    os.makedirs(track_dir, exist_ok=True)
+    with zipfile.ZipFile(io.BytesIO(res.content)) as z:
+        z.extractall(track_dir)
+    got = sorted(os.listdir(track_dir))
+    logger.info(f"[job {request_id}] Modal stems received: {got}")
+    if len(got) < 6:
+        raise Exception(f"Modal returned only {len(got)} stems: {got}")
+
+
 def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str, filename: str, stem_count: str = "6"):
     """
     Runs the separation engine (Demucs or BS-RoFormer, see SEPARATION_ENGINE)
@@ -1431,7 +1480,17 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
         os.makedirs(output_dir, exist_ok=True)
 
         engine_for_this_job = SEPARATION_ENGINE
-        if engine_for_this_job == "bsroformer":
+        if engine_for_this_job == "modal":
+            # GPU path. If anything goes wrong, fall back to local Demucs so
+            # the user still gets their stems.
+            try:
+                _run_modal_separation(file_path, output_dir, request_id)
+            except Exception as modal_err:
+                logger.error(f"[job {request_id}] Modal separation failed, falling back to local Demucs: {modal_err}")
+                engine_for_this_job = "demucs"
+        if engine_for_this_job == "modal":
+            pass  # stems already unpacked into output_dir by _run_modal_separation
+        elif engine_for_this_job == "bsroformer":
             # BS-RoFormer SW: transformer-based 6-stem model (vocals, drums,
             # bass, guitar, piano, other), better SDR than Demucs — biggest
             # gain is on bass. Auto-downloads its checkpoint (~700MB) into
