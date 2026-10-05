@@ -5712,6 +5712,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const h = await playItem(item, 'main-safe', null, () => { if (libPlaying === h) libPlaying = null; });
         libPlaying = h;
       };
+      const hp = document.createElement('button'); hp.type = 'button'; hp.textContent = '🎧'; hp.className = 'lib-hp';
+      hp.title = 'Listen in headphones only - the room never hears it (pick CUE OUT first)';
+      hp.onclick = async () => {
+        if (libPlaying) { try { libPlaying.src.stop(); } catch (e) {} libPlaying = null; }
+        const h = await playItem(item, 'cue', null, () => { if (libPlaying === h) libPlaying = null; });
+        libPlaying = h;
+      };
       const asg = document.createElement('button'); asg.type = 'button';
       asg.textContent = a[item.stem] === item.id ? 'ON PAD' : 'PUT ON PAD';
       asg.className = a[item.stem] === item.id ? 'on' : '';
@@ -5725,7 +5732,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const x = getAssign(); Object.keys(x).forEach(k => { if (x[k] === item.id) delete x[k]; }); setAssign(x);
         refreshPads(); renderLibrary();
       };
-      top.append(dot, nm, st, play, asg, dl, del);
+      top.append(dot, nm, st, play, hp, asg, dl, del);
       const cv = document.createElement('canvas'); cv.className = 'lib-wave';
       row.append(top, cv); root.appendChild(row);
       drawWave(cv, item);
