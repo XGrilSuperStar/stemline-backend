@@ -3361,6 +3361,19 @@ document.addEventListener('keydown', (e) => {
   e.preventDefault();
   removeStemSampleRegion(selectedSampleRegion.stem, selectedSampleRegion.id);
 });
+
+// Spacebar toggles play/pause, like every other DAW/mixer out there.
+document.addEventListener('keydown', (e) => {
+  if (e.code !== 'Space' && e.key !== ' ') return;
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  e.preventDefault();
+  if (isPlaying) {
+    pausePreview();
+  } else {
+    playPreview();
+  }
+});
 document.addEventListener('pointerdown', (e) => {
   if (!e.target.closest('.wave-sample-region')) {
     selectedSampleRegion = null;
