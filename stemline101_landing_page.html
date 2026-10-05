@@ -3387,11 +3387,20 @@ document.addEventListener('keydown', (e) => {
   const t = e.target;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
   e.preventDefault();
+  // If the library is auditioning a sample/stem/mix, space stops that first.
+  if (window.__stopAuditions && window.__stopAuditions()) return;
   if (isPlaying) {
     pausePreview();
   } else {
     playPreview();
   }
+});
+// A focused button would otherwise ALSO "click" when space is released.
+document.addEventListener('keyup', (e) => {
+  if (e.code !== 'Space' && e.key !== ' ') return;
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  e.preventDefault();
 });
 document.addEventListener('pointerdown', (e) => {
   if (!e.target.closest('.wave-sample-region')) {
@@ -5327,10 +5336,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function playItem(item, dest, onStart, onEnd, padStem) {
     if (dest === 'cue' && !cueReady()) { toast('Pick CUE OUT (headphones) first'); return null; }
-    if (dest === 'main-safe') { // library audition: headphones if set, else main only when song is stopped
-      if (cueReady()) dest = 'cue';
-      else if (songPlaying()) { toast('Pick CUE OUT first - song is playing'); return null; }
-      else dest = 'main';
+    if (dest === 'main-safe') { // library audition: headphones if set, else straight to main (layers over the song if it's playing)
+      dest = cueReady() ? 'cue' : 'main';
     }
     try { await ensureEngineReady(); } catch (e) {}
     if (!audioCtx) return null;
@@ -5620,7 +5627,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function toggleMixPlay(item) {
     if (mixAudio) { mixAudio.pause(); URL.revokeObjectURL(mixAudio.src); mixAudio = null; }
     if (mixAudioId === item.id) { mixAudioId = null; renderLibrary(); return; }
-    if (songPlaying()) { toast('Stop the song first'); return; }
+    if (songPlaying() && typeof pausePreview === 'function') pausePreview(); // don't refuse - just pause the song so the mix can be heard
     mixAudio = new Audio(URL.createObjectURL(item.blob)); mixAudioId = item.id;
     mixAudio.onended = () => { mixAudioId = null; mixAudio = null; renderLibrary(); };
     mixAudio.play().catch(() => {});
@@ -5740,6 +5747,20 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
   window.__renderLibrary = renderLibrary;
+
+  // Spacebar hook: stop anything the library is auditioning (sample, stem
+  // preview, saved mix). Returns true if something was playing, so the
+  // spacebar handler stops that first instead of also toggling the song.
+  window.__stopAuditions = function () {
+    let any = false;
+    if (libPlaying) { try { libPlaying.src.stop(); } catch (e) {} libPlaying = null; any = true; }
+    if (libStemPlaying) { stopLibStem(); any = true; }
+    if (mixAudio) {
+      try { mixAudio.pause(); URL.revokeObjectURL(mixAudio.src); } catch (e) {}
+      mixAudio = null; mixAudioId = null; renderLibrary(); any = true;
+    }
+    return any;
+  };
 
   /* ---------- library stems: preview + chop to sample ---------- */
   const libStemCache = new Map();
