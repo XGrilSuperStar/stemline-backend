@@ -1470,7 +1470,7 @@
   <div>
     <h1 class="stencil">Unmix any song<br>into its stems.<br><span class="accent">Mix them with any other.</span></h1>
     <div class="eyebrow"><span class="cat-no">STM-001</span> 6-CHANNEL DECONSTRUCTION UNIT</div>
-    <p class="sub">Split any track into clean vocals, drums, bass, and more — then pull in stems from other songs and blend them together on one mixer. Great for DJing.</p>
+    <p class="sub">Split any track into clean vocals, drums, bass, and more — then pull in stems from other songs and blend them together on one mixer. Great for DJing, and for cutting your own ringtones.</p>
       <div id="how">
       <div class="steps-six">
         <div class="step">
@@ -1916,6 +1916,7 @@
         <li>The headphone icon next to the square sends it to headphones only.</li>
         <li>Press Delete or Backspace to remove the highlighted selection from the timeline (doesn't touch the audio).</li>
       </ol>
+      <div class="sample-help-tip" style="margin-top:0.6rem;font-size:0.68rem;color:var(--sci-glow,#3CFDE0);">Great for ringtones — chop your favorite hook and save it.</div>
     </div></div>
     </div>
   </div>
@@ -5708,6 +5709,8 @@ document.addEventListener('DOMContentLoaded', () => {
       asg.textContent = a[item.stem] === item.id ? 'ON PAD' : 'PUT ON PAD';
       asg.className = a[item.stem] === item.id ? 'on' : '';
       asg.onclick = () => { const x = getAssign(); x[item.stem] = item.id; setAssign(x); refreshPads(); renderLibrary(); };
+      const dl = document.createElement('button'); dl.type = 'button'; dl.textContent = 'DOWNLOAD'; dl.title = 'Save this sample to your device as an MP3 (Premium)';
+      dl.onclick = () => downloadSampleNow(item, dl);
       const del = document.createElement('button'); del.type = 'button'; del.textContent = '✕'; del.title = 'Delete';
       del.onclick = async () => {
         if (!confirm('Delete "' + item.name + '"?')) return;
@@ -5715,7 +5718,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const x = getAssign(); Object.keys(x).forEach(k => { if (x[k] === item.id) delete x[k]; }); setAssign(x);
         refreshPads(); renderLibrary();
       };
-      top.append(dot, nm, st, play, asg, del);
+      top.append(dot, nm, st, play, asg, dl, del);
       const cv = document.createElement('canvas'); cv.className = 'lib-wave';
       row.append(top, cv); root.appendChild(row);
       drawWave(cv, item);
