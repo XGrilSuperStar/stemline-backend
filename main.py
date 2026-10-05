@@ -1746,6 +1746,20 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
                 key: f"{chain},{FX_PROFILES[key]},alimiter=limit=0.95"
                 for key, chain in STEM_FILTER_CHAINS.items()
             }
+        # "other" is a catch-all full of leftover bleed. The polish chain
+        # above (exciter, multiband, saturation, widening) made it sound
+        # worse by boosting that bleed, so it gets its own cleanup instead,
+        # chosen by ear against the raw stem: trim muddy lows and watery
+        # highs, light denoise, turn the centre down (leftover vocal/bass/
+        # drum bleed sits there; synths and pads are usually wide), and a
+        # gentle gate.
+        STEM_FILTER_CHAINS["other"] = (
+            "highpass=f=90,lowpass=f=15000,equalizer=f=1500:t=q:w=1:g=1,"
+            "afftdn=nr=14:nf=-40,stereotools=mlev=0.6,"
+            "agate=threshold=0.01:ratio=1.5:range=0.5:attack=10:release=250,"
+            "alimiter=limit=0.95"
+        )
+        OTHER_FALLBACK_CHAIN = "highpass=f=90,equalizer=f=1500:t=q:w=1:g=1,alimiter=limit=0.95"
         for f in os.listdir(stem_dir):
             lower_f = f.lower()
             for key, filter_chain in STEM_FILTER_CHAINS.items():
@@ -1762,9 +1776,12 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
                         tmp_path,
                     ]
                     eq_result = subprocess.run(eq_cmd, capture_output=True, text=True, timeout=120)
-                    if eq_result.returncode != 0 and STEM_FX:
+                    if eq_result.returncode != 0 and (STEM_FX or key == "other"):
                         logger.warning(f"[job {request_id}] FX chain failed on {f}, retrying base chain: {eq_result.stderr[-300:]}")
-                        base_chain = f"{EQ_PROFILES[key]},{COMPRESSOR_PROFILES[key]}" + (f",{EXCITER_PROFILES[key]}" if key in EXCITER_PROFILES else "")
+                        if key == "other":
+                            base_chain = OTHER_FALLBACK_CHAIN
+                        else:
+                            base_chain = f"{EQ_PROFILES[key]},{COMPRESSOR_PROFILES[key]}" + (f",{EXCITER_PROFILES[key]}" if key in EXCITER_PROFILES else "")
                         eq_cmd[eq_cmd.index("-af") + 1] = f"{gate_filter},{base_chain}" if gate_filter else base_chain
                         eq_result = subprocess.run(eq_cmd, capture_output=True, text=True, timeout=120)
                     if eq_result.returncode == 0 and os.path.exists(tmp_path):
