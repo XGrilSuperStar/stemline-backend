@@ -2512,7 +2512,14 @@ async def robots_txt():
 
 @app.get("/sitemap.xml", response_class=Response)
 async def sitemap_xml():
-    pages = ["", "about", "faq", "reviews", "privacy", "terms"]
+    pages = [
+        "", "about", "faq", "reviews", "privacy", "terms",
+        "guides",
+        "guides/what-are-stems",
+        "guides/how-ai-stem-separation-works",
+        "guides/mixing-stems-bpm-and-key",
+        "guides/getting-cleaner-stems",
+    ]
     urls = "".join(
         f"  <url><loc>https://stemline101.com/{p}</loc></url>\n" for p in pages
     )
@@ -2523,6 +2530,10 @@ async def sitemap_xml():
         "</urlset>\n"
     )
     return Response(content=body, media_type="application/xml")
+
+
+from guides import router as guides_router
+app.include_router(guides_router)
 
 
 if __name__ == "__main__":
