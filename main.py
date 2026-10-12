@@ -2532,6 +2532,14 @@ async def sitemap_xml():
     return Response(content=body, media_type="application/xml")
 
 
+@app.get("/googlecc9edcf10a64534a.html", response_class=Response)
+async def google_site_verification():
+    return Response(
+        content="google-site-verification: googlecc9edcf10a64534a.html",
+        media_type="text/html",
+    )
+
+
 from guides import router as guides_router
 app.include_router(guides_router)
 
