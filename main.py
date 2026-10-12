@@ -2496,5 +2496,34 @@ async def faq_page():
 async def reviews_page():
     return FileResponse("reviews_page.html", media_type="text/html")
 
+
+@app.get("/robots.txt", response_class=Response)
+async def robots_txt():
+    body = (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Disallow: /admin\n"
+        "Disallow: /api/\n"
+        "\n"
+        "Sitemap: https://stemline101.com/sitemap.xml\n"
+    )
+    return Response(content=body, media_type="text/plain")
+
+
+@app.get("/sitemap.xml", response_class=Response)
+async def sitemap_xml():
+    pages = ["", "about", "faq", "reviews", "privacy", "terms"]
+    urls = "".join(
+        f"  <url><loc>https://stemline101.com/{p}</loc></url>\n" for p in pages
+    )
+    body = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        f"{urls}"
+        "</urlset>\n"
+    )
+    return Response(content=body, media_type="application/xml")
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8080)))
