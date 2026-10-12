@@ -2194,6 +2194,9 @@ TERMS_HTML = """
 <head>
 <meta charset="UTF-8">
 <title>Terms of Service — Stemline101</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Stemline101 Terms of Service: the rules for using our AI stem separation and mixing tools.">
+<link rel="canonical" href="https://stemline101.com/terms">
 <style>
   body { background:#111; color:#eee; font-family: system-ui, sans-serif;
          max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem 4rem; line-height: 1.6; }
@@ -2285,6 +2288,9 @@ PRIVACY_HTML = """
 <head>
 <meta charset="UTF-8">
 <title>Privacy Policy — Stemline101</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Stemline101 Privacy Policy: what we collect, how we use it, and your choices.">
+<link rel="canonical" href="https://stemline101.com/privacy">
 <style>
   body { background:#111; color:#eee; font-family: system-ui, sans-serif;
          max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem 4rem; line-height: 1.6; }
@@ -2366,6 +2372,9 @@ ABOUT_HTML = """
 <head>
 <meta charset="UTF-8">
 <title>About — Stemline101</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="About Stemline101: a web app that splits songs into stems and lets you mix stems from different tracks.">
+<link rel="canonical" href="https://stemline101.com/about">
 <style>
   body { background:#111; color:#eee; font-family: system-ui, sans-serif;
          max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem 4rem; line-height: 1.6; }
@@ -2434,6 +2443,9 @@ FAQ_HTML = """
 <head>
 <meta charset="UTF-8">
 <title>FAQ — Stemline101</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Answers to common questions about Stemline101: formats, pricing, stem separation, and using your stems.">
+<link rel="canonical" href="https://stemline101.com/faq">
 <style>
   body { background:#111; color:#eee; font-family: system-ui, sans-serif;
          max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem 4rem; line-height: 1.6; }
@@ -2513,7 +2525,7 @@ async def robots_txt():
 @app.get("/sitemap.xml", response_class=Response)
 async def sitemap_xml():
     pages = [
-        "", "about", "faq", "reviews", "privacy", "terms",
+        "", "about", "faq", "privacy", "terms",
         "guides",
         "guides/what-are-stems",
         "guides/how-ai-stem-separation-works",
