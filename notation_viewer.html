@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Sheet music (private preview) — Stemline101</title>
+<script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.8.9/build/opensheetmusicdisplay.min.js"></script>
+<style>
+  body { background:#111; color:#eee; font-family: system-ui, sans-serif; margin:0; padding:1.5rem; line-height:1.5; }
+  h1 { color:#f0a500; font-size:1.3rem; margin:0 0 .3rem; }
+  .row { display:flex; flex-wrap:wrap; gap:.7rem; align-items:center; margin:1rem 0; }
+  select, button { background:#1c1c1c; color:#eee; border:1px solid #444; border-radius:4px; padding:.5rem .8rem; font-size:1rem; }
+  button { cursor:pointer; background:#f0a500; color:#111; border:none; font-weight:600; }
+  button.secondary { background:transparent; color:#eee; border:1px solid #555; font-weight:400; }
+  button:disabled { opacity:.4; cursor:default; }
+  #status { color:#aaa; min-height:1.4em; }
+  #sheet { background:#fff; border-radius:6px; padding:1rem; min-height:120px; margin-top:1rem; }
+  .note { color:#999; font-size:.9rem; }
+</style>
+</head>
+<body>
+<h1>Sheet music — private preview</h1>
+<p class="note">Pick a split song and a stem. The notes are detected automatically, so expect some mistakes, especially on busy or noisy stems. This page is not linked anywhere.</p>
+
+<div class="row">
+  <select id="song"><option>Loading your songs…</option></select>
+  <select id="inst">
+    <option value="bass">Bass</option>
+    <option value="vocals">Vocals</option>
+    <option value="guitar">Guitar</option>
+    <option value="piano">Keys / Synth</option>
+    <option value="other">Other</option>
+  </select>
+  <button id="go">Show sheet music</button>
+  <button id="dlxml" class="secondary" disabled>Download MusicXML</button>
+  <button id="dlmidi" class="secondary" disabled>Download MIDI</button>
+</div>
+<div id="status"></div>
+<div id="sheet"></div>
+
+<script>
+(function () {
+  var token = null;
+  try { token = localStorage.getItem('soundlounge101_token'); } catch (e) {}
+  var statusEl = document.getElementById('status');
+  var songSel = document.getElementById('song');
+  var instSel = document.getElementById('inst');
+  var goBtn = document.getElementById('go');
+  var xmlBtn = document.getElementById('dlxml');
+  var midiBtn = document.getElementById('dlmidi');
+  var osmd = null, lastXml = null, rows = [];
+
+  function setStatus(t) { statusEl.textContent = t || ''; }
+
+  function url(id, inst, fmt) {
+    return '/api/v1/my-stems/' + id + '/notation/' + inst + '?fmt=' + fmt + '&token=' + encodeURIComponent(token);
+  }
+
+  function save(blob, name) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+
+  async function loadSongs() {
+    if (!token) { songSel.innerHTML = '<option>Log in on the main page first</option>'; goBtn.disabled = true; return; }
+    try {
+      var r = await fetch('/api/v1/my-stems?include_unsaved=true&token=' + encodeURIComponent(token));
+      if (!r.ok) throw new Error('Could not load your songs.');
+      rows = await r.json();
+      if (!rows.length) { songSel.innerHTML = '<option>No songs yet</option>'; goBtn.disabled = true; return; }
+      songSel.innerHTML = '';
+      rows.forEach(function (s, i) {
+        var o = document.createElement('option');
+        o.value = i;
+        o.textContent = s.track_name + (s.instrument ? ' (' + s.instrument + ' only)' : '');
+        songSel.appendChild(o);
+      });
+      syncInst();
+    } catch (e) { setStatus(e.message); goBtn.disabled = true; }
+  }
+
+  function syncInst() {
+    var s = rows[songSel.value];
+    if (s && s.instrument) { instSel.value = s.instrument === 'synth' ? 'piano' : s.instrument; instSel.disabled = true; }
+    else { instSel.disabled = false; }
+  }
+  songSel.addEventListener('change', syncInst);
+
+  goBtn.addEventListener('click', async function () {
+    var s = rows[songSel.value]; if (!s) return;
+    var inst = instSel.value;
+    goBtn.disabled = true; xmlBtn.disabled = true; midiBtn.disabled = true;
+    setStatus('Listening to the stem and writing out the notes… this can take a minute.');
+    try {
+      var r = await fetch(url(s.id, inst, 'musicxml'));
+      if (!r.ok) {
+        var msg = 'Something went wrong.';
+        try { msg = (await r.json()).detail || msg; } catch (e) {}
+        throw new Error(msg);
+      }
+      lastXml = await r.text();
+      if (!osmd) osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay('sheet', { autoResize: true, drawTitle: true });
+      await osmd.load(lastXml);
+      osmd.render();
+      setStatus('Done.');
+      xmlBtn.disabled = false; midiBtn.disabled = false;
+      xmlBtn.onclick = function () { save(new Blob([lastXml], { type: 'application/xml' }), s.track_name + '_' + inst + '.musicxml'); };
+      midiBtn.onclick = async function () {
+        var m = await fetch(url(s.id, inst, 'midi'));
+        if (m.ok) save(await m.blob(), s.track_name + '_' + inst + '.mid');
+      };
+    } catch (e) { setStatus(e.message); }
+    goBtn.disabled = false;
+  });
+
+  loadSongs();
+})();
+</script>
+</body>
+</html>

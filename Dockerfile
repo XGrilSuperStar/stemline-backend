@@ -9,6 +9,9 @@ WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+# Basic Pitch (audio -> notes) runs on the onnxruntime already in requirements.txt;
+# --no-deps keeps pip from also installing TensorFlow.
+RUN pip install --no-cache-dir --no-deps basic-pitch
 
 COPY . .
 

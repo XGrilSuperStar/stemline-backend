@@ -2516,6 +2516,7 @@ async def robots_txt():
         "Allow: /\n"
         "Disallow: /admin\n"
         "Disallow: /api/\n"
+        "Disallow: /notation-viewer\n"
         "\n"
         "Sitemap: https://stemline101.com/sitemap.xml\n"
     )
@@ -2550,6 +2551,88 @@ async def google_site_verification():
         content="google-site-verification: googlecc9edcf10a64534a.html",
         media_type="text/html",
     )
+
+
+# ---------------------------------------------------------------------------
+# Sheet music (HIDDEN): turns one separated stem into MIDI / MusicXML.
+# Everything here is off unless NOTATION_ENABLED=1 is set, and nothing on the
+# public site links to it.
+# ---------------------------------------------------------------------------
+NOTATION_ENABLED = os.getenv("NOTATION_ENABLED", "").strip().lower() in ("1", "true", "yes")
+_notation_cache = {}
+_notation_cache_lock = threading.Lock()
+
+
+def _instrument_audio(stem_row, instrument):
+    """Return (audio_bytes, ext) for one instrument of a saved stem row."""
+    if stem_row.instrument:
+        if stem_row.instrument != instrument:
+            raise HTTPException(status_code=404, detail=f"This saved stem is {stem_row.instrument}, not {instrument}.")
+        ext = stem_row.zip_path.rsplit('.', 1)[-1].lower()
+        if is_r2_key(stem_row.zip_path):
+            return r2_download_bytes(stem_row.zip_path), ext
+        with open(stem_row.zip_path, "rb") as f:
+            return f.read(), ext
+    if is_r2_key(stem_row.zip_path):
+        zip_bytes = r2_download_bytes(stem_row.zip_path)
+    else:
+        with open(stem_row.zip_path, "rb") as f:
+            zip_bytes = f.read()
+    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+        names = zf.namelist()
+        for ext in ("mp3", "wav"):
+            match = next((n for n in names if n.lower().endswith(instrument + "." + ext)), None)
+            if match:
+                return zf.read(match), ext
+    raise HTTPException(status_code=404, detail=f"No {instrument} track in this split.")
+
+
+@app.get("/api/v1/my-stems/{stem_id}/notation/{instrument}")
+def stem_notation(stem_id: int, instrument: str, fmt: str = "musicxml", token: str = None, db: Session = Depends(get_db)):
+    if not NOTATION_ENABLED:
+        raise HTTPException(status_code=404, detail="Not Found")
+    user_id = get_current_user(token)
+    if instrument not in STEM_INSTRUMENTS:
+        raise HTTPException(status_code=400, detail=f"Unknown instrument: {instrument}")
+    if fmt not in ("musicxml", "midi"):
+        raise HTTPException(status_code=400, detail="fmt must be 'musicxml' or 'midi'.")
+    stem_row = db.query(Stem).filter(Stem.id == stem_id, Stem.user_id == user_id).first()
+    if not stem_row:
+        raise HTTPException(status_code=404, detail="Saved stem not found.")
+
+    cache_key = (user_id, stem_id, instrument)
+    with _notation_cache_lock:
+        result = _notation_cache.get(cache_key)
+    if result is None:
+        audio, ext = _instrument_audio(stem_row, instrument)
+        try:
+            import notation
+            result = notation.transcribe(audio, ext, instrument)
+        except ImportError:
+            raise HTTPException(status_code=503, detail="The sheet music engine isn't installed on this server.")
+        except notation.NotationError as e:
+            raise HTTPException(status_code=422, detail=str(e))
+        except Exception as e:
+            logger.error(f"Notation error: {str(e)}")
+            raise HTTPException(status_code=500, detail="Could not transcribe this stem.")
+        with _notation_cache_lock:
+            if len(_notation_cache) >= 8:
+                _notation_cache.pop(next(iter(_notation_cache)))
+            _notation_cache[cache_key] = result
+
+    base = f"{stem_row.track_name}_{instrument}"
+    if fmt == "midi":
+        return Response(content=result["midi"], media_type="audio/midi",
+                        headers={"Content-Disposition": f'attachment; filename="{base}.mid"'})
+    return Response(content=result["musicxml"], media_type="application/vnd.recordare.musicxml+xml",
+                    headers={"Content-Disposition": f'inline; filename="{base}.musicxml"'})
+
+
+@app.get("/notation-viewer", response_class=HTMLResponse)
+async def notation_viewer():
+    if not NOTATION_ENABLED:
+        raise HTTPException(status_code=404, detail="Not Found")
+    return FileResponse("notation_viewer.html", media_type="text/html")
 
 
 from guides import router as guides_router
