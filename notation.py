@@ -236,7 +236,7 @@ def _add_tablature(xml, instrument):
                     fret = pitch - open_p
                     if fret < 0 or fret > 15 or si in used:
                         continue
-                    cost = abs(fret - prev_fret[0]) + (0 if fret else -1)
+                    cost = fret  # lowest fret, open strings first
                     if best is None or cost < best[0]:
                         best = (cost, si, fret)
                 if best is None:  # out of range: clamp onto the lowest string
@@ -301,13 +301,49 @@ def _add_tablature(xml, instrument):
                         si, fret = assign[p]
                         nt = ET.SubElement(t, "notations")
                         tech = ET.SubElement(nt, "technical")
-                        ET.SubElement(tech, "string").text = str(si + 1)
+                        ET.SubElement(tech, "string").text = str(nstr - si)  # MusicXML: 1 = highest string
                         ET.SubElement(tech, "fret").text = str(fret)
                     m.append(t)
         return ET.tostring(root, encoding="unicode", xml_declaration=True)
     except Exception:
         return xml
 
+
+
+_MAJOR_PC = [0, 2, 4, 5, 7, 9, 11]
+_NAMES_SHARP = {0: "C", 1: "G", 2: "D", 3: "A", 4: "E", 5: "B", 6: "F#", 7: "C#",
+                -1: "F", -2: "Bb", -3: "Eb", -4: "Ab", -5: "Db", -6: "Gb", -7: "Cb"}
+
+
+def _pick_key(score):
+    """Choose the key signature that needs the FEWEST accidentals for the notes
+    actually played (a bass line of A, E and D is written with no sharps, not
+    in 'D major' with two). Returns (sharps, label)."""
+    weight = {}
+    for n in score.recurse().notes:
+        for p in n.pitches:
+            weight[p.pitchClass] = weight.get(p.pitchClass, 0.0) + float(n.quarterLength)
+    if not weight:
+        return 0, ""
+    best = None
+    for sh in range(-4, 5):
+        tonic = (sh * 7) % 12                      # major tonic pitch class
+        scale = {(tonic + i) % 12 for i in _MAJOR_PC}
+        outside = sum(w for pc, w in weight.items() if pc not in scale)
+        key = (round(outside, 3), abs(sh), sh)
+        if best is None or key < best[0]:
+            best = (key, sh, tonic)
+    _, sh, tonic = best
+    # major or its relative minor: whichever tonic is heavier in the line
+    minor_tonic = (tonic + 9) % 12
+    is_minor = weight.get(minor_tonic, 0.0) > weight.get(tonic, 0.0)
+    name = _NAMES_SHARP[sh]
+    if is_minor:
+        from music21 import pitch
+        name = pitch.Pitch(minor_tonic).name.replace("-", "b") + " minor"
+    else:
+        name += " major"
+    return sh, f"Key: {name}"
 
 
 def _midi_to_musicxml(midi_bytes, title, bpm=None):
@@ -331,13 +367,11 @@ def _midi_to_musicxml(midi_bytes, title, bpm=None):
         score.metadata.composer = "Transcribed by Stemline101"
 
         key_label = ""
+        sharps = 0
         try:
-            detected = score.analyze("key")
-            sharps = detected.sharps
-            tonic = detected.tonic.name.replace("-", "b")
-            key_label = f"Key: {tonic} {detected.mode}"
+            sharps, key_label = _pick_key(score)
         except Exception:
-            sharps = 0
+            pass
 
         for part in score.parts:
             for old in part.recurse().getElementsByClass(m21key.KeySignature):
