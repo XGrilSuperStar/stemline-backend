@@ -254,6 +254,38 @@ def _quantize_midi(midi, bpm, beats=4, downbeat=None):
     return out
 
 
+def _add_letters(xml):
+    """Print the note letter (A, E, F#...) under every note, so pitches can be
+    checked without reading the clef."""
+    import xml.etree.ElementTree as ET
+    try:
+        root = ET.fromstring(xml)
+        for part in root.findall("part"):
+            for m in part.findall("measure"):
+                notes = m.findall("note")
+                i = 0
+                while i < len(notes):
+                    grp = [notes[i]]
+                    while i + 1 < len(notes) and notes[i + 1].find("chord") is not None:
+                        i += 1
+                        grp.append(notes[i])
+                    names = []
+                    for n in grp:
+                        p = n.find("pitch")
+                        if p is None:
+                            continue
+                        alter = int(float(p.findtext("alter") or 0))
+                        names.append(p.findtext("step") + ("#" * alter if alter > 0 else "b" * -alter))
+                    if names:
+                        lyr = ET.SubElement(grp[0], "lyric", number="1")
+                        ET.SubElement(lyr, "syllabic").text = "single"
+                        ET.SubElement(lyr, "text").text = "".join(names) if len(names) == 1 else " ".join(names)
+                    i += 1
+        return ET.tostring(root, encoding="unicode", xml_declaration=True)
+    except Exception:
+        return xml
+
+
 # Open-string MIDI pitches, lowest string first, for the tab staff.
 TUNINGS = {
     "bass": [28, 33, 38, 43],            # E A D G
@@ -514,5 +546,6 @@ def transcribe(audio_bytes, ext, instrument):
     midi_bytes = buf.getvalue()
 
     xml = _midi_to_musicxml(midi_bytes, settings["title"], bpm, beats)
+    xml = _add_letters(xml)
     xml = _add_tablature(xml, instrument)
     return {"midi": midi_bytes, "musicxml": xml, "bpm": bpm, "note_count": note_count}
