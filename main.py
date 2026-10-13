@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import zipfile
 import uuid
+import concurrent.futures
 import threading
 import time
 from datetime import datetime, timedelta
@@ -1731,8 +1732,15 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
         _mc = "-80/-80,-26/-26,0/-13"
         _mb = f"mcompand=args='0.005,0.1 6 {_mc} 120 | 0.003,0.05 6 {_mc} 500 | 0.0005,0.02 6 {_mc} 4000 | 0,0.025 6 {_mc} 20000',volume=4dB"
         _sat = "volume=1.4,asoftclip=type=tanh,volume=0.714"
+        # ffmpeg 7+ renamed mode "cut" to "cutabove" (cut when loud); older
+        # builds only know "cut". Ask ffmpeg which one it supports.
+        try:
+            _deq_help = subprocess.run(["ffmpeg", "-hide_banner", "-h", "filter=adynamicequalizer"], capture_output=True, text=True, timeout=20).stdout
+            _deq_mode = "cutabove" if "cutabove" in _deq_help else "cut"
+        except Exception:
+            _deq_mode = "cut"
         def _deq(freq, thr="0.06"):
-            return f"adynamicequalizer=threshold={thr}:dfrequency={freq}:dqfactor=2:tfrequency={freq}:tqfactor=2:attack=10:release=100:ratio=2:mode=cut"
+            return f"adynamicequalizer=threshold={thr}:dfrequency={freq}:dqfactor=2:tfrequency={freq}:tqfactor=2:attack=10:release=100:ratio=2:mode={_deq_mode}"
         FX_PROFILES = {
             "vocals": f"{_deq(5500)},volume=0dB",
             "drums": f"{_deq(400)},{_mb},{_sat},volume=-1dB",
@@ -1760,7 +1768,7 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
             "alimiter=limit=0.95"
         )
         OTHER_FALLBACK_CHAIN = "highpass=f=90,equalizer=f=1500:t=q:w=1:g=1,alimiter=limit=0.95"
-        for f in os.listdir(stem_dir):
+        def _polish_stem(f):
             lower_f = f.lower()
             for key, filter_chain in STEM_FILTER_CHAINS.items():
                 if key in lower_f:
@@ -1792,6 +1800,13 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
                         if os.path.exists(tmp_path):
                             os.remove(tmp_path)
                     break
+
+        # Polish all stems at once (the server has a few CPU cores; doing
+        # them one after another was the slowest part of a split).
+        _polish_files = list(os.listdir(stem_dir))
+        _polish_workers = max(1, min(len(_polish_files), int(os.getenv("POLISH_WORKERS", str(os.cpu_count() or 2)))))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=_polish_workers) as _pool:
+            list(_pool.map(_polish_stem, _polish_files))
 
         # Build the zip in memory and upload straight to R2, keyed by this
         # request's uuid so it can never collide with any other split's zip
