@@ -190,6 +190,126 @@ def _quantize_midi(midi, bpm):
     return out
 
 
+# Open-string MIDI pitches, lowest string first, for the tab staff.
+TUNINGS = {
+    "bass": [28, 33, 38, 43],            # E A D G
+    "guitar": [40, 45, 50, 55, 59, 64],  # E A D G B E
+}
+_STEP = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
+
+
+def _add_tablature(xml, instrument):
+    """Add a TAB staff under the notation staff (MusicXML string/fret).
+    Only for bass/guitar, and only when the score is a single simple voice per
+    measure. Any problem -> return the plain notation untouched."""
+    tuning = TUNINGS.get(instrument)
+    if not tuning:
+        return xml
+    import copy
+    import xml.etree.ElementTree as ET
+    try:
+        root = ET.fromstring(xml)
+        parts = root.findall("part")
+        if len(parts) != 1:
+            return xml
+        measures = parts[0].findall("measure")
+        if not measures or any(m.find("backup") is not None or m.find("forward") is not None
+                               for m in measures):
+            return xml
+        nstr = len(tuning)
+        prev_fret = [0]
+
+        def midi_of(note):
+            p = note.find("pitch")
+            if p is None:
+                return None
+            alter = p.findtext("alter")
+            return (int(p.findtext("octave")) + 1) * 12 + _STEP[p.findtext("step")] + int(float(alter or 0))
+
+        def place(pitches):
+            """Choose a (string, fret) for each pitch of a chord: distinct
+            strings, lowest fret near the previous hand position."""
+            used, out = set(), {}
+            for pitch in sorted(pitches, reverse=True):
+                best = None
+                for si, open_p in enumerate(tuning):
+                    fret = pitch - open_p
+                    if fret < 0 or fret > 15 or si in used:
+                        continue
+                    cost = abs(fret - prev_fret[0]) + (0 if fret else -1)
+                    if best is None or cost < best[0]:
+                        best = (cost, si, fret)
+                if best is None:  # out of range: clamp onto the lowest string
+                    best = (0, 0, max(0, pitch - tuning[0]))
+                    if 0 in used:
+                        continue
+                used.add(best[1])
+                out[pitch] = (best[1], best[2])
+            if out:
+                prev_fret[0] = min(f for _, f in out.values())
+            return out
+
+        def insert_staff(note, n):
+            el = ET.Element("staff")
+            el.text = str(n)
+            for i, ch in enumerate(list(note)):
+                if ch.tag in ("beam", "notations", "lyric", "play"):
+                    note.insert(i, el)
+                    return
+            note.append(el)
+
+        first = measures[0].find("attributes")
+        for tag in ("staves", "clef", "staff-details"):
+            for old in first.findall(tag):
+                first.remove(old)
+        st = ET.SubElement(first, "staves"); st.text = "2"
+        c1 = ET.SubElement(first, "clef", number="1")
+        ET.SubElement(c1, "sign").text = "F"; ET.SubElement(c1, "line").text = "4"
+        c2 = ET.SubElement(first, "clef", number="2")
+        ET.SubElement(c2, "sign").text = "TAB"; ET.SubElement(c2, "line").text = "5"
+        sd = ET.SubElement(first, "staff-details", number="2")
+        ET.SubElement(sd, "staff-lines").text = str(nstr)
+
+        for m in measures:
+            notes = m.findall("note")
+            total = sum(int(n.findtext("duration") or 0) for n in notes if n.find("chord") is None)
+            for n in notes:
+                insert_staff(n, 1)
+            bk = ET.SubElement(m, "backup")
+            ET.SubElement(bk, "duration").text = str(total)
+            # group chord members so they get distinct strings
+            groups = []
+            for n in notes:
+                if n.find("chord") is not None and groups:
+                    groups[-1].append(n)
+                else:
+                    groups.append([n])
+            for g in groups:
+                pitches = [midi_of(n) for n in g if midi_of(n) is not None]
+                assign = place(pitches) if pitches else {}
+                for n in g:
+                    t = copy.deepcopy(n)
+                    for tag in ("beam", "notations", "accidental", "staff", "stem", "lyric"):
+                        for e in t.findall(tag):
+                            t.remove(e)
+                    v = t.find("voice")
+                    if v is not None:
+                        v.text = "2"
+                    insert_staff(t, 2)
+                    p = midi_of(n)
+                    if p is not None and p in assign:
+                        si, fret = assign[p]
+                        nt = ET.SubElement(t, "notations")
+                        tech = ET.SubElement(nt, "technical")
+                        ET.SubElement(tech, "string").text = str(si + 1)
+                        ET.SubElement(tech, "fret").text = str(fret)
+                    m.append(t)
+        return ET.tostring(root, encoding="unicode", xml_declaration=True)
+    except Exception:
+        return xml
+
+
+
 def _midi_to_musicxml(midi_bytes, title):
     from music21 import converter, key as m21key, metadata, stream
 
@@ -219,6 +339,8 @@ def _midi_to_musicxml(midi_bytes, title):
         for part in score.parts:
             for old in part.recurse().getElementsByClass(m21key.KeySignature):
                 old.activeSite.remove(old)
+            part.partName = title
+            part.partAbbreviation = title
             part.insert(0, m21key.KeySignature(sharps))
             if sharps < 0:  # flat key: spell accidentals as flats
                 for n in part.recurse().notes:
@@ -281,4 +403,5 @@ def transcribe(audio_bytes, ext, instrument):
     midi_bytes = buf.getvalue()
 
     xml = _midi_to_musicxml(midi_bytes, settings["title"])
+    xml = _add_tablature(xml, instrument)
     return {"midi": midi_bytes, "musicxml": xml, "bpm": bpm, "note_count": note_count}
