@@ -3918,7 +3918,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 <script>
 (function () {
-  const API_BASE = 'https://stemline-backend-production.up.railway.app';
+  const API_BASE = window.location.origin;  // same server that serves this page
   window.API_BASE = API_BASE;
 
   const navAccountBtn = document.getElementById('navAccountBtn');
