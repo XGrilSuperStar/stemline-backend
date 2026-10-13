@@ -311,7 +311,7 @@ def _add_tablature(xml, instrument):
 
 
 def _midi_to_musicxml(midi_bytes, title):
-    from music21 import converter, key as m21key, metadata, stream
+    from music21 import converter, expressions, key as m21key, meter, metadata, stream
 
     with tempfile.TemporaryDirectory() as td:
         mid_path = os.path.join(td, "in.mid")
@@ -330,9 +330,12 @@ def _midi_to_musicxml(midi_bytes, title):
         score.metadata.title = title
         score.metadata.composer = "Transcribed by Stemline101"
 
+        key_label = ""
         try:
             detected = score.analyze("key")
             sharps = detected.sharps
+            tonic = detected.tonic.name.replace("-", "b")
+            key_label = f"Key: {tonic} {detected.mode}"
         except Exception:
             sharps = 0
 
@@ -342,6 +345,14 @@ def _midi_to_musicxml(midi_bytes, title):
             part.partName = title
             part.partAbbreviation = title
             part.insert(0, m21key.KeySignature(sharps))
+            if not list(part.recurse().getElementsByClass(meter.TimeSignature)):
+                m0 = part.getElementsByClass(stream.Measure).first()
+                (m0 if m0 is not None else part).insert(0, meter.TimeSignature("4/4"))  # 4/4 unless told otherwise
+            if key_label:
+                te = expressions.TextExpression(key_label)
+                te.placement = "above"
+                m1 = part.getElementsByClass(stream.Measure).first()
+                (m1 if m1 is not None else part).insert(0, te)
             if sharps < 0:  # flat key: spell accidentals as flats
                 for n in part.recurse().notes:
                     pitches = n.pitches
