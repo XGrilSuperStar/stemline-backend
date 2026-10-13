@@ -155,7 +155,61 @@ def _refine_bpm(onsets, prior):
     return float(cands[pick])
 
 
-def _quantize_midi(midi, bpm):
+def _detect_meter(midi, bpm):
+    """Time signature from the notes themselves: bars start where the heavy
+    (long/loud) notes keep landing. Tries 3 and 4 beats per bar and every
+    possible bar start; 4/4 wins unless 3/4 is clearly stronger.
+    Returns (beats_per_bar, downbeat_offset_in_beats)."""
+    import numpy as np
+    notes = [n for i in midi.instruments for n in i.notes]
+    if len(notes) < 8:
+        return 4, 0.0
+    b = 60.0 / bpm
+    starts = np.array([n.start for n in notes])
+    weight = np.array([n.velocity * (n.end - n.start) ** 0.5 for n in notes])
+    offs = np.linspace(0, b, 24, endpoint=False)
+    def cost(o):
+        ph = ((starts - o) / b) % 1.0
+        return float(np.mean(np.minimum(ph, 1.0 - ph)))
+    off = float(offs[int(np.argmin([cost(o) for o in offs]))])
+    idx = np.floor((starts - off) / b + 0.5).astype(int)
+    idx -= idx.min()
+    pitches = np.array([n.pitch % 12 for n in notes])
+    w = np.bincount(idx, weights=weight)
+    if w.size < 8 or w.mean() <= 0:
+        return 4, 0.0
+    # pitch class of the heaviest note starting on each beat
+    beat_pc = {}
+    for k in np.unique(idx):
+        sel = np.where(idx == k)[0]
+        beat_pc[int(k)] = int(pitches[sel[np.argmax(weight[sel])]])
+    best = {}
+    for B in (3, 4):
+        for ph in range(B):
+            sel = w[ph::B]
+            if sel.size < 3:
+                continue
+            prom = float(sel.mean() / w.mean())
+            pcs = [beat_pc[k] for k in range(ph, w.size, B) if k in beat_pc]
+            if not pcs:
+                continue
+            # bars tend to open on the same note (the root): reward that
+            same = max(pcs.count(x) for x in set(pcs)) / len(pcs)
+            score = prom * (0.5 + same)
+            if B not in best or score > best[B][0]:
+                best[B] = (score, ph)
+    if 4 not in best:
+        return 4, 0.0
+    use = 4
+    if 3 in best and best[3][0] > best[4][0] * 1.1:
+        use = 3
+    ph = best[use][1]
+    # beat index `ph` (counted from the first note's beat) is the downbeat
+    first_beat_pos = off + b * (np.floor((starts.min() - off) / b + 0.5))
+    return use, float(first_beat_pos + ph * b)
+
+
+def _quantize_midi(midi, bpm, beats=4, downbeat=None):
     """Snap note starts/ends to a 16th-note grid at `bpm`, then return a new
     PrettyMIDI. No triplets, no tiny rests: one clean grid."""
     import numpy as np
@@ -171,13 +225,23 @@ def _quantize_midi(midi, bpm):
         return float(np.mean(np.minimum(ph, 1.0 - ph)))
     off = float(offs[int(np.argmin([cost(o) for o in offs]))])
 
+    # Make the detected downbeat the start of a bar. Notes before it become a
+    # pick-up measure (leading rest) instead of being cut off.
+    shift = 0.0
+    if downbeat is not None:
+        bar = beats * 60.0 / bpm
+        shift = -downbeat
+        while starts.min() + shift < -1e-6:
+            shift += bar
+        off = (off + shift) % g if shift else off
     out = pretty_midi.PrettyMIDI(initial_tempo=bpm)
+    out.time_signature_changes.append(pretty_midi.TimeSignature(beats, 4, 0))
     for inst in midi.instruments:
         new = pretty_midi.Instrument(program=inst.program, is_drum=False, name=inst.name)
         notes = []
         for n in sorted(inst.notes, key=lambda n: n.start):
-            s = max(0, int(round((n.start - off) / g)))
-            e = max(s + 1, int(round((n.end - off) / g)))
+            s = max(0, int(round((n.start + shift - off) / g)))
+            e = max(s + 1, int(round((n.end + shift - off) / g)))
             notes.append([s, e, n.pitch, n.velocity])
         for a, b in zip(notes, notes[1:]):  # no overlaps on one line / same pitch
             if a[2] == b[2] or b[0] - a[1] < 0:
@@ -346,7 +410,7 @@ def _pick_key(score):
     return sh, f"Key: {name}"
 
 
-def _midi_to_musicxml(midi_bytes, title, bpm=None):
+def _midi_to_musicxml(midi_bytes, title, bpm=None, beats=4):
     from music21 import converter, expressions, key as m21key, meter, metadata, stream
 
     with tempfile.TemporaryDirectory() as td:
@@ -381,7 +445,7 @@ def _midi_to_musicxml(midi_bytes, title, bpm=None):
             part.insert(0, m21key.KeySignature(sharps))
             if not list(part.recurse().getElementsByClass(meter.TimeSignature)):
                 m0 = part.getElementsByClass(stream.Measure).first()
-                (m0 if m0 is not None else part).insert(0, meter.TimeSignature("4/4"))  # 4/4 unless told otherwise
+                (m0 if m0 is not None else part).insert(0, meter.TimeSignature(f"{beats}/4"))
             label = "   |   ".join(x for x in (f"{round(bpm)} BPM" if bpm else "", key_label) if x)
             if label:
                 te = expressions.TextExpression(label)
@@ -438,7 +502,8 @@ def transcribe(audio_bytes, ext, instrument):
         _make_monophonic(midi)
     onsets = [n.start for i in midi.instruments for n in i.notes]
     bpm = _refine_bpm(onsets, prior)
-    midi = _quantize_midi(midi, bpm)
+    beats, downbeat = _detect_meter(midi, bpm)
+    midi = _quantize_midi(midi, bpm, beats, downbeat)
 
     note_count = sum(len(i.notes) for i in midi.instruments)
     if note_count == 0:
@@ -448,6 +513,6 @@ def transcribe(audio_bytes, ext, instrument):
     midi.write(buf)
     midi_bytes = buf.getvalue()
 
-    xml = _midi_to_musicxml(midi_bytes, settings["title"], bpm)
+    xml = _midi_to_musicxml(midi_bytes, settings["title"], bpm, beats)
     xml = _add_tablature(xml, instrument)
     return {"midi": midi_bytes, "musicxml": xml, "bpm": bpm, "note_count": note_count}
