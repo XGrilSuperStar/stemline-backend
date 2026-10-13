@@ -310,7 +310,7 @@ def _add_tablature(xml, instrument):
 
 
 
-def _midi_to_musicxml(midi_bytes, title):
+def _midi_to_musicxml(midi_bytes, title, bpm=None):
     from music21 import converter, expressions, key as m21key, meter, metadata, stream
 
     with tempfile.TemporaryDirectory() as td:
@@ -348,8 +348,9 @@ def _midi_to_musicxml(midi_bytes, title):
             if not list(part.recurse().getElementsByClass(meter.TimeSignature)):
                 m0 = part.getElementsByClass(stream.Measure).first()
                 (m0 if m0 is not None else part).insert(0, meter.TimeSignature("4/4"))  # 4/4 unless told otherwise
-            if key_label:
-                te = expressions.TextExpression(key_label)
+            label = "   |   ".join(x for x in (f"{round(bpm)} BPM" if bpm else "", key_label) if x)
+            if label:
+                te = expressions.TextExpression(label)
                 te.placement = "above"
                 m1 = part.getElementsByClass(stream.Measure).first()
                 (m1 if m1 is not None else part).insert(0, te)
@@ -413,6 +414,6 @@ def transcribe(audio_bytes, ext, instrument):
     midi.write(buf)
     midi_bytes = buf.getvalue()
 
-    xml = _midi_to_musicxml(midi_bytes, settings["title"])
+    xml = _midi_to_musicxml(midi_bytes, settings["title"], bpm)
     xml = _add_tablature(xml, instrument)
     return {"midi": midi_bytes, "musicxml": xml, "bpm": bpm, "note_count": note_count}
