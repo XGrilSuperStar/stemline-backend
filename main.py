@@ -1783,7 +1783,7 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
                         "-af", f"{gate_filter},{filter_chain}" if gate_filter else filter_chain,
                         tmp_path,
                     ]
-                    eq_result = subprocess.run(eq_cmd, capture_output=True, text=True, timeout=120)
+                    eq_result = subprocess.run(eq_cmd, capture_output=True, text=True, timeout=400)
                     if eq_result.returncode != 0 and (STEM_FX or key == "other"):
                         logger.warning(f"[job {request_id}] FX chain failed on {f}, retrying base chain: {eq_result.stderr[-300:]}")
                         if key == "other":
@@ -1791,7 +1791,7 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
                         else:
                             base_chain = f"{EQ_PROFILES[key]},{COMPRESSOR_PROFILES[key]}" + (f",{EXCITER_PROFILES[key]}" if key in EXCITER_PROFILES else "")
                         eq_cmd[eq_cmd.index("-af") + 1] = f"{gate_filter},{base_chain}" if gate_filter else base_chain
-                        eq_result = subprocess.run(eq_cmd, capture_output=True, text=True, timeout=120)
+                        eq_result = subprocess.run(eq_cmd, capture_output=True, text=True, timeout=400)
                     if eq_result.returncode == 0 and os.path.exists(tmp_path):
                         os.replace(tmp_path, src_path)
                         logger.info(f"[job {request_id}] Applied EQ+compressor ({key}) to {f}")
@@ -1804,7 +1804,7 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
         # Polish all stems at once (the server has a few CPU cores; doing
         # them one after another was the slowest part of a split).
         _polish_files = list(os.listdir(stem_dir))
-        _polish_workers = max(1, min(len(_polish_files), int(os.getenv("POLISH_WORKERS", str(os.cpu_count() or 2)))))
+        _polish_workers = max(1, min(len(_polish_files), int(os.getenv("POLISH_WORKERS", "1"))))
         with concurrent.futures.ThreadPoolExecutor(max_workers=_polish_workers) as _pool:
             list(_pool.map(_polish_stem, _polish_files))
 
