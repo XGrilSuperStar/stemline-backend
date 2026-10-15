@@ -41,15 +41,15 @@
   .tag { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--vu-amber); }
   h1 { margin: 0.1rem 0 0; font-family: 'Big Shoulders Stencil', sans-serif; font-weight: 800; font-size: 1.7rem; letter-spacing: 0.04em; text-transform: uppercase; }
   h2 { margin: 0 0 0.6rem; font-family: 'Big Shoulders Stencil', sans-serif; font-weight: 800; font-size: 1.05rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--vu-amber); }
-  .back {
+  a.back {
     font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; font-weight: 700;
     letter-spacing: 0.06em; text-transform: uppercase; text-decoration: none;
     color: var(--vu-amber); border: 1px solid rgba(231,163,62,0.55); border-radius: 4px;
     padding: 0.55rem 0.9rem; margin-left: auto; white-space: nowrap;
     background: linear-gradient(180deg, rgba(231,163,62,0.12), rgba(231,163,62,0.04));
   }
-  .back:hover { background: rgba(231,163,62,0.2); }
-  .back + .logo { margin-left: 0; }
+  a.back:hover { background: rgba(231,163,62,0.2); }
+  a.back + .logo { margin-left: 0; }
   .logo { display: flex; align-items: center; gap: 10px; margin-left: auto; text-decoration: none; color: inherit; }
   .logo-mark { width: 38px; height: 38px; flex-shrink: 0; }
   .logo-mark svg { display: block; width: 100%; height: 100%; }
@@ -177,7 +177,7 @@
     select { min-width: 0; flex: 1 1 100%; }
     #wave { height: 240px; }
     header { flex-wrap: wrap; }
-    .back { order: 3; margin-left: 0; }
+    a.back { order: 3; margin-left: 0; }
     .pads { gap: 6px; }
   }
 </style>
