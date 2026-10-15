@@ -57,6 +57,41 @@
     letter-spacing: 0.05em; text-transform: uppercase; color: var(--chrome);
   }
 
+  .back {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; font-weight: 700;
+    letter-spacing: 0.06em; text-transform: uppercase; text-decoration: none;
+    color: var(--vu-amber); border: 1px solid rgba(231,163,62,0.55); border-radius: 4px;
+    padding: 0.55rem 0.9rem; margin-left: auto; white-space: nowrap;
+    background: linear-gradient(180deg, rgba(231,163,62,0.12), rgba(231,163,62,0.04));
+  }
+  .back:hover { background: rgba(231,163,62,0.2); }
+  .back + .logo { margin-left: 0; }
+
+  .intro { margin: 0 0 0.4rem; }
+  .intro h2 {
+    margin: 0 0 0.25rem; font-family: 'Big Shoulders Stencil', sans-serif; font-weight: 700;
+    font-size: 1.25rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--chrome);
+  }
+  .intro p { margin: 0 0 0.7rem; color: var(--chrome-dim); font-size: 0.92rem; max-width: 62ch; }
+  .facts { display: flex; flex-wrap: wrap; gap: 0.5rem; list-style: none; margin: 0; padding: 0; }
+  .facts li {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; letter-spacing: 0.03em;
+    color: var(--chrome-dim); background: #0e0e10; border: 1px solid var(--concrete-line);
+    border-radius: 999px; padding: 0.3rem 0.75rem;
+  }
+  .facts li::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 0.5rem;
+    border-radius: 50%; background: var(--vu-amber); vertical-align: middle; }
+  .field { display: flex; flex-direction: column; gap: 0.3rem; }
+  .field > span {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--vu-amber);
+  }
+  .row { align-items: flex-end; }
+  #sheet:empty::before {
+    content: 'Your sheet music will appear here.'; display: block; padding: 2.2rem 0;
+    text-align: center; color: #8a8f98; font-size: 0.9rem;
+  }
+
   main { max-width: 1100px; margin: 0 auto; padding: 1.25rem 1.5rem 3rem; }
   .note { color: var(--chrome-dim); font-size: 0.88rem; max-width: 70ch; margin: 0 0 1rem; }
 
@@ -118,7 +153,8 @@
   #sheet { background: #fff; color: #111; border-radius: 3px; padding: 1rem; min-height: 140px; }
 
   @media (max-width: 640px) {
-    header { padding: 0.8rem 1rem; }
+    header { padding: 0.8rem 1rem; flex-wrap: wrap; }
+    .back { order: 3; margin-left: 0; }
     h1 { font-size: 1.25rem; }
     .logo-text { font-size: 1.05rem; }
     main { padding: 1rem; }
@@ -132,6 +168,7 @@
     <div class="tag">Stem to notation</div>
     <h1>Sheet music</h1>
   </div>
+  <a class="back" href="/">&larr; Mixing board</a>
   <a class="logo" href="/" aria-label="Stemline101 home">
     <span class="logo-mark">
       <svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -160,17 +197,25 @@
 </header>
 
 <main>
-<p class="note">Pick a split song and a stem. The notes are detected automatically, so expect some mistakes, especially on busy or noisy stems. Free accounts get 2 short previews a month; Premium unlocks the full chart plus MusicXML and MIDI downloads.</p>
+<section class="intro">
+  <h2>Turn any stem into sheet music</h2>
+  <p>Choose one of your split songs and an instrument, then press Show sheet music.</p>
+  <ul class="facts">
+    <li>Notes are detected automatically &mdash; expect some mistakes on busy stems</li>
+    <li>Free: 2 short previews a month</li>
+    <li>Premium: full chart + MusicXML &amp; MIDI downloads</li>
+  </ul>
+</section>
 
 <div class="row">
-  <select id="song"><option>Loading your songs…</option></select>
-  <select id="inst">
+  <label class="field"><span>Song</span><select id="song"><option>Loading your songs…</option></select></label>
+  <label class="field"><span>Stem</span><select id="inst">
     <option value="bass">Bass</option>
     <option value="vocals">Vocals</option>
     <option value="guitar">Guitar</option>
     <option value="piano">Keys / Synth</option>
     <option value="other">Other</option>
-  </select>
+  </select></label>
   <button id="go">Show sheet music</button>
   <button id="dlxml" class="secondary" disabled>Download MusicXML</button>
   <button id="dlmidi" class="secondary" disabled>Download MIDI</button>
