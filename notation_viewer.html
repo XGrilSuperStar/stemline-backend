@@ -239,6 +239,7 @@
       if (!r.ok) {
         var msg = 'Something went wrong.';
         try { msg = (await r.json()).detail || msg; } catch (e) {}
+        if (r.status === 402) msg = 'Sheet music is a Premium feature. Upgrade on the main page to unlock it.';
         throw new Error(msg);
       }
       lastXml = await r.text();

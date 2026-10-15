@@ -2592,6 +2592,10 @@ def stem_notation(stem_id: int, instrument: str, fmt: str = "musicxml", token: s
     if not NOTATION_ENABLED:
         raise HTTPException(status_code=404, detail="Not Found")
     user_id = get_current_user(token)
+    # Paid tier only (admin counts as premium).
+    notation_user = db.query(User).filter(User.id == user_id).first()
+    if not effective_is_premium(db, notation_user):
+        raise HTTPException(status_code=402, detail="Sheet music is a Premium feature. Upgrade to unlock it.")
     if instrument not in STEM_INSTRUMENTS:
         raise HTTPException(status_code=400, detail=f"Unknown instrument: {instrument}")
     if fmt not in ("musicxml", "midi"):
