@@ -141,6 +141,17 @@
   }
   #status:empty { opacity: 0; }
 
+  /* Tempo / key / time readout */
+  .info { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 0 0 0.9rem; }
+  .info:empty { display: none; }
+  .chip {
+    display: flex; flex-direction: column; gap: 0.1rem; min-width: 110px;
+    padding: 0.5rem 0.9rem; background: #0e0e10; border: 1px solid var(--concrete-line);
+    border-left: 3px solid var(--vu-amber); border-radius: 3px;
+  }
+  .chip span { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--chrome-dim); }
+  .chip b { font-family: 'Big Shoulders Stencil', sans-serif; font-size: 1.5rem; letter-spacing: 0.04em; color: var(--vu-amber); font-weight: 800; line-height: 1.1; }
+
   /* Sheet: white paper in a metal bezel */
   .bezel {
     padding: 10px; border-radius: 8px;
@@ -221,6 +232,7 @@
   <button id="dlmidi" class="secondary" disabled>Download MIDI</button>
 </div>
 <div id="status"></div>
+<div id="info" class="info"></div>
 <div class="bezel"><div id="sheet"></div></div>
 </main>
 
@@ -237,6 +249,17 @@
   var osmd = null, lastXml = null, rows = [];
 
   function setStatus(t) { statusEl.textContent = t || ''; }
+  var infoEl = document.getElementById('info');
+  function showInfo(xml) {
+    var bpm = (xml.match(/(\d+)\s*BPM/) || [])[1] || (xml.match(/<per-minute>\s*([\d.]+)/) || [])[1] || (xml.match(/<sound[^>]*tempo="([\d.]+)"/) || [])[1];
+    var key = (xml.match(/Key:\s*([A-G][b#]?\s+(?:major|minor))/) || [])[1];
+    var beats = (xml.match(/<beats>(\d+)<\/beats>/) || [])[1], bt = (xml.match(/<beat-type>(\d+)<\/beat-type>/) || [])[1];
+    var h = '';
+    if (bpm) h += '<div class="chip"><span>Tempo</span><b>' + Math.round(parseFloat(bpm)) + ' BPM</b></div>';
+    if (key) h += '<div class="chip"><span>Key</span><b>' + key + '</b></div>';
+    if (beats && bt) h += '<div class="chip"><span>Time</span><b>' + beats + '/' + bt + '</b></div>';
+    infoEl.innerHTML = h;
+  }
 
   function url(id, inst, fmt) {
     return '/api/v1/my-stems/' + id + '/notation/' + inst + '?fmt=' + fmt + '&token=' + encodeURIComponent(token);
@@ -277,7 +300,7 @@
   goBtn.addEventListener('click', async function () {
     var s = rows[songSel.value]; if (!s) return;
     var inst = instSel.value;
-    goBtn.disabled = true; xmlBtn.disabled = true; midiBtn.disabled = true;
+    goBtn.disabled = true; xmlBtn.disabled = true; midiBtn.disabled = true; infoEl.innerHTML = '';
     setStatus('Listening to the stem and writing out the notes… this can take a minute.');
     try {
       var r = await fetch(url(s.id, inst, 'musicxml'));
@@ -292,6 +315,7 @@
       if (!osmd) osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay('sheet', { autoResize: true, drawTitle: true });
       await osmd.load(lastXml);
       osmd.render();
+      showInfo(lastXml);
       if (isPreview) {
         setStatus('Free preview: first 8 measures only. ' + usesLeft + ' free preview(s) left this month. Upgrade to Premium for the full chart and downloads.');
         xmlBtn.disabled = true; midiBtn.disabled = true;
