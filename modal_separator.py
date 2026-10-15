@@ -77,7 +77,7 @@ def separate(audio: bytes) -> bytes:
         output_single_stem="Vocals",
         output_format="WAV",
         use_autocast=True,  # fp16 on the GPU: much faster, no audible quality change
-        mdxc_params={"batch_size": 4, "overlap": 8, "segment_size": 256},
+        mdxc_params={"batch_size": 4, "overlap": 4, "segment_size": 256},
     )
     sep.load_model(ROFORMER_MODEL)
     files = sep.separate(src)
