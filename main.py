@@ -1452,6 +1452,7 @@ def _run_modal_separation(file_path: str, output_dir: str, request_id: str):
         r = requests.post(f"{MODAL_SEPARATE_URL}/submit", data=fh, headers=headers, timeout=180)
     r.raise_for_status()
     call_id = r.json()["call_id"]
+    _modal_t0 = time.time()
     logger.info(f"[job {request_id}] Modal job submitted: {call_id}")
 
     deadline = time.time() + MODAL_TIMEOUT_SECONDS
@@ -1466,6 +1467,7 @@ def _run_modal_separation(file_path: str, output_dir: str, request_id: str):
             raise Exception(f"Modal job failed ({res.status_code}): {res.text[:300]}")
         break
 
+    logger.info(f"[job {request_id}] Modal GPU finished in {time.time() - _modal_t0:.0f}s")
     track_dir = os.path.join(output_dir, "modal", "track")
     os.makedirs(track_dir, exist_ok=True)
     with zipfile.ZipFile(io.BytesIO(res.content)) as z:

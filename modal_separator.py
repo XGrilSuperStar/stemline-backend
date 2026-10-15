@@ -31,31 +31,37 @@ ROFORMER_MODEL = "model_bs_roformer_ep_317_sdr_12.9755.ckpt"
 STEMS = ["vocals", "drums", "bass", "guitar", "piano", "other"]
 
 
-@app.function(
-    gpu="A10G",
-    image=image,
-    timeout=1200,
-    volumes={MODEL_DIR: models_vol},
-    # Stay warm briefly after a job so back-to-back splits skip the model load,
-    # then scale to zero so an idle GPU never bills.
-    scaledown_window=300,
-)
-def separate(audio: bytes) -> bytes:
-    import glob, io, shutil, subprocess, tempfile, time, zipfile
-
-    work = tempfile.mkdtemp(prefix="sep_")
-    src = os.path.join(work, "song.wav")
+def _decode_to_wav(audio: bytes, work: str) -> str:
+    """Full-length stereo 44.1k WAV, same as the backend does for Demucs."""
+    import subprocess
     raw = os.path.join(work, "upload.bin")
+    src = os.path.join(work, "song.wav")
     open(raw, "wb").write(audio)
-
-    # Full-length stereo 44.1k WAV, same as the backend does for Demucs.
     subprocess.run(
         ["ffmpeg", "-y", "-loglevel", "error", "-i", raw, "-vn", "-ar", "44100",
          "-ac", "2", "-c:a", "pcm_s16le", src],
         check=True,
     )
+    return src
 
-    # --- Demucs 6-stem (same settings as production) ---
+
+# Demucs and BS-Roformer used to run one after the other on a single GPU.
+# They don't depend on each other, so each now gets its own GPU and they run
+# at the same time: a split takes as long as the slower of the two, not the
+# sum. GPU-seconds (and cost) stay about the same.
+@app.function(
+    gpu="A10G",
+    image=image,
+    timeout=1200,
+    volumes={MODEL_DIR: models_vol},
+    scaledown_window=300,
+)
+def run_demucs(audio: bytes) -> dict:
+    """Demucs htdemucs_6s. Returns {"vocals": mp3 bytes, ..., "other": mp3 bytes}."""
+    import shutil, subprocess, tempfile, time
+
+    work = tempfile.mkdtemp(prefix="dem_")
+    src = _decode_to_wav(audio, work)
     t = time.time()
     demucs_out = os.path.join(work, "demucs")
     subprocess.run(
@@ -65,8 +71,25 @@ def separate(audio: bytes) -> bytes:
     )
     print(f"demucs {time.time() - t:.1f}s")
     stem_dir = os.path.join(demucs_out, "htdemucs_6s", "song")
+    out = {name: open(os.path.join(stem_dir, f"{name}.mp3"), "rb").read() for name in STEMS}
+    models_vol.commit()  # persist any freshly downloaded weights
+    shutil.rmtree(work, ignore_errors=True)
+    return out
 
-    # --- BS-Roformer vocals ---
+
+@app.function(
+    gpu="A10G",
+    image=image,
+    timeout=1200,
+    volumes={MODEL_DIR: models_vol},
+    scaledown_window=300,
+)
+def run_roformer(audio: bytes) -> bytes:
+    """BS-Roformer vocals only. Returns a 192k mp3."""
+    import shutil, subprocess, tempfile, time
+
+    work = tempfile.mkdtemp(prefix="rof_")
+    src = _decode_to_wav(audio, work)
     t = time.time()
     from audio_separator.separator import Separator
 
@@ -89,20 +112,37 @@ def separate(audio: bytes) -> bytes:
             voc = p
     if voc is None:
         raise RuntimeError(f"BS-Roformer produced no vocals file: {files}")
-    # Replace Demucs' vocals with the Roformer ones, as 192k mp3 to match.
+    out_mp3 = os.path.join(work, "vocals.mp3")
     subprocess.run(
-        ["ffmpeg", "-y", "-loglevel", "error", "-i", voc, "-b:a", "192k",
-         os.path.join(stem_dir, "vocals.mp3")],
+        ["ffmpeg", "-y", "-loglevel", "error", "-i", voc, "-b:a", "192k", out_mp3],
         check=True,
     )
-
+    data = open(out_mp3, "rb").read()
     models_vol.commit()  # persist any freshly downloaded weights
+    shutil.rmtree(work, ignore_errors=True)
+    return data
+
+
+@app.function(image=modal.Image.debian_slim(python_version="3.11"), timeout=1200)
+def separate(audio: bytes) -> bytes:
+    """Fan out to both GPUs, then zip the six stems (same output as before)."""
+    import io, time, zipfile
+
+    t = time.time()
+    dem_call = run_demucs.spawn(audio)
+    rof_call = run_roformer.spawn(audio)
+    stems = dem_call.get()
+    try:
+        stems["vocals"] = rof_call.get()
+    except Exception as e:
+        # Roformer failed: keep Demucs' own vocals rather than failing the split.
+        print(f"roformer failed, using demucs vocals: {e}")
+    print(f"separate total {time.time() - t:.1f}s")
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as z:
         for name in STEMS:
-            z.write(os.path.join(stem_dir, f"{name}.mp3"), f"{name}.mp3")
-    shutil.rmtree(work, ignore_errors=True)
+            z.writestr(f"{name}.mp3", stems[name])
     return buf.getvalue()
 
 
