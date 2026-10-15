@@ -1544,7 +1544,7 @@
             <span class="screen-tabs">
               <button type="button" class="screen-tab active" data-view="waves">WAVES</button>
               <button type="button" class="screen-tab" data-view="stems" id="screenStemsTab">MY STEMS <span id="screenCount">(0)</span></button>
-              <button type="button" class="screen-tab" data-view="samples" id="screenSamplesTab">MIXES</button>
+              <button type="button" class="screen-tab" data-view="samples" id="screenSamplesTab">SAMPLES</button>
             </span>
           </div>
           <div class="transport" role="group" aria-label="Playback transport">
@@ -1632,6 +1632,7 @@
               <button class="cue-btn" type="button" title="Solo: isolate this channel, mute all others" aria-label="Solo">S</button>
               <button class="mute-btn" type="button" title="Mute this channel (stays out of main mix)">M</button>
             </div>
+            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="vocals" style="--pc:#ff5540" aria-label="Sample pad"><span class="pad-label">SAMPLE</span><span></span></button><button type="button" class="pad-hp" data-hp="vocals" title="On = pad plays in headphones only">🎧</button></div>
           </div>
           <div class="channel" data-stem="drums">
             <div class="name">Drums</div>
@@ -1668,6 +1669,7 @@
               <button class="cue-btn" type="button" title="Solo: isolate this channel, mute all others" aria-label="Solo">S</button>
               <button class="mute-btn" type="button" title="Mute this channel (stays out of main mix)">M</button>
             </div>
+            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="drums" style="--pc:#ffa022" aria-label="Sample pad"><span class="pad-label">SAMPLE</span><span></span></button><button type="button" class="pad-hp" data-hp="drums" title="On = pad plays in headphones only">🎧</button></div>
           </div>
           <div class="channel" data-stem="bass">
             <div class="name">Bass</div>
@@ -1704,6 +1706,7 @@
               <button class="cue-btn" type="button" title="Solo: isolate this channel, mute all others" aria-label="Solo">S</button>
               <button class="mute-btn" type="button" title="Mute this channel (stays out of main mix)">M</button>
             </div>
+            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="bass" style="--pc:#2fe08a" aria-label="Sample pad"><span class="pad-label">SAMPLE</span><span></span></button><button type="button" class="pad-hp" data-hp="bass" title="On = pad plays in headphones only">🎧</button></div>
           </div>
           <div class="channel" data-stem="guitar">
             <div class="name">Guitar</div>
@@ -1740,6 +1743,7 @@
               <button class="cue-btn" type="button" title="Solo: isolate this channel, mute all others" aria-label="Solo">S</button>
               <button class="mute-btn" type="button" title="Mute this channel (stays out of main mix)">M</button>
             </div>
+            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="guitar" style="--pc:#9b6dff" aria-label="Sample pad"><span class="pad-label">SAMPLE</span><span></span></button><button type="button" class="pad-hp" data-hp="guitar" title="On = pad plays in headphones only">🎧</button></div>
           </div>
           <div class="channel" data-stem="piano">
             <div class="name">Synth</div>
@@ -1776,6 +1780,7 @@
               <button class="cue-btn" type="button" title="Solo: isolate this channel, mute all others" aria-label="Solo">S</button>
               <button class="mute-btn" type="button" title="Mute this channel (stays out of main mix)">M</button>
             </div>
+            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="piano" style="--pc:#ff5cb0" aria-label="Sample pad"><span class="pad-label">SAMPLE</span><span></span></button><button type="button" class="pad-hp" data-hp="piano" title="On = pad plays in headphones only">🎧</button></div>
           </div>
           <div class="channel" data-stem="other">
             <div class="name">Other</div>
@@ -1812,6 +1817,7 @@
               <button class="cue-btn" type="button" title="Solo: isolate this channel, mute all others" aria-label="Solo">S</button>
               <button class="mute-btn" type="button" title="Mute this channel (stays out of main mix)">M</button>
             </div>
+            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="other" style="--pc:#3ab6ff" aria-label="Sample pad"><span class="pad-label">SAMPLE</span><span></span></button><button type="button" class="pad-hp" data-hp="other" title="On = pad plays in headphones only">🎧</button></div>
           </div>
         </div>
 
@@ -3570,7 +3576,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     canvas.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
-      return; // sampling moved to the Sampler page (/sampler); scrub handler takes this drag
+      return; // sampling/editing moved to the Sampler page (/sampler); scrub handler takes this drag
       canvas.setPointerCapture(e.pointerId);
       selecting = true;
       startX = e.clientX;
@@ -3621,7 +3627,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (sampleLib) { sampleLib.style.display = view === 'samples' ? 'flex' : 'none'; if (view === 'samples' && window.__renderLibrary) window.__renderLibrary(); }
       const browseBar = document.getElementById('screenBrowse');
       if (browseBar) browseBar.style.display = view === 'stems' ? 'flex' : 'none';
-      if (screenTitle) screenTitle.textContent = view === 'waves' ? 'STEM WAVEFORMS' : (view === 'samples' ? 'SAVED MIXES' : 'MY STEMS');
+      if (screenTitle) screenTitle.textContent = view === 'waves' ? 'STEM WAVEFORMS' : (view === 'samples' ? 'SAMPLE LIBRARY' : 'MY STEMS');
     });
   });
 
@@ -5678,11 +5684,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     if (!lib.length) {
       const e = document.createElement('div'); e.className = 'lib-empty mono';
-      e.textContent = mixes.length ? '' : 'No saved mixes yet.';
-      if (!mixes.length) root.appendChild(e);
-      return; // samples now live on the Sampler page (/sampler)
+      e.textContent = 'No samples yet. Cut a region on a waveform, right-click it, Save sample.';
+      root.appendChild(e); return;
     }
-    return; // samples now live on the Sampler page (/sampler)
     const a = getAssign();
     const TYPE_ORDER = ['vocals', 'drums', 'bass', 'guitar', 'piano', 'other'];
     const sortedLib = lib.slice().sort((x, y) => {
