@@ -290,6 +290,8 @@ def _add_letters(xml):
 TUNINGS = {
     "bass": [28, 33, 38, 43],            # E A D G
     "guitar": [40, 45, 50, 55, 59, 64],  # E A D G B E
+    "other": [40, 45, 50, 55, 59, 64],   # shown as guitar tab
+    "piano": [40, 45, 50, 55, 59, 64],   # shown as guitar tab
 }
 _STEP = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
 
@@ -360,7 +362,12 @@ def _add_tablature(xml, instrument):
                 first.remove(old)
         st = ET.SubElement(first, "staves"); st.text = "2"
         c1 = ET.SubElement(first, "clef", number="1")
-        ET.SubElement(c1, "sign").text = "F"; ET.SubElement(c1, "line").text = "4"
+        if instrument == "bass":
+            ET.SubElement(c1, "sign").text = "F"; ET.SubElement(c1, "line").text = "4"
+        else:
+            ET.SubElement(c1, "sign").text = "G"; ET.SubElement(c1, "line").text = "2"
+            if instrument == "guitar":
+                ET.SubElement(c1, "clef-octave-change").text = "-1"
         c2 = ET.SubElement(first, "clef", number="2")
         ET.SubElement(c2, "sign").text = "TAB"; ET.SubElement(c2, "line").text = "5"
         sd = ET.SubElement(first, "staff-details", number="2")

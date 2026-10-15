@@ -318,7 +318,8 @@
       showInfo(lastXml);
       if (isPreview) {
         setStatus('Free preview: first 8 measures only. ' + usesLeft + ' free preview(s) left this month. Upgrade to Premium for the full chart and downloads.');
-        xmlBtn.disabled = true; midiBtn.disabled = true;
+        xmlBtn.disabled = true; midiBtn.disabled = false;
+        midiBtn.onclick = function () { setStatus('MIDI download is a Premium feature. Upgrade to unlock MIDI and MusicXML downloads.'); };
         goBtn.disabled = false;
         return;
       }
@@ -327,7 +328,7 @@
       xmlBtn.onclick = function () { save(new Blob([lastXml], { type: 'application/xml' }), s.track_name + '_' + inst + '.musicxml'); };
       midiBtn.onclick = async function () {
         var m = await fetch(url(s.id, inst, 'midi'));
-        if (m.ok) save(await m.blob(), s.track_name + '_' + inst + '.mid');
+        if (m.ok) save(await m.blob(), s.track_name + '_' + inst + '.mid'); else setStatus('Could not download MIDI.');
       };
     } catch (e) { setStatus(e.message); }
     goBtn.disabled = false;
