@@ -1931,7 +1931,7 @@
       <input type="text" id="authUsername" placeholder="Username" autocomplete="off" style="width:100%;box-sizing:border-box;padding:0.65rem;margin-bottom:0.7rem;background:var(--void);border:1px solid var(--concrete-line);color:var(--chrome);font-family:inherit;font-size:0.8rem;display:none;">
       <div style="position:relative;margin-bottom:1.1rem;">
         <input type="password" id="authPassword" placeholder="Password" required minlength="8" autocomplete="new-password" style="width:100%;box-sizing:border-box;padding:0.65rem;padding-right:2.6rem;background:var(--void);border:1px solid var(--concrete-line);color:var(--chrome);font-family:inherit;font-size:0.8rem;">
-        <button type="button" id="authPasswordToggle" aria-label="Show password" style="position:absolute;right:0.5rem;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--chrome-dim);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.65rem;letter-spacing:0.04em;">SHOW</button>
+        <button type="button" id="authPasswordToggle" aria-label="Show password" style="position:absolute;right:0.5rem;top:50%;transform:translateY(-50%);background:none;border:none;color:#E7A33E;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.75rem;font-weight:700;letter-spacing:0.06em;padding:0.4rem;">SHOW</button>
       </div>
       <p id="authPasswordHint" style="display:none;color:var(--chrome-dim);font-size:0.68rem;margin:-0.85rem 0 1.1rem;">At least 8 characters, with 1 capital letter, 1 number, and 1 symbol.</p>
       <label id="authTermsWrap" style="display:none;align-items:flex-start;gap:0.5rem;margin-bottom:1.1rem;font-size:0.72rem;color:var(--chrome-dim);line-height:1.4;cursor:pointer;">
@@ -1958,7 +1958,8 @@
     <div id="resetPasswordForm" style="display:none;">
       <p style="color:var(--chrome-dim);font-size:0.75rem;margin:0 0 0.9rem;">Choose a new password.</p>
       <div style="position:relative;margin-bottom:0.4rem;">
-        <input type="password" id="resetNewPassword" placeholder="New password" minlength="8" autocomplete="new-password" style="width:100%;box-sizing:border-box;padding:0.65rem;background:var(--void);border:1px solid var(--concrete-line);color:var(--chrome);font-family:inherit;font-size:0.8rem;">
+        <input type="password" id="resetNewPassword" placeholder="New password" minlength="8" autocomplete="new-password" style="width:100%;box-sizing:border-box;padding:0.65rem;padding-right:3.4rem;background:var(--void);border:1px solid var(--concrete-line);color:var(--chrome);font-family:inherit;font-size:0.8rem;">
+        <button type="button" id="resetPasswordToggle" aria-label="Show password" style="position:absolute;right:0.5rem;top:50%;transform:translateY(-50%);background:none;border:none;color:#E7A33E;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:0.75rem;font-weight:700;letter-spacing:0.06em;padding:0.4rem;">SHOW</button>
       </div>
       <p style="color:var(--chrome-dim);font-size:0.68rem;margin:0 0 0.9rem;">At least 8 characters, with 1 capital letter, 1 number, and 1 symbol.</p>
       <button type="button" id="resetSubmitBtn" class="btn-primary" style="width:100%;border:none;cursor:pointer;font-family:inherit;">Set new password</button>
@@ -4107,6 +4108,16 @@ document.addEventListener('DOMContentLoaded', () => {
     authPassword.type = showing ? 'password' : 'text';
     authPasswordToggle.textContent = showing ? 'SHOW' : 'HIDE';
   });
+  (function () {
+    const rt = document.getElementById('resetPasswordToggle'), rp = document.getElementById('resetNewPassword');
+    if (!rt || !rp) return;
+    rt.addEventListener('click', () => {
+      const showing = rp.type === 'text';
+      rp.type = showing ? 'password' : 'text';
+      rt.textContent = showing ? 'SHOW' : 'HIDE';
+      rt.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+    });
+  })();
 
   const authForgotWrap = document.getElementById('authForgotWrap');
   const authForgotLink = document.getElementById('authForgotLink');
