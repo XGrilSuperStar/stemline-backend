@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Stemline Sampler: chop any stem into samples, drop them on a 16-pad grid, trim and play them live. Free to try, Premium for unlimited samples and downloads.">
+<title>Sampler — Stemline101</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil:wght@700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void: #0B0B0D;
+    --concrete: #17171A;
+    --concrete-line: rgba(216,220,226,0.14);
+    --chrome: #D8DCE2;
+    --chrome-dim: rgba(216,220,226,0.55);
+    --steel: #6B7078;
+    --ember: #B8562E;
+    --vu-amber: #E7A33E;
+    --teal: #3CFDE0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh;
+    background: var(--void); color: var(--chrome);
+    font-family: 'Inter', system-ui, sans-serif; line-height: 1.5;
+  }
+  header {
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    padding: 0.9rem 1.5rem;
+    background:
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.018) 0 1px, transparent 1px 3px),
+      linear-gradient(180deg, #1d1d21, #121214);
+    border-bottom: 1px solid var(--concrete-line);
+    position: relative;
+  }
+  header::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+    background: linear-gradient(90deg, var(--vu-amber), var(--ember) 40%, transparent 85%);
+  }
+  .tag { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--vu-amber); }
+  h1 { margin: 0.1rem 0 0; font-family: 'Big Shoulders Stencil', sans-serif; font-weight: 800; font-size: 1.7rem; letter-spacing: 0.04em; text-transform: uppercase; }
+  h2 { margin: 0 0 0.6rem; font-family: 'Big Shoulders Stencil', sans-serif; font-weight: 800; font-size: 1.05rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--vu-amber); }
+  .logo { display: flex; align-items: center; gap: 10px; margin-left: auto; text-decoration: none; color: inherit; }
+  .logo-mark { width: 38px; height: 38px; flex-shrink: 0; }
+  .logo-mark svg { display: block; width: 100%; height: 100%; }
+  .logo-text { font-family: 'Big Shoulders Stencil', sans-serif; font-weight: 800; font-size: 1.35rem; letter-spacing: 0.05em; text-transform: uppercase; }
+  nav.back { max-width: 1200px; margin: 0.8rem auto 0; padding: 0 1.5rem; font: 500 0.75rem 'JetBrains Mono', monospace; }
+  nav.back a { color: var(--chrome-dim); text-decoration: none; }
+  nav.back a:hover { color: var(--vu-amber); }
+
+  main { max-width: 1200px; margin: 0 auto; padding: 1rem 1.5rem 3rem; }
+  .note { color: var(--chrome-dim); font-size: 0.88rem; max-width: 80ch; margin: 0 0 1rem; }
+
+  .panel {
+    padding: 1rem; margin: 0 0 1rem;
+    background:
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.02) 0 1px, transparent 1px 3px),
+      linear-gradient(180deg, #1f1f23, #141416);
+    border: 1px solid var(--concrete-line); border-radius: 6px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 6px 18px rgba(0,0,0,0.45);
+  }
+  .row { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
+  select, button, input[type=text] {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; letter-spacing: 0.03em;
+    border-radius: 4px; padding: 0.55rem 0.8rem;
+  }
+  select, input[type=text] {
+    background: #0e0e10; color: var(--chrome); border: 1px solid var(--concrete-line);
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.6);
+  }
+  select { min-width: 160px; }
+  input[type=text] { min-width: 180px; }
+  select:focus, button:focus-visible, input:focus-visible { outline: 2px solid var(--vu-amber); outline-offset: 1px; }
+  button {
+    cursor: pointer; font-weight: 700; text-transform: uppercase;
+    background: linear-gradient(180deg, #f0b250, var(--vu-amber) 55%, #c98a2c);
+    color: #1a1204; border: 1px solid #8a5d17;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 2px 6px rgba(0,0,0,0.5);
+  }
+  button:hover:not(:disabled) { filter: brightness(1.08); }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button.secondary {
+    background: repeating-linear-gradient(90deg, rgba(255,255,255,0.03) 0 1px, transparent 1px 3px), linear-gradient(180deg, #2a2a2f, #1a1a1d);
+    color: var(--chrome); border: 1px solid var(--concrete-line); font-weight: 500;
+  }
+  button.secondary.on { color: #04201c; background: var(--teal); border-color: var(--teal); font-weight: 700; }
+  button:disabled, select:disabled { opacity: 0.4; cursor: default; }
+
+  #status {
+    min-height: 1.6em; padding: 0.35rem 0.7rem; margin-bottom: 1rem;
+    font-family: 'JetBrains Mono', monospace; font-size: 0.78rem;
+    color: var(--vu-amber); background: #0e0e10; border-left: 3px solid var(--ember); border-radius: 2px;
+  }
+  #status:empty { opacity: 0; }
+
+  /* waveform editor */
+  .bezel {
+    padding: 8px; border-radius: 8px;
+    background: repeating-linear-gradient(90deg, rgba(255,255,255,0.03) 0 1px, transparent 1px 3px), linear-gradient(180deg, #2a2a2f, #131315);
+    border: 1px solid var(--concrete-line);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06);
+  }
+  #wave { display: block; width: 100%; height: 230px; background: #08080a; border-radius: 3px; touch-action: none; cursor: crosshair; }
+  .readout { display: flex; flex-wrap: wrap; gap: 1.2rem; margin: 0.5rem 0 0.8rem; font: 500 0.72rem 'JetBrains Mono', monospace; color: var(--chrome-dim); }
+  .readout b { color: var(--vu-amber); font-weight: 700; }
+
+  /* pad grid */
+  .grid-wrap { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 1rem; }
+  .pads { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .pad {
+    --pc: #6B7078; position: relative; aspect-ratio: 1 / 0.9; min-height: 74px; border-radius: 8px; padding: 6px;
+    display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between;
+    text-transform: none; text-align: left; letter-spacing: 0;
+    background: repeating-linear-gradient(90deg, rgba(255,255,255,0.03) 0 1px, transparent 1px 3px), linear-gradient(180deg, #232327, #131315);
+    color: var(--chrome); border: 2px solid rgba(216,220,226,0.14);
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.6), 0 3px 8px rgba(0,0,0,0.45);
+    transition: box-shadow .08s, background .08s, border-color .08s;
+  }
+  .pad .num { font: 700 0.62rem 'JetBrains Mono', monospace; color: var(--chrome-dim); }
+  .pad .nm { font: 700 0.7rem 'JetBrains Mono', monospace; color: var(--pc); width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pad .key { position: absolute; top: 6px; right: 8px; font: 700 0.6rem 'JetBrains Mono', monospace; color: rgba(216,220,226,0.35); text-transform: uppercase; }
+  .pad.has { border-color: color-mix(in srgb, var(--pc) 60%, transparent); background: linear-gradient(180deg, color-mix(in srgb, var(--pc) 22%, #1b1b1f), #131315); box-shadow: inset 0 2px 6px rgba(0,0,0,0.5), 0 0 10px color-mix(in srgb, var(--pc) 35%, transparent); }
+  .pad.sel { outline: 2px solid var(--vu-amber); outline-offset: 2px; }
+  .pad.lit, .pad.flash { background: var(--pc); border-color: var(--pc); box-shadow: 0 0 18px var(--pc), 0 0 5px var(--pc); }
+  .pad.lit .nm, .pad.flash .nm, .pad.lit .num, .pad.flash .num, .pad.lit .key, .pad.flash .key { color: #000; }
+
+  /* inspector */
+  .insp-empty { color: var(--chrome-dim); font-size: 0.82rem; }
+  #trim { display: block; width: 100%; height: 90px; background: #08080a; border-radius: 3px; touch-action: none; cursor: ew-resize; margin: 0.5rem 0; }
+  .ctl { display: flex; align-items: center; gap: 0.6rem; margin: 0.5rem 0; font: 500 0.72rem 'JetBrains Mono', monospace; color: var(--chrome-dim); }
+  .ctl label { width: 70px; flex-shrink: 0; }
+  .ctl input[type=range] { flex: 1; accent-color: var(--vu-amber); }
+  .ctl span.v { width: 54px; text-align: right; color: var(--chrome); }
+
+  /* library */
+  .lib { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+  .lib-item { --pc: #888; border: 1px solid color-mix(in srgb, var(--pc) 45%, transparent); border-radius: 6px; padding: 8px; background: rgba(0,0,0,0.3); display: flex; align-items: center; gap: 6px; }
+  .lib-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--pc); box-shadow: 0 0 6px var(--pc); flex-shrink: 0; }
+  .lib-name { flex: 1; font-size: 0.74rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lib-stem { color: var(--chrome-dim); font: 500 0.58rem 'JetBrains Mono', monospace; text-transform: uppercase; }
+  .lib-item button { padding: 0.25rem 0.5rem; font-size: 0.62rem; }
+  .empty { color: var(--chrome-dim); font-size: 0.82rem; padding: 0.4rem 0; }
+
+  .how { color: var(--chrome-dim); font-size: 0.88rem; max-width: 90ch; }
+  .how ol { margin: 0.4rem 0 0; padding-left: 1.2rem; }
+  .how li { margin: 0.3rem 0; }
+
+  #toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); background: #111; color: #fff; border: 1px solid var(--teal); padding: 7px 14px; border-radius: 6px; font: 600 0.75rem 'JetBrains Mono', monospace; z-index: 10001; opacity: 0; pointer-events: none; transition: opacity .15s; max-width: 90vw; text-align: center; }
+  #toast.show { opacity: 1; }
+
+  @media (max-width: 860px) { .grid-wrap { grid-template-columns: 1fr; } }
+  @media (max-width: 640px) {
+    header { padding: 0.8rem 1rem; }
+    h1 { font-size: 1.25rem; }
+    .logo-text { font-size: 1.05rem; }
+    main { padding: 1rem; }
+    select { min-width: 0; flex: 1 1 100%; }
+    #wave { height: 180px; }
+    .pads { gap: 6px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="tag">Chop &amp; play</div>
+    <h1>Sampler</h1>
+  </div>
+  <a class="logo" href="/" aria-label="Stemline101 home">
+    <span class="logo-mark">
+      <svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+          <linearGradient id="waveGrad" gradientUnits="userSpaceOnUse" x1="30" y1="110" x2="190" y2="110">
+            <stop offset="0%" stop-color="#FFB020"/>
+            <stop offset="100%" stop-color="#3CFDE0"/>
+          </linearGradient>
+        </defs>
+        <circle cx="110" cy="110" r="98" fill="#0E1013"/>
+        <circle cx="110" cy="110" r="98" fill="none" stroke="#3ab6ff" stroke-width="4" opacity="0.6"/>
+        <g stroke="url(#waveGrad)" stroke-width="10" stroke-linecap="round" fill="none">
+          <line x1="40" y1="110" x2="40" y2="110"/>
+          <line x1="60" y1="90" x2="60" y2="130"/>
+          <line x1="80" y1="65" x2="80" y2="155"/>
+          <line x1="100" y1="100" x2="100" y2="120"/>
+          <line x1="120" y1="45" x2="120" y2="175"/>
+          <line x1="140" y1="80" x2="140" y2="140"/>
+          <line x1="160" y1="95" x2="160" y2="125"/>
+          <line x1="180" y1="105" x2="180" y2="115"/>
+        </g>
+      </svg>
+    </span>
+    <span class="logo-text">Stemline</span>
+  </a>
+</header>
+<nav class="back"><a href="/">&larr; Back to the mixer</a> &nbsp;&middot;&nbsp; <a href="/notation-viewer">Sheet music</a></nav>
+
+<main>
+<p class="note">Load any stem from your saved songs, drag across the waveform to grab a piece, and save it to a pad. Trim it, tune it, loop it, and play it live from the pad grid or your keyboard. Free accounts can save 2 samples a month; Premium unlocks unlimited samples and downloads.</p>
+
+<div class="panel">
+  <h2>1. Pick a stem</h2>
+  <div class="row">
+    <select id="song"><option>Loading your songs…</option></select>
+    <select id="inst">
+      <option value="vocals">Vocals</option>
+      <option value="drums">Drums</option>
+      <option value="bass">Bass</option>
+      <option value="guitar">Guitar</option>
+      <option value="piano">Keys / Synth</option>
+      <option value="other">Other</option>
+    </select>
+    <button id="load">Load stem</button>
+  </div>
+</div>
+<div id="status"></div>
+
+<div class="panel">
+  <h2>2. Grab a piece</h2>
+  <div class="bezel"><canvas id="wave"></canvas></div>
+  <div class="readout">
+    <span>Start <b id="rStart">–</b></span><span>End <b id="rEnd">–</b></span><span>Length <b id="rLen">–</b></span>
+    <span>Drag to select &middot; drag the edges to adjust &middot; scroll to zoom</span>
+  </div>
+  <div class="row">
+    <button id="prev" class="secondary" disabled>&#9654; Preview</button>
+    <button id="loopSel" class="secondary" disabled>Loop</button>
+    <button id="zoomSel" class="secondary" disabled>Zoom to selection</button>
+    <button id="zoomAll" class="secondary" disabled>Show all</button>
+    <input type="text" id="sampName" maxlength="40" placeholder="Sample name">
+    <button id="save" disabled>Save to selected pad</button>
+  </div>
+</div>
+
+<div class="grid-wrap">
+  <div class="panel">
+    <h2>3. Pads</h2>
+    <div class="pads" id="pads"></div>
+    <div class="row" style="margin-top:0.8rem;">
+      <button id="hpPick" class="secondary">&#127911; Headphones&hellip;</button>
+      <select id="hpSel" style="display:none;"></select>
+      <span id="hpStatus" class="tag" style="color:var(--chrome-dim);"></span>
+    </div>
+  </div>
+  <div class="panel" id="inspector">
+    <h2>Pad editor</h2>
+    <div class="insp-empty" id="inspEmpty">Click a pad to edit its sample.</div>
+    <div id="inspBody" style="display:none;">
+      <div class="row">
+        <input type="text" id="padName" maxlength="40">
+        <span class="lib-stem" id="padStem"></span>
+      </div>
+      <canvas id="trim"></canvas>
+      <div class="ctl"><label>Volume</label><input type="range" id="vol" min="0" max="150" value="100"><span class="v" id="volV">100%</span></div>
+      <div class="ctl"><label>Pitch</label><input type="range" id="semi" min="-12" max="12" value="0" step="1"><span class="v" id="semiV">0 st</span></div>
+      <div class="row">
+        <button id="padPlay" class="secondary">&#9654; Play</button>
+        <button id="padHp" class="secondary" title="Play in headphones only">&#127911; Headphones</button>
+        <button id="padLoop" class="secondary">Loop</button>
+        <button id="padDl" class="secondary">Download</button>
+        <button id="padClear" class="secondary">Clear pad</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Your samples</h2>
+  <div class="lib" id="lib"></div>
+</div>
+
+<div class="panel how">
+  <h2>How it works</h2>
+  <ol>
+    <li>Pick a saved song and a stem, then press Load stem. Only your own saved stems appear here.</li>
+    <li>Drag across the waveform to grab a piece. Pull the edges to fine-tune it, and scroll to zoom in for precise cuts.</li>
+    <li>Click a pad, then Save to selected pad. The sample keeps a little extra audio on each side, so you can re-trim it later.</li>
+    <li>Play pads by clicking them or with the keys 1 2 3 4 / Q W E R / A S D F / Z X C V.</li>
+    <li>Use Headphones to send a pad to a second output so you can audition it before the room hears it.</li>
+    <li>Samples are stored in this browser. Premium accounts can download any sample as an MP3, which makes a handy ringtone.</li>
+  </ol>
+</div>
+</main>
+<div id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+  var COLORS = { vocals:'#ff5540', drums:'#ffa022', bass:'#2fe08a', guitar:'#9b6dff', piano:'#ff5cb0', other:'#3ab6ff' };
+  var KEYS = ['1','2','3','4','q','w','e','r','a','s','d','f','z','x','c','v'];
+  var PAD_PAD = 2;                 // seconds of extra audio kept each side for retrimming (same as the mixer)
+  var GRID_KEY = 'stemline_pad_grid';
+  var FREE_KEY = 'stemline_sampler_free';
+  var FREE_PER_MONTH = 2;
+
+  var token = null;
+  try { token = localStorage.getItem('soundlounge101_token'); } catch (e) {}
+  var isPremium = false;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var statusEl = $('status'), songSel = $('song'), instSel = $('inst');
+  var wave = $('wave'), trim = $('trim');
+
+  var rows = [];
+  var ctx = null, cueDest = null, cueEl = null, cueReady = false;
+  var lib = [];                    // saved samples (shared IndexedDB with the mixer)
+  var grid = [];                   // 16 sample ids (or null)
+  var sel = -1;                    // selected pad
+  var playing = {};                // pad index or 'prev' -> {src, g}
+
+  // loaded stem
+  var buf = null, bufInst = null, bufName = '';
+  var viewA = 0, viewB = 0;        // visible range in seconds
+  var selA = null, selB = null;    // selection in seconds
+  var loopSel = false;
+  var playhead = null;             // {t0, from, to, rate}
+
+  function setStatus(t) { statusEl.textContent = t || ''; }
+  function toast(msg) {
+    var t = $('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(t._t); t._t = setTimeout(function () { t.classList.remove('show'); }, 2400);
+  }
+  function fmt(t) { if (t == null || isNaN(t)) return '–'; var m = Math.floor(t / 60); return m + ':' + (t % 60).toFixed(2).padStart(5, '0'); }
+  function engine() {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+
+  /* ---------- storage: same IndexedDB the mixer page uses, so saved samples carry over ---------- */
+  var dbp = null;
+  function db() {
+    if (dbp) return dbp;
+    dbp = new Promise(function (res, rej) {
+      try {
+        var rq = indexedDB.open('stemline_samples', 2);
+        rq.onupgradeneeded = function () {
+          var d = rq.result;
+          if (!d.objectStoreNames.contains('samples')) d.createObjectStore('samples', { keyPath: 'id' });
+          if (!d.objectStoreNames.contains('mixes')) d.createObjectStore('mixes', { keyPath: 'id' });
+        };
+        rq.onsuccess = function () { res(rq.result); };
+        rq.onerror = function () { rej(rq.error); };
+      } catch (e) { rej(e); }
+    });
+    return dbp;
+  }
+  function idbPut(item) { return db().then(function (d) { d.transaction('samples', 'readwrite').objectStore('samples').put(item); }).catch(function (e) { console.warn('save failed', e); }); }
+  function idbDel(id) { return db().then(function (d) { d.transaction('samples', 'readwrite').objectStore('samples').delete(id); }).catch(function () {}); }
+  function idbAll() {
+    return db().then(function (d) {
+      return new Promise(function (res, rej) { var r = d.transaction('samples').objectStore('samples').getAll(); r.onsuccess = function () { res(r.result || []); }; r.onerror = function () { rej(r.error); }; });
+    }).catch(function () { return []; });
+  }
+  function loadGrid() { try { var g = JSON.parse(localStorage.getItem(GRID_KEY)); if (Array.isArray(g)) return g.concat(new Array(16)).slice(0, 16).map(function (x) { return x || null; }); } catch (e) {} return new Array(16).fill(null); }
+  function saveGrid() { try { localStorage.setItem(GRID_KEY, JSON.stringify(grid)); } catch (e) {} }
+  function byId(id) { return lib.find(function (x) { return x.id === id; }); }
+
+  /* ---------- free-tier counter (2 saves per calendar month) ---------- */
+  function month() { return new Date().toISOString().slice(0, 7); }
+  function freeUsed() { try { var o = JSON.parse(localStorage.getItem(FREE_KEY)); return o && o.m === month() ? o.n : 0; } catch (e) { return 0; } }
+  function freeBump() { try { localStorage.setItem(FREE_KEY, JSON.stringify({ m: month(), n: freeUsed() + 1 })); } catch (e) {} }
+
+  async function loadMe() {
+    if (!token) return;
+    try {
+      var r = await fetch('/api/v1/me?token=' + encodeURIComponent(token));
+      if (r.ok) isPremium = !!(await r.json()).is_premium;
+    } catch (e) {}
+    refreshInspector();
+  }
+
+  /* ---------- songs ---------- */
+  function stemUrl(id, inst) { return '/api/v1/my-stems/' + encodeURIComponent(id) + '/download/' + encodeURIComponent(inst) + '?token=' + encodeURIComponent(token); }
+  async function loadSongs() {
+    if (!token) { songSel.innerHTML = '<option>Log in on the main page first</option>'; $('load').disabled = true; return; }
+    try {
+      var r = await fetch('/api/v1/my-stems?include_unsaved=true&token=' + encodeURIComponent(token));
+      if (!r.ok) throw new Error('Could not load your songs.');
+      rows = await r.json();
+      if (!rows.length) { songSel.innerHTML = '<option>No songs yet</option>'; $('load').disabled = true; return; }
+      songSel.innerHTML = '';
+      rows.forEach(function (s, i) {
+        var o = document.createElement('option'); o.value = i;
+        o.textContent = s.track_name + (s.instrument ? ' (' + s.instrument + ' only)' : '');
+        songSel.appendChild(o);
+      });
+      syncInst();
+    } catch (e) { setStatus(e.message); $('load').disabled = true; }
+  }
+  function syncInst() {
+    var s = rows[songSel.value];
+    if (s && s.instrument) { instSel.value = s.instrument === 'synth' ? 'piano' : s.instrument; instSel.disabled = true; }
+    else instSel.disabled = false;
+  }
+  songSel.addEventListener('change', syncInst);
+
+  $('load').addEventListener('click', async function () {
+    var s = rows[songSel.value]; if (!s) return;
+    var inst = instSel.value;
+    $('load').disabled = true; setStatus('Loading the stem…');
+    try {
+      var r = await fetch(stemUrl(s.id, inst));
+      if (!r.ok) { var m = 'Could not load that stem.'; try { m = (await r.json()).detail || m; } catch (e) {} throw new Error(m); }
+      var ab = await engine().decodeAudioData(await r.arrayBuffer());
+      buf = ab; bufInst = inst; bufName = s.track_name;
+      viewA = 0; viewB = ab.duration; selA = selB = null;
+      $('sampName').value = s.track_name + ' ' + (inst === 'piano' ? 'synth' : inst);
+      setStatus('Loaded. Drag across the waveform to grab a piece.');
+      ['prev', 'loopSel', 'zoomSel', 'zoomAll', 'save'].forEach(function (id) { $(id).disabled = false; });
+      drawWave(); readout();
+    } catch (e) { setStatus(e.message); }
+    $('load').disabled = false;
+  });
+
+  /* ---------- big waveform editor ---------- */
+  function sizeCanvas(c) {
+    var dpr = window.devicePixelRatio || 1, w = c.clientWidth || 600, h = c.clientHeight || 200;
+    if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+    var g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { g: g, w: w, h: h };
+  }
+  function peaksDraw(g, data, i0, i1, w, h, color) {
+    g.fillStyle = color; g.globalAlpha = 0.9;
+    var span = Math.max(1, i1 - i0);
+    for (var x = 0; x < w; x++) {
+      var a = i0 + Math.floor(x / w * span), b = Math.max(a + 1, i0 + Math.floor((x + 1) / w * span));
+      var mx = 0, step = Math.max(1, ((b - a) / 12) | 0);
+      for (var i = a; i < b && i < data.length; i += step) { var v = Math.abs(data[i]); if (v > mx) mx = v; }
+      var hh = Math.max(1, mx * h * 0.92); g.fillRect(x, (h - hh) / 2, 1, hh);
+    }
+    g.globalAlpha = 1;
+  }
+  function t2x(t, w) { return (t - viewA) / (viewB - viewA) * w; }
+  function x2t(x, w) { return viewA + x / w * (viewB - viewA); }
+
+  function drawWave() {
+    var c = sizeCanvas(wave), g = c.g, w = c.w, h = c.h;
+    g.clearRect(0, 0, w, h);
+    g.fillStyle = '#08080a'; g.fillRect(0, 0, w, h);
+    g.strokeStyle = 'rgba(216,220,226,0.08)'; g.beginPath(); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.stroke();
+    if (!buf) { g.fillStyle = 'rgba(216,220,226,0.4)'; g.font = '600 13px JetBrains Mono, monospace'; g.textAlign = 'center'; g.fillText('Load a stem to see its waveform', w / 2, h / 2); return; }
+    var sr = buf.sampleRate, col = COLORS[bufInst] || '#E7A33E';
+    peaksDraw(g, buf.getChannelData(0), Math.floor(viewA * sr), Math.floor(viewB * sr), w, h, col);
+    if (selA != null) {
+      var x0 = t2x(selA, w), x1 = t2x(selB, w);
+      g.fillStyle = 'rgba(231,163,62,0.18)'; g.fillRect(x0, 0, x1 - x0, h);
+      g.fillStyle = '#E7A33E'; g.fillRect(x0 - 1, 0, 3, h); g.fillRect(x1 - 1, 0, 3, h);
+    }
+    if (playhead && ctx) {
+      var t = playhead.from + (ctx.currentTime - playhead.t0) * playhead.rate;
+      if (playhead.loop) { var L = playhead.to - playhead.from; t = playhead.from + ((t - playhead.from) % L + L) % L; }
+      if (t >= playhead.from && t <= playhead.to) { var px = t2x(t, w); g.fillStyle = '#3CFDE0'; g.fillRect(px, 0, 2, h); }
+    }
+  }
+  function readout() {
+    $('rStart').textContent = selA == null ? '–' : fmt(selA);
+    $('rEnd').textContent = selB == null ? '–' : fmt(selB);
+    $('rLen').textContent = selA == null ? '–' : (selB - selA).toFixed(2) + 's';
+  }
+  (function raf() { if (playhead) drawWave(); requestAnimationFrame(raf); })();
+
+  wave.addEventListener('pointerdown', function (e) {
+    if (!buf) return;
+    var r = wave.getBoundingClientRect(), w = r.width, x = e.clientX - r.left;
+    var drag = null;
+    if (selA != null) {
+      var d0 = Math.abs(x - t2x(selA, w)), d1 = Math.abs(x - t2x(selB, w));
+      if (Math.min(d0, d1) <= 10) drag = d0 <= d1 ? 'a' : 'b';
+    }
+    var anchor = null;
+    if (!drag) { anchor = Math.min(buf.duration, Math.max(0, x2t(x, w))); selA = selB = anchor; drag = 'new'; }
+    wave.setPointerCapture(e.pointerId);
+    function move(ev) {
+      var t = Math.min(buf.duration, Math.max(0, x2t(ev.clientX - r.left, w)));
+      if (drag === 'new') { selA = Math.min(anchor, t); selB = Math.max(anchor, t); }
+      else if (drag === 'a') selA = Math.min(t, selB - 0.02);
+      else selB = Math.max(t, selA + 0.02);
+      drawWave(); readout();
+    }
+    function up() {
+      wave.removeEventListener('pointermove', move); wave.removeEventListener('pointerup', up); wave.removeEventListener('pointercancel', up);
+      if (selA != null && selB - selA < 0.02) { selA = selB = null; }
+      drawWave(); readout();
+    }
+    wave.addEventListener('pointermove', move); wave.addEventListener('pointerup', up); wave.addEventListener('pointercancel', up);
+  });
+  wave.addEventListener('wheel', function (e) {
+    if (!buf) return; e.preventDefault();
+    var r = wave.getBoundingClientRect(), t = x2t(e.clientX - r.left, r.width), k = e.deltaY > 0 ? 1.25 : 0.8;
+    var span = Math.min(buf.duration, Math.max(0.05, (viewB - viewA) * k));
+    var frac = (t - viewA) / (viewB - viewA);
+    viewA = Math.max(0, t - span * frac); viewB = Math.min(buf.duration, viewA + span); viewA = Math.max(0, viewB - span);
+    drawWave();
+  }, { passive: false });
+  $('zoomAll').onclick = function () { if (!buf) return; viewA = 0; viewB = buf.duration; drawWave(); };
+  $('zoomSel').onclick = function () {
+    if (!buf || selA == null) { toast('Select a piece first'); return; }
+    var pad = (selB - selA) * 0.15; viewA = Math.max(0, selA - pad); viewB = Math.min(buf.duration, selB + pad); drawWave();
+  };
+  window.addEventListener('resize', function () { drawWave(); drawTrim(); });
+
+  /* ---------- playback ---------- */
+  function stopKey(k) { var h = playing[k]; if (h) { try { h.src.stop(); } catch (e) {} delete playing[k]; } }
+  function makeBuffer(item) {
+    var c = engine(), b = c.createBuffer(item.data.length, item.data[0].length, item.sr);
+    item.data.forEach(function (ch, i) { b.copyToChannel(ch, i); });
+    return b;
+  }
+  function playItem(key, item, opts) {
+    opts = opts || {};
+    stopKey(key);
+    if (opts.dest === 'cue' && !cueReady) { toast('Pick a headphones output first'); return null; }
+    var c = engine(), src = c.createBufferSource(), g = c.createGain();
+    src.buffer = item._buf || (item._buf = makeBuffer(item));
+    var rate = Math.pow(2, (item.semi || 0) / 12);
+    src.playbackRate.value = rate;
+    g.gain.value = (item.vol == null ? 1 : item.vol) * 0.95;
+    src.connect(g);
+    g.connect(opts.dest === 'cue' ? cueDest : c.destination);
+    var loop = !!opts.loop;
+    if (loop) { src.loop = true; src.loopStart = item.inT; src.loopEnd = item.outT; }
+    src.onended = function () { try { g.disconnect(); } catch (e) {} if (playing[key] && playing[key].src === src) { delete playing[key]; if (opts.onEnd) opts.onEnd(); } };
+    src.start(0, item.inT, loop ? undefined : Math.max(0.02, (item.outT - item.inT) / rate));
+    var h = { src: src, g: g, t0: c.currentTime, rate: rate, loop: loop };
+    playing[key] = h;
+    return h;
+  }
+
+  $('prev').onclick = function () {
+    if (!buf || selA == null) { toast('Select a piece first'); return; }
+    if (playing.prev) { stopKey('prev'); playhead = null; drawWave(); return; }
+    var data = []; for (var ch = 0; ch < buf.numberOfChannels; ch++) data.push(buf.getChannelData(ch));
+    var item = { sr: buf.sampleRate, data: data, inT: selA, outT: selB, _buf: buf };
+    var h = playItem('prev', item, { loop: loopSel, onEnd: function () { playhead = null; drawWave(); } });
+    if (h) playhead = { t0: h.t0, from: selA, to: selB, rate: 1, loop: loopSel };
+  };
+  $('loopSel').onclick = function () { loopSel = !loopSel; this.classList.toggle('on', loopSel); };
+
+  /* ---------- save to pad ---------- */
+  $('save').onclick = async function () {
+    if (!buf || selA == null) { toast('Select a piece first'); return; }
+    if (sel < 0) { toast('Click a pad first, then save'); return; }
+    if (!isPremium && freeUsed() >= FREE_PER_MONTH) { toast('Free accounts save 2 samples a month. Upgrade to Premium for unlimited.'); return; }
+    var name = ($('sampName').value || '').trim() || 'Sample';
+    var s0 = Math.max(0, selA - PAD_PAD), s1 = Math.min(buf.duration, selB + PAD_PAD);
+    var i0 = Math.floor(s0 * buf.sampleRate), i1 = Math.floor(s1 * buf.sampleRate), data = [];
+    for (var c = 0; c < buf.numberOfChannels; c++) data.push(buf.getChannelData(c).slice(i0, i1));
+    var item = { id: 's' + Date.now() + Math.floor(Math.random() * 1000), stem: bufInst, name: name, sr: buf.sampleRate, data: data, inT: selA - s0, outT: selB - s0, vol: 1, semi: 0 };
+    lib.push(item); await idbPut(item);
+    grid[sel] = item.id; saveGrid();
+    if (!isPremium) freeBump();
+    renderPads(); renderLib(); refreshInspector();
+    toast('Saved to pad ' + (sel + 1) + (isPremium ? '' : ' (' + Math.max(0, FREE_PER_MONTH - freeUsed()) + ' free left this month)'));
+  };
+
+  /* ---------- pad grid ---------- */
+  function renderPads() {
+    var root = $('pads'); root.innerHTML = '';
+    for (var i = 0; i < 16; i++) (function (i) {
+      var it = grid[i] && byId(grid[i]);
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'pad' + (it ? ' has' : '') + (i === sel ? ' sel' : '');
+      b.style.setProperty('--pc', it ? (COLORS[it.stem] || '#E7A33E') : '#6B7078');
+      b.dataset.pad = i;
+      b.innerHTML = '<span class="num">' + (i + 1) + '</span><span class="key">' + KEYS[i] + '</span><span class="nm"></span>';
+      b.querySelector('.nm').textContent = it ? it.name : '';
+      b.addEventListener('pointerdown', function () { selectPad(i); firePad(i); });
+      b.addEventListener('contextmenu', function (e) { e.preventDefault(); selectPad(i); });
+      root.appendChild(b);
+    })(i);
+  }
+  function padEl(i) { return $('pads').children[i]; }
+  function selectPad(i) {
+    sel = i;
+    for (var k = 0; k < 16; k++) padEl(k).classList.toggle('sel', k === i);
+    refreshInspector();
+  }
+  function firePad(i, forceCue) {
+    var it = grid[i] && byId(grid[i]), p = padEl(i);
+    p.classList.add('flash'); setTimeout(function () { p.classList.remove('flash'); }, 140);
+    if (!it) return;
+    var loopOn = !!it.loop;
+    if (loopOn && playing[i]) { stopKey(i); p.classList.remove('lit'); return; }
+    var h = playItem(i, it, { loop: loopOn, dest: (forceCue || it.hp) ? 'cue' : 'main', onEnd: function () { p.classList.remove('lit'); } });
+    if (h) p.classList.add('lit');
+  }
+  document.addEventListener('keydown', function (e) {
+    if (e.target && /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    var i = KEYS.indexOf(e.key.toLowerCase());
+    if (i >= 0 && !e.repeat) { e.preventDefault(); firePad(i); }
+    else if (e.code === 'Space') { e.preventDefault(); Object.keys(playing).forEach(stopKey); playhead = null; document.querySelectorAll('.pad.lit').forEach(function (p) { p.classList.remove('lit'); }); }
+  });
+
+  /* ---------- pad editor ---------- */
+  var cur = null; // item being edited
+  function refreshInspector() {
+    cur = sel >= 0 && grid[sel] ? byId(grid[sel]) : null;
+    $('inspBody').style.display = cur ? 'block' : 'none';
+    $('inspEmpty').style.display = cur ? 'none' : 'block';
+    $('inspEmpty').textContent = sel >= 0 ? 'Pad ' + (sel + 1) + ' is empty. Grab a piece of a stem above and press Save to selected pad.' : 'Click a pad to edit its sample.';
+    if (!cur) return;
+    $('padName').value = cur.name;
+    $('padStem').textContent = cur.stem === 'piano' ? 'synth' : cur.stem;
+    $('vol').value = Math.round((cur.vol == null ? 1 : cur.vol) * 100); $('volV').textContent = $('vol').value + '%';
+    $('semi').value = cur.semi || 0; $('semiV').textContent = (cur.semi || 0) + ' st';
+    $('padLoop').classList.toggle('on', !!cur.loop);
+    $('padHp').classList.toggle('on', !!cur.hp);
+    $('padDl').textContent = isPremium ? 'Download MP3' : 'Download (Premium)';
+    drawTrim();
+  }
+  function drawTrim() {
+    if (!cur) return;
+    var c = sizeCanvas(trim), g = c.g, w = c.w, h = c.h, col = COLORS[cur.stem] || '#E7A33E';
+    g.clearRect(0, 0, w, h); g.fillStyle = '#08080a'; g.fillRect(0, 0, w, h);
+    peaksDraw(g, cur.data[0], 0, cur.data[0].length, w, h, col);
+    var total = cur.data[0].length / cur.sr, x0 = cur.inT / total * w, x1 = cur.outT / total * w;
+    g.fillStyle = 'rgba(0,0,0,0.65)'; g.fillRect(0, 0, x0, h); g.fillRect(x1, 0, w - x1, h);
+    g.fillStyle = col; g.fillRect(x0 - 1, 0, 3, h); g.fillRect(x1 - 1, 0, 3, h);
+  }
+  trim.addEventListener('pointerdown', function (e) {
+    if (!cur) return;
+    var item = cur, r = trim.getBoundingClientRect(), total = item.data[0].length / item.sr;
+    var x = e.clientX - r.left, x0 = item.inT / total * r.width, x1 = item.outT / total * r.width;
+    var which = Math.abs(x - x0) <= Math.abs(x - x1) ? 'in' : 'out';
+    if (Math.min(Math.abs(x - x0), Math.abs(x - x1)) > 22) return;
+    trim.setPointerCapture(e.pointerId);
+    function move(ev) {
+      var t = Math.min(total, Math.max(0, (ev.clientX - r.left) / r.width * total));
+      if (which === 'in') item.inT = Math.min(t, item.outT - 0.03); else item.outT = Math.max(t, item.inT + 0.03);
+      drawTrim();
+    }
+    async function up() { trim.removeEventListener('pointermove', move); trim.removeEventListener('pointerup', up); trim.removeEventListener('pointercancel', up); await idbPut(strip(item)); }
+    trim.addEventListener('pointermove', move); trim.addEventListener('pointerup', up); trim.addEventListener('pointercancel', up);
+  });
+  function strip(item) { var o = {}; Object.keys(item).forEach(function (k) { if (k !== '_buf') o[k] = item[k]; }); return o; }
+  function persist() { if (cur) idbPut(strip(cur)); }
+
+  $('padName').addEventListener('change', function () { if (!cur) return; var v = this.value.trim(); if (v) { cur.name = v; persist(); renderPads(); renderLib(); } });
+  $('vol').addEventListener('input', function () { if (!cur) return; cur.vol = this.value / 100; $('volV').textContent = this.value + '%'; });
+  $('vol').addEventListener('change', persist);
+  $('semi').addEventListener('input', function () { if (!cur) return; cur.semi = +this.value; $('semiV').textContent = this.value + ' st'; });
+  $('semi').addEventListener('change', persist);
+  $('padPlay').onclick = function () { if (sel >= 0) firePad(sel); };
+  $('padLoop').onclick = function () { if (!cur) return; cur.loop = !cur.loop; this.classList.toggle('on', cur.loop); persist(); };
+  $('padHp').onclick = function () {
+    if (!cur) return;
+    if (!cur.hp && !cueReady) { toast('Pick a headphones output first'); return; }
+    cur.hp = !cur.hp; this.classList.toggle('on', cur.hp); persist();
+  };
+  $('padClear').onclick = function () { if (sel < 0) return; stopKey(sel); grid[sel] = null; saveGrid(); renderPads(); refreshInspector(); toast('Pad cleared'); };
+  $('padDl').onclick = function () {
+    if (!cur) return;
+    if (!isPremium) { toast('Downloading samples is a Premium feature.'); return; }
+    downloadMp3(cur, this);
+  };
+
+  /* ---------- library ---------- */
+  function renderLib() {
+    var root = $('lib'); root.innerHTML = '';
+    if (!lib.length) { var e = document.createElement('div'); e.className = 'empty'; e.textContent = 'No samples yet. Load a stem, grab a piece, and save it to a pad.'; root.appendChild(e); return; }
+    var order = ['vocals', 'drums', 'bass', 'guitar', 'piano', 'other'];
+    lib.slice().sort(function (a, b) { var x = order.indexOf(a.stem), y = order.indexOf(b.stem); return (x < 0 ? 99 : x) - (y < 0 ? 99 : y); }).forEach(function (item) {
+      var row = document.createElement('div'); row.className = 'lib-item'; row.style.setProperty('--pc', COLORS[item.stem] || '#888');
+      var dot = document.createElement('span'); dot.className = 'lib-dot';
+      var nm = document.createElement('span'); nm.className = 'lib-name'; nm.textContent = item.name; nm.title = item.name;
+      var st = document.createElement('span'); st.className = 'lib-stem'; st.textContent = item.stem === 'piano' ? 'synth' : item.stem;
+      var play = document.createElement('button'); play.type = 'button'; play.className = 'secondary'; play.textContent = '▶';
+      play.onclick = function () { playItem('lib', item, {}); };
+      var put = document.createElement('button'); put.type = 'button'; put.className = 'secondary'; put.textContent = 'To pad';
+      put.title = sel >= 0 ? 'Put on pad ' + (sel + 1) : 'Click a pad first';
+      put.onclick = function () { if (sel < 0) { toast('Click a pad first'); return; } grid[sel] = item.id; saveGrid(); renderPads(); refreshInspector(); };
+      var del = document.createElement('button'); del.type = 'button'; del.className = 'secondary'; del.textContent = '✕'; del.title = 'Delete';
+      del.onclick = async function () {
+        if (!confirm('Delete "' + item.name + '"?')) return;
+        lib = lib.filter(function (x) { return x !== item; }); await idbDel(item.id);
+        grid = grid.map(function (g) { return g === item.id ? null : g; }); saveGrid();
+        renderPads(); renderLib(); refreshInspector();
+      };
+      row.append(dot, nm, st, play, put, del); root.appendChild(row);
+    });
+  }
+
+  /* ---------- headphones (second output) ---------- */
+  $('hpPick').onclick = async function () {
+    if (!('setSinkId' in HTMLMediaElement.prototype)) { $('hpStatus').textContent = 'Not supported in this browser'; return; }
+    try {
+      var c = engine();
+      if (!cueDest) { cueDest = c.createMediaStreamDestination(); cueEl = new Audio(); cueEl.srcObject = cueDest.stream; }
+      var deviceId = null;
+      if (navigator.mediaDevices && navigator.mediaDevices.selectAudioOutput) {
+        deviceId = (await navigator.mediaDevices.selectAudioOutput()).deviceId;
+      } else {
+        var st = await navigator.mediaDevices.getUserMedia({ audio: true }); st.getTracks().forEach(function (t) { t.stop(); });
+        var outs = (await navigator.mediaDevices.enumerateDevices()).filter(function (d) { return d.kind === 'audiooutput'; });
+        if (!outs.length) throw new Error('no outputs');
+        var hs = $('hpSel'); hs.innerHTML = ''; outs.forEach(function (d) { var o = document.createElement('option'); o.value = d.deviceId; o.textContent = d.label || 'Output'; hs.appendChild(o); });
+        hs.style.display = ''; hs.onchange = async function () { await cueEl.setSinkId(hs.value); };
+        deviceId = outs[outs.length > 1 ? 1 : 0].deviceId; hs.value = deviceId;
+      }
+      await cueEl.setSinkId(deviceId); await cueEl.play();
+      cueReady = true; $('hpStatus').textContent = 'Headphones ready'; $('hpPick').classList.add('on');
+    } catch (e) { console.warn(e); $('hpStatus').textContent = 'Could not pick an output'; }
+  };
+
+  /* ---------- MP3 download (Premium) ---------- */
+  function loadLame() {
+    if (window.lamejs) return Promise.resolve();
+    return new Promise(function (res, rej) {
+      var s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js';
+      s.onload = res; s.onerror = function () { rej(new Error('MP3 encoder failed to load')); }; document.head.appendChild(s);
+    });
+  }
+  async function downloadMp3(item, btn) {
+    var label = btn.textContent; btn.disabled = true; btn.textContent = 'Encoding…';
+    try {
+      await loadLame();
+      var i0 = Math.floor(item.inT * item.sr), i1 = Math.floor(item.outT * item.sr);
+      var L = item.data[0].subarray(i0, i1), R = (item.data[1] || item.data[0]).subarray(i0, i1);
+      var enc = new lamejs.Mp3Encoder(2, item.sr, 192), parts = [], block = 1152;
+      function i16(f) { var o = new Int16Array(f.length); for (var i = 0; i < f.length; i++) { var s = Math.max(-1, Math.min(1, f[i] * (item.vol == null ? 1 : item.vol))); o[i] = s < 0 ? s * 32768 : s * 32767; } return o; }
+      for (var i = 0; i < L.length; i += block) { var out = enc.encodeBuffer(i16(L.subarray(i, i + block)), i16(R.subarray(i, i + block))); if (out.length) parts.push(new Uint8Array(out)); }
+      var end = enc.flush(); if (end.length) parts.push(new Uint8Array(end));
+      var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(parts, { type: 'audio/mpeg' }));
+      a.download = (item.name.replace(/[\\/:*?"<>|]+/g, '').trim() || 'sample') + '.mp3';
+      document.body.appendChild(a); a.click(); a.remove();
+    } catch (e) { toast('Could not make the MP3'); }
+    btn.disabled = false; btn.textContent = label;
+  }
+
+  /* ---------- init ---------- */
+  (async function init() {
+    grid = loadGrid();
+    lib = await idbAll();
+    grid = grid.map(function (g) { return g && byId(g) ? g : null; });
+    renderPads(); renderLib(); drawWave();
+    loadSongs(); loadMe();
+  })();
+})();
+</script>
+</body>
+</html>
