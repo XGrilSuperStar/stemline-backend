@@ -19,3 +19,10 @@ scipy
 librosa
 onnxruntime
 torch<2.6
+# sheet music (basic-pitch itself is installed --no-deps in the Dockerfile to avoid pulling TensorFlow)
+pretty_midi
+resampy
+mir_eval
+music21
+setuptools
+typing_extensions

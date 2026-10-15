@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import zipfile
 import uuid
+import json
 import concurrent.futures
 import threading
 import time
@@ -112,6 +113,8 @@ class User(Base):
     premium_expires_at = Column(DateTime, nullable=True)
     splits_this_period = Column(Integer, default=0)
     splits_period_start = Column(DateTime, nullable=True)
+    notation_month = Column(String, nullable=True)   # "YYYY-MM" of the free sheet-music count
+    notation_used = Column(Text, nullable=True)      # JSON list of "stemid:instrument" used that month
 
 class SignupRequest(BaseModel):
     email: str
@@ -343,6 +346,15 @@ try:
         conn.commit()
 except Exception as e:
     logger.warning(f"Split usage column migration skipped or already applied: {e}")
+
+# One-time migration: free-tier sheet music usage columns
+try:
+    with engine.connect() as conn:
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS notation_month VARCHAR"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS notation_used TEXT"))
+        conn.commit()
+except Exception as e:
+    logger.warning(f"Notation usage column migration skipped or already applied: {e}")
 
 # Email config (set these in Railway env vars to enable real email delivery)
 # Railway blocks outbound SMTP ports, so we send email over HTTPS via Resend
@@ -2565,6 +2577,124 @@ async def google_site_verification():
         content="google-site-verification: googlecc9edcf10a64534a.html",
         media_type="text/html",
     )
+
+
+# ---------------------------------------------------------------------------
+# Sheet music (HIDDEN): turns one separated stem into MIDI / MusicXML.
+# Everything here is off unless NOTATION_ENABLED=1 is set, and nothing on the
+# public site links to it.
+# ---------------------------------------------------------------------------
+NOTATION_ENABLED = os.getenv("NOTATION_ENABLED", "").strip().lower() in ("1", "true", "yes")
+FREE_NOTATION_PER_MONTH = 2
+FREE_NOTATION_MEASURES = 8
+_notation_cache = {}
+_notation_cache_lock = threading.Lock()
+
+
+def _instrument_audio(stem_row, instrument):
+    """Return (audio_bytes, ext) for one instrument of a saved stem row."""
+    if stem_row.instrument:
+        if stem_row.instrument != instrument:
+            raise HTTPException(status_code=404, detail=f"This saved stem is {stem_row.instrument}, not {instrument}.")
+        ext = stem_row.zip_path.rsplit('.', 1)[-1].lower()
+        if is_r2_key(stem_row.zip_path):
+            return r2_download_bytes(stem_row.zip_path), ext
+        with open(stem_row.zip_path, "rb") as f:
+            return f.read(), ext
+    if is_r2_key(stem_row.zip_path):
+        zip_bytes = r2_download_bytes(stem_row.zip_path)
+    else:
+        with open(stem_row.zip_path, "rb") as f:
+            zip_bytes = f.read()
+    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+        names = zf.namelist()
+        for ext in ("mp3", "wav"):
+            match = next((n for n in names if n.lower().endswith(instrument + "." + ext)), None)
+            if match:
+                return zf.read(match), ext
+    raise HTTPException(status_code=404, detail=f"No {instrument} track in this split.")
+
+
+@app.get("/api/v1/my-stems/{stem_id}/notation/{instrument}")
+def stem_notation(stem_id: int, instrument: str, fmt: str = "musicxml", token: str = None, db: Session = Depends(get_db)):
+    if not NOTATION_ENABLED:
+        raise HTTPException(status_code=404, detail="Not Found")
+    user_id = get_current_user(token)
+    notation_user = db.query(User).filter(User.id == user_id).first()
+    notation_premium = effective_is_premium(db, notation_user)
+    # Downloads (MIDI) are Premium only. Free users get an on-screen snippet.
+    if fmt == "midi" and not notation_premium:
+        raise HTTPException(status_code=402, detail="Downloads are a Premium feature. Upgrade to unlock them.")
+    if instrument not in STEM_INSTRUMENTS:
+        raise HTTPException(status_code=400, detail=f"Unknown instrument: {instrument}")
+    if fmt not in ("musicxml", "midi"):
+        raise HTTPException(status_code=400, detail="fmt must be 'musicxml' or 'midi'.")
+    stem_row = db.query(Stem).filter(Stem.id == stem_id, Stem.user_id == user_id).first()
+    if not stem_row:
+        raise HTTPException(status_code=404, detail="Saved stem not found.")
+
+    # Free tier: 2 different stems/instruments per calendar month. Re-opening
+    # one already counted this month is free.
+    use_key = f"{stem_id}:{instrument}"
+    month_now = datetime.utcnow().strftime("%Y-%m")
+    used_list = []
+    count_this_use = False
+    if not notation_premium:
+        try:
+            used_list = json.loads(notation_user.notation_used or "[]") if notation_user.notation_month == month_now else []
+        except Exception:
+            used_list = []
+        if use_key not in used_list:
+            if len(used_list) >= FREE_NOTATION_PER_MONTH:
+                raise HTTPException(status_code=402, detail=f"You've used your {FREE_NOTATION_PER_MONTH} free sheet music previews this month. Upgrade to Premium for unlimited full sheet music and downloads.")
+            count_this_use = True
+
+    cache_key = (user_id, stem_id, instrument)
+    with _notation_cache_lock:
+        result = _notation_cache.get(cache_key)
+    if result is None:
+        audio, ext = _instrument_audio(stem_row, instrument)
+        try:
+            import notation
+            result = notation.transcribe(audio, ext, instrument)
+        except ImportError:
+            raise HTTPException(status_code=503, detail="The sheet music engine isn't installed on this server.")
+        except notation.NotationError as e:
+            raise HTTPException(status_code=422, detail=str(e))
+        except Exception as e:
+            logger.error(f"Notation error: {str(e)}")
+            raise HTTPException(status_code=500, detail="Could not transcribe this stem.")
+        with _notation_cache_lock:
+            if len(_notation_cache) >= 8:
+                _notation_cache.pop(next(iter(_notation_cache)))
+            _notation_cache[cache_key] = result
+
+    if count_this_use:
+        used_list.append(use_key)
+        notation_user.notation_month = month_now
+        notation_user.notation_used = json.dumps(used_list)
+        db.commit()
+
+    base = f"{stem_row.track_name}_{instrument}"
+    if not notation_premium:
+        import notation
+        left = max(0, FREE_NOTATION_PER_MONTH - len(used_list))
+        return Response(content=notation.preview(result["musicxml"], FREE_NOTATION_MEASURES),
+                        media_type="application/vnd.recordare.musicxml+xml",
+                        headers={"Content-Disposition": f'inline; filename="{base}.musicxml"',
+                                 "X-Notation-Preview": "1", "X-Notation-Uses-Left": str(left)})
+    if fmt == "midi":
+        return Response(content=result["midi"], media_type="audio/midi",
+                        headers={"Content-Disposition": f'attachment; filename="{base}.mid"'})
+    return Response(content=result["musicxml"], media_type="application/vnd.recordare.musicxml+xml",
+                    headers={"Content-Disposition": f'inline; filename="{base}.musicxml"'})
+
+
+@app.get("/notation-viewer", response_class=HTMLResponse)
+async def notation_viewer():
+    if not NOTATION_ENABLED:
+        raise HTTPException(status_code=404, detail="Not Found")
+    return FileResponse("notation_viewer.html", media_type="text/html")
 
 
 from guides import router as guides_router
