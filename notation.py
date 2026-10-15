@@ -549,3 +549,14 @@ def transcribe(audio_bytes, ext, instrument):
     xml = _add_letters(xml)
     xml = _add_tablature(xml, instrument)
     return {"midi": midi_bytes, "musicxml": xml, "bpm": bpm, "note_count": note_count}
+
+
+def preview(xml, max_measures=8):
+    """Free-tier snippet: keep only the first few measures of every part.
+    Tempo, key and time signature live in the first measure, so they stay."""
+    import xml.etree.ElementTree as ET
+    root = ET.fromstring(xml)
+    for part in root.findall("part"):
+        for m in part.findall("measure")[max_measures:]:
+            part.remove(m)
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(root, encoding="unicode")

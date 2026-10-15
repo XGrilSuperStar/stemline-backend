@@ -239,13 +239,20 @@
       if (!r.ok) {
         var msg = 'Something went wrong.';
         try { msg = (await r.json()).detail || msg; } catch (e) {}
-        if (r.status === 402) msg = 'Sheet music is a Premium feature. Upgrade on the main page to unlock it.';
-        throw new Error(msg);
+                throw new Error(msg);
       }
       lastXml = await r.text();
+      var isPreview = r.headers.get('X-Notation-Preview') === '1';
+      var usesLeft = r.headers.get('X-Notation-Uses-Left');
       if (!osmd) osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay('sheet', { autoResize: true, drawTitle: true });
       await osmd.load(lastXml);
       osmd.render();
+      if (isPreview) {
+        setStatus('Free preview: first 8 measures only. ' + usesLeft + ' free preview(s) left this month. Upgrade to Premium for the full chart and downloads.');
+        xmlBtn.disabled = true; midiBtn.disabled = true;
+        goBtn.disabled = false;
+        return;
+      }
       setStatus('Done.');
       xmlBtn.disabled = false; midiBtn.disabled = false;
       xmlBtn.onclick = function () { save(new Blob([lastXml], { type: 'application/xml' }), s.track_name + '_' + inst + '.musicxml'); };
