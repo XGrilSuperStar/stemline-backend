@@ -45,7 +45,17 @@
   .logo-mark { width: 38px; height: 38px; flex-shrink: 0; }
   .logo-mark svg { display: block; width: 100%; height: 100%; }
   .logo-text { font-family: 'Big Shoulders Stencil', sans-serif; font-weight: 800; font-size: 1.35rem; letter-spacing: 0.05em; text-transform: uppercase; }
-  nav.back { max-width: 1200px; margin: 0.8rem auto 0; padding: 0 1.5rem; font: 500 0.75rem 'JetBrains Mono', monospace; }
+  .help-pill { margin-left: auto; padding: 0.35rem 0.9rem; border-radius: 999px; border: 1px solid var(--teal); background: rgba(60,253,224,0.12); color: var(--teal); font: 700 0.65rem 'JetBrains Mono', monospace; letter-spacing: 0.04em; cursor: pointer; box-shadow: 0 0 10px rgba(60,253,224,0.3); text-transform: uppercase; }
+  .help-pill:hover:not(:disabled) { background: rgba(60,253,224,0.22); filter: none; }
+  #helpPop { position: fixed; inset: 0; z-index: 10000; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.65); padding: 1rem; }
+  #helpPop.open { display: flex; }
+  #helpPop .box { position: relative; max-width: 520px; width: 100%; max-height: 90vh; overflow: auto; padding: 1.2rem 1.4rem; border-radius: 8px; background: repeating-linear-gradient(90deg, rgba(255,255,255,0.02) 0 1px, transparent 1px 3px), linear-gradient(180deg, #232327, #141416); border: 1px solid var(--concrete-line); box-shadow: 0 14px 40px rgba(0,0,0,0.7); }
+  #helpPop h3 { margin: 0 0 0.6rem; font-family: 'Big Shoulders Stencil', sans-serif; font-weight: 800; font-size: 1.2rem; letter-spacing: 0.06em; color: var(--vu-amber); }
+  #helpPop ol { margin: 0; padding-left: 1.2rem; color: var(--chrome); font-size: 0.86rem; }
+  #helpPop li { margin: 0.35rem 0; }
+  #helpPop .tip { margin-top: 0.7rem; font: 600 0.72rem 'JetBrains Mono', monospace; color: var(--teal); }
+  #helpPop .x { position: absolute; top: 8px; right: 10px; padding: 0.15rem 0.5rem; font-size: 0.8rem; background: none; border: 0; box-shadow: none; color: var(--chrome-dim); }
+  nav.back { max-width: 1200px; margin: 0.8rem auto 0; padding: 0 1.5rem; font: 500 0.75rem 'JetBrains Mono', monospace; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
   nav.back a { color: var(--chrome-dim); text-decoration: none; }
   nav.back a:hover { color: var(--vu-amber); }
 
@@ -193,7 +203,7 @@
     <span class="logo-text">Stemline</span>
   </a>
 </header>
-<nav class="back"><a href="/">&larr; Back to the mixer</a> &nbsp;&middot;&nbsp; <a href="/notation-viewer">Sheet music</a></nav>
+<nav class="back"><a href="/">&larr; Back to the mixer</a> &nbsp;&middot;&nbsp; <a href="/notation-viewer">Sheet music</a><button type="button" class="help-pill" id="helpBtn">How to sample</button></nav>
 
 <main>
 <p class="note">Load any stem from your saved songs, drag across the waveform to grab a piece, and save it to a pad. Trim it, tune it, loop it, and play it live from the pad grid or your keyboard. Free accounts can save 2 samples a month; Premium unlocks unlimited samples and downloads.</p>
@@ -282,6 +292,22 @@
   </ol>
 </div>
 </main>
+<div id="helpPop" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+  <div class="box">
+    <button type="button" class="x" id="helpClose" aria-label="Close">&#10005;</button>
+    <h3 id="helpTitle">HOW TO SAMPLE</h3>
+    <ol>
+      <li>Pick a saved song and a stem, then press Load stem.</li>
+      <li>Drag across the waveform to grab a piece. Pull the edges to adjust it, and scroll to zoom in.</li>
+      <li>Click a pad, give the sample a name, then press Save to selected pad.</li>
+      <li>Click a pad, or press its key, to play the sample back.</li>
+      <li>In the Pad editor, drag the edges to re-trim, rename it, change volume or pitch, or set it to loop.</li>
+      <li>The headphones button plays a pad in headphones only, so the room never hears it.</li>
+      <li>Your samples also appear on the mixer: the stem's colored pad plays it, and the SAMPLES list holds the rest.</li>
+    </ol>
+    <div class="tip">Great for ringtones: chop your favorite hook and save it.</div>
+  </div>
+</div>
 <div id="toast"></div>
 
 <script>
@@ -736,6 +762,17 @@
     } catch (e) { toast('Could not make the MP3'); }
     btn.disabled = false; btn.textContent = label;
   }
+
+  /* ---------- how to sample popup ---------- */
+  (function () {
+    var pop = $('helpPop');
+    function open() { pop.classList.add('open'); }
+    function close() { pop.classList.remove('open'); }
+    $('helpBtn').addEventListener('click', open);
+    $('helpClose').addEventListener('click', close);
+    pop.addEventListener('pointerdown', function (e) { if (e.target === pop) close(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+  })();
 
   /* ---------- init ---------- */
   (async function init() {
