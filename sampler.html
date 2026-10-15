@@ -276,6 +276,7 @@
     <li>Drag across the waveform to grab a piece. Pull the edges to fine-tune it, and scroll to zoom in for precise cuts.</li>
     <li>Click a pad, then Save to selected pad. The sample keeps a little extra audio on each side, so you can re-trim it later.</li>
     <li>Play pads by clicking them or with the keys 1 2 3 4 / Q W E R / A S D F / Z X C V.</li>
+    <li>Everything you save here is also waiting on the mixer: the stem's colored pad plays it, and it shows up in the mixer's SAMPLES list with its own play, headphones, trim and delete buttons.</li>
     <li>Use Headphones to send a pad to a second output so you can audition it before the room hears it.</li>
     <li>Samples are stored in this browser. Premium accounts can download any sample as an MP3, which makes a handy ringtone.</li>
   </ol>
@@ -351,6 +352,14 @@
     return db().then(function (d) {
       return new Promise(function (res, rej) { var r = d.transaction('samples').objectStore('samples').getAll(); r.onsuccess = function () { res(r.result || []); }; r.onerror = function () { rej(r.error); }; });
     }).catch(function () { return []; });
+  }
+  // The mixer has one pad per stem; keep it in sync so saved samples are ready to play there.
+  var MIXER_KEY = 'stemline_pad_assign';
+  function mixerAssign(stem, id) {
+    try { var a = JSON.parse(localStorage.getItem(MIXER_KEY)) || {}; if (id) a[stem] = id; else Object.keys(a).forEach(function (k) { if (a[k] === stem) delete a[k]; }); localStorage.setItem(MIXER_KEY, JSON.stringify(a)); } catch (e) {}
+  }
+  function mixerUnassignId(id) {
+    try { var a = JSON.parse(localStorage.getItem(MIXER_KEY)) || {}; Object.keys(a).forEach(function (k) { if (a[k] === id) delete a[k]; }); localStorage.setItem(MIXER_KEY, JSON.stringify(a)); } catch (e) {}
   }
   function loadGrid() { try { var g = JSON.parse(localStorage.getItem(GRID_KEY)); if (Array.isArray(g)) return g.concat(new Array(16)).slice(0, 16).map(function (x) { return x || null; }); } catch (e) {} return new Array(16).fill(null); }
   function saveGrid() { try { localStorage.setItem(GRID_KEY, JSON.stringify(grid)); } catch (e) {} }
@@ -548,7 +557,7 @@
     for (var c = 0; c < buf.numberOfChannels; c++) data.push(buf.getChannelData(c).slice(i0, i1));
     var item = { id: 's' + Date.now() + Math.floor(Math.random() * 1000), stem: bufInst, name: name, sr: buf.sampleRate, data: data, inT: selA - s0, outT: selB - s0, vol: 1, semi: 0 };
     lib.push(item); await idbPut(item);
-    grid[sel] = item.id; saveGrid();
+    grid[sel] = item.id; saveGrid(); mixerAssign(bufInst, item.id);
     if (!isPremium) freeBump();
     renderPads(); renderLib(); refreshInspector();
     toast('Saved to pad ' + (sel + 1) + (isPremium ? '' : ' (' + Math.max(0, FREE_PER_MONTH - freeUsed()) + ' free left this month)'));
@@ -669,12 +678,12 @@
       play.onclick = function () { playItem('lib', item, {}); };
       var put = document.createElement('button'); put.type = 'button'; put.className = 'secondary'; put.textContent = 'To pad';
       put.title = sel >= 0 ? 'Put on pad ' + (sel + 1) : 'Click a pad first';
-      put.onclick = function () { if (sel < 0) { toast('Click a pad first'); return; } grid[sel] = item.id; saveGrid(); renderPads(); refreshInspector(); };
+      put.onclick = function () { if (sel < 0) { toast('Click a pad first'); return; } grid[sel] = item.id; saveGrid(); mixerAssign(item.stem, item.id); renderPads(); refreshInspector(); };
       var del = document.createElement('button'); del.type = 'button'; del.className = 'secondary'; del.textContent = '✕'; del.title = 'Delete';
       del.onclick = async function () {
         if (!confirm('Delete "' + item.name + '"?')) return;
         lib = lib.filter(function (x) { return x !== item; }); await idbDel(item.id);
-        grid = grid.map(function (g) { return g === item.id ? null : g; }); saveGrid();
+        grid = grid.map(function (g) { return g === item.id ? null : g; }); saveGrid(); mixerUnassignId(item.id);
         renderPads(); renderLib(); refreshInspector();
       };
       row.append(dot, nm, st, play, put, del); root.appendChild(row);
