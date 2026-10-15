@@ -64,7 +64,7 @@
   #helpPop li { margin: 0.35rem 0; }
   #helpPop .tip { margin-top: 0.7rem; font: 600 0.72rem 'JetBrains Mono', monospace; color: var(--teal); }
   #helpPop .x { position: absolute; top: 8px; right: 10px; padding: 0.15rem 0.5rem; font-size: 0.8rem; background: none; border: 0; box-shadow: none; color: var(--chrome-dim); }
-  nav.back { max-width: 1200px; margin: 0.8rem auto 0; padding: 0 1.5rem; font: 500 0.75rem 'JetBrains Mono', monospace; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+  nav.back { max-width: 1500px; margin: 0.8rem auto 0; padding: 0 1.5rem; font: 500 0.75rem 'JetBrains Mono', monospace; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
   nav.back a { color: var(--chrome-dim); text-decoration: none; }
   nav.back a:hover { color: var(--vu-amber); }
 
@@ -180,6 +180,59 @@
     a.back { order: 3; margin-left: 0; }
     .pads { gap: 6px; }
   }
+
+  /* ===== studio layout (DAW style) ===== */
+  main.studio { max-width: 1500px; }
+  .studio-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 1rem; align-items: start; }
+  .stage > .panel, .browser { margin-bottom: 1rem; }
+  .pick { padding: 0.7rem 1rem; }
+  .pick .hint { color: var(--chrome-dim); font-size: 0.74rem; }
+  .dev-head { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; margin-bottom: 0.5rem; }
+  .dev-head h2 { margin: 0; }
+  .wavecard { padding: 0.7rem; }
+  .wavecard .bezel { padding: 6px; }
+  #wave { height: 440px; }
+  .readout .muted { margin-left: auto; opacity: 0.7; }
+  .browser { position: sticky; top: 0.8rem; max-height: calc(100vh - 1.6rem); display: flex; flex-direction: column; }
+  .browser .lib { grid-template-columns: 1fr; overflow-y: auto; align-content: start; }
+  .pads { grid-template-columns: repeat(8, 1fr); gap: 8px; }
+  .pad { min-height: 62px; aspect-ratio: 1 / 0.8; }
+  /* device panel: zoomed sample on the left, knobs on the right */
+  .dev-grid { display: grid; grid-template-columns: minmax(0, 1fr) 230px; gap: 1.2rem; align-items: center; }
+  .dev-left { display: flex; flex-direction: column; gap: 0.5rem; }
+  .dev-left input[type=text] { width: 100%; }
+  #trim { height: 120px; margin: 0; border: 1px solid var(--concrete-line); }
+  .dev-right { display: flex; justify-content: center; gap: 1.6rem; }
+  .knob { display: flex; flex-direction: column; align-items: center; gap: 0.35rem; user-select: none; }
+  .knob .dial {
+    --f: 0.5; position: relative; width: 78px; height: 78px; border-radius: 50%; cursor: ns-resize; touch-action: none;
+    background:
+      radial-gradient(circle at 50% 38%, #3a3a40, #17171a 70%),
+      #17171a;
+    border: 2px solid #0a0a0b;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.12),
+      0 0 0 4px #101012, 0 0 0 5px rgba(216,220,226,0.12);
+  }
+  .knob .dial::before {
+    content: ''; position: absolute; inset: -9px; border-radius: 50%;
+    background: conic-gradient(from 225deg, var(--vu-amber) calc(var(--f) * 270deg), rgba(216,220,226,0.12) 0 270deg, transparent 0);
+    -webkit-mask: radial-gradient(circle, transparent 0 39px, #000 40px 44px, transparent 45px);
+            mask: radial-gradient(circle, transparent 0 39px, #000 40px 44px, transparent 45px);
+  }
+  .knob .dial i { position: absolute; left: 50%; top: 6px; width: 3px; height: 20px; margin-left: -1.5px; background: var(--vu-amber); border-radius: 2px; transform-origin: 50% 33px; box-shadow: 0 0 6px rgba(231,163,62,0.7); }
+  .knob .kl { font: 500 0.62rem 'JetBrains Mono', monospace; letter-spacing: 0.14em; text-transform: uppercase; color: var(--chrome-dim); margin-top: 0.5rem; }
+  .knob .kv { font: 700 0.8rem 'JetBrains Mono', monospace; color: var(--vu-amber); }
+  @media (max-width: 1100px) {
+    .studio-grid { grid-template-columns: 1fr; }
+    .browser { position: static; max-height: none; }
+    .browser .lib { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); max-height: 360px; }
+    .pads { grid-template-columns: repeat(4, 1fr); }
+  }
+  @media (max-width: 700px) {
+    #wave { height: 280px; }
+    .dev-grid { grid-template-columns: 1fr; }
+    .readout .muted { margin-left: 0; }
+  }
 </style>
 </head>
 <body>
@@ -217,78 +270,85 @@
 </header>
 <nav class="back"><a href="/">&larr; Back to the mixer</a> &nbsp;&middot;&nbsp; <a href="/notation-viewer">Sheet music</a><button type="button" class="help-pill" id="helpBtn">How to sample</button></nav>
 
-<main>
+<main class="studio">
 <p class="note">Load any stem from your saved songs, drag across the waveform to grab a piece, and save it to a pad. Trim it, tune it, loop it, and play it live from the pad grid or your keyboard. Free accounts can save 2 samples a month; Premium unlocks unlimited samples and downloads.</p>
 
-<div class="panel">
-  <h2>1. Pick a stem</h2>
-  <div class="row">
-    <select id="song"><option>Loading your songs…</option></select>
-    <select id="inst">
-      <option value="vocals">Vocals</option>
-      <option value="drums">Drums</option>
-      <option value="bass">Bass</option>
-      <option value="guitar">Guitar</option>
-      <option value="piano">Keys / Synth</option>
-      <option value="other">Other</option>
-    </select>
-    <button id="load">Load stem</button>
-  </div>
-</div>
-<div id="status"></div>
-
-<div class="panel">
-  <h2>2. Grab a piece</h2>
-  <div class="bezel"><canvas id="wave"></canvas></div>
-  <div class="readout">
-    <span>Start <b id="rStart">–</b></span><span>End <b id="rEnd">–</b></span><span>Length <b id="rLen">–</b></span>
-    <span>Drag to select &middot; drag the edges to adjust &middot; scroll to zoom</span>
-  </div>
-  <div class="row">
-    <button id="prev" class="secondary" disabled>&#9654; Preview</button>
-    <button id="loopSel" class="secondary" disabled>Loop</button>
-    <button id="zoomSel" class="secondary" disabled>Zoom to selection</button>
-    <button id="zoomAll" class="secondary" disabled>Show all</button>
-    <input type="text" id="sampName" maxlength="40" placeholder="Sample name">
-    <button id="save" disabled>Save to selected pad</button>
-  </div>
-</div>
-
-<div class="grid-wrap">
-  <div class="panel">
-    <h2>3. Pads</h2>
-    <div class="pads" id="pads"></div>
-    <div class="row" style="margin-top:0.8rem;">
-      <button id="hpPick" class="secondary">&#127911; Headphones&hellip;</button>
-      <select id="hpSel" style="display:none;"></select>
-      <span id="hpStatus" class="tag" style="color:var(--chrome-dim);"></span>
-    </div>
-  </div>
-  <div class="panel" id="inspector">
-    <h2>Pad editor</h2>
-    <div class="insp-empty" id="inspEmpty">Click a pad to edit its sample.</div>
-    <div id="inspBody" style="display:none;">
+<div class="studio-grid">
+  <div class="stage">
+    <div class="panel pick">
       <div class="row">
-        <input type="text" id="padName" maxlength="40">
-        <span class="lib-stem" id="padStem"></span>
-      </div>
-      <canvas id="trim"></canvas>
-      <div class="ctl"><label>Volume</label><input type="range" id="vol" min="0" max="150" value="100"><span class="v" id="volV">100%</span></div>
-      <div class="ctl"><label>Pitch</label><input type="range" id="semi" min="-12" max="12" value="0" step="1"><span class="v" id="semiV">0 st</span></div>
-      <div class="row">
-        <button id="padPlay" class="secondary">&#9654; Play</button>
-        <button id="padHp" class="secondary" title="Play in headphones only">&#127911; Headphones</button>
-        <button id="padLoop" class="secondary">Loop</button>
-        <button id="padDl" class="secondary">Download</button>
-        <button id="padClear" class="secondary">Clear pad</button>
+        <select id="song"><option>Loading your songs…</option></select>
+        <select id="inst">
+          <option value="vocals">Vocals</option>
+          <option value="drums">Drums</option>
+          <option value="bass">Bass</option>
+          <option value="guitar">Guitar</option>
+          <option value="piano">Keys / Synth</option>
+          <option value="other">Other</option>
+        </select>
+        <button id="load">Load stem</button>
+        <span class="hint">Pick a saved song and a stem, then load it.</span>
       </div>
     </div>
-  </div>
-</div>
+    <div id="status"></div>
 
-<div class="panel">
-  <h2>Your samples</h2>
-  <div class="lib" id="lib"></div>
+    <div class="panel wavecard">
+      <div class="bezel"><canvas id="wave"></canvas></div>
+      <div class="readout">
+        <span>Start <b id="rStart">–</b></span><span>End <b id="rEnd">–</b></span><span>Length <b id="rLen">–</b></span>
+        <span class="muted">Drag to select &middot; drag the edges to adjust &middot; scroll to zoom</span>
+      </div>
+      <div class="row">
+        <button id="prev" class="secondary" disabled>&#9654; Preview</button>
+        <button id="loopSel" class="secondary" disabled>Loop</button>
+        <button id="zoomSel" class="secondary" disabled>Zoom to selection</button>
+        <button id="zoomAll" class="secondary" disabled>Show all</button>
+        <input type="text" id="sampName" maxlength="40" placeholder="Sample name">
+        <button id="save" disabled>Save to selected pad</button>
+      </div>
+    </div>
+
+    <div class="panel device" id="inspector">
+      <div class="dev-head"><h2>Sample editor</h2><span class="lib-stem" id="padStem"></span></div>
+      <div class="insp-empty" id="inspEmpty">Click a pad to edit its sample.</div>
+      <div id="inspBody" style="display:none;">
+        <div class="dev-grid">
+          <div class="dev-left">
+            <input type="text" id="padName" maxlength="40">
+            <canvas id="trim"></canvas>
+            <div class="row">
+              <button id="padPlay" class="secondary">&#9654; Play</button>
+              <button id="padHp" class="secondary" title="Play in headphones only">&#127911; Headphones</button>
+              <button id="padLoop" class="secondary">Loop</button>
+              <button id="padDl" class="secondary">Download</button>
+              <button id="padClear" class="secondary">Clear pad</button>
+            </div>
+          </div>
+          <div class="dev-right">
+            <div class="knob" id="kVol"><div class="dial"><i></i></div><span class="kl">Volume</span><span class="kv"></span></div>
+            <div class="knob" id="kSemi"><div class="dial"><i></i></div><span class="kl">Pitch</span><span class="kv"></span></div>
+            <div class="ctl" style="display:none"><input type="range" id="vol" min="0" max="150" value="100"><span class="v" id="volV">100%</span></div>
+            <div class="ctl" style="display:none"><input type="range" id="semi" min="-12" max="12" value="0" step="1"><span class="v" id="semiV">0 st</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel padspanel">
+      <div class="dev-head"><h2>Pads</h2></div>
+      <div class="pads" id="pads"></div>
+      <div class="row" style="margin-top:0.8rem;">
+        <button id="hpPick" class="secondary">&#127911; Headphones&hellip;</button>
+        <select id="hpSel" style="display:none;"></select>
+        <span id="hpStatus" class="tag" style="color:var(--chrome-dim);"></span>
+      </div>
+    </div>
+  </div>
+
+  <aside class="panel browser">
+    <div class="dev-head"><h2>Your samples</h2></div>
+    <div class="lib" id="lib"></div>
+  </aside>
 </div>
 
 <div class="panel how">
@@ -515,6 +575,17 @@
       if (li > 0) { g.fillStyle = 'rgba(216,220,226,0.14)'; g.fillRect(0, RULER + li * laneH, w, 1); }
     }
 
+    // slice markers: samples already saved from this song + stem
+    lib.forEach(function (it) {
+      if (it.srcOff == null || it.srcSong !== bufName || it.stem !== bufInst) return;
+      var sa = it.srcOff + it.inT, sb = it.srcOff + it.outT;
+      if (sb < viewA || sa > viewB) return;
+      var xa = t2x(sa, w), xb = t2x(sb, w), pc = COLORS[it.stem] || '#E7A33E', pi = grid.indexOf(it.id);
+      g.globalAlpha = 0.3; g.fillStyle = pc; g.fillRect(xa, RULER, Math.max(2, xb - xa), h - RULER); g.globalAlpha = 1;
+      g.fillStyle = pc; g.fillRect(xa, RULER, 2, h - RULER); g.fillRect(xb - 2, RULER, 2, h - RULER);
+      if (xb - xa > 26 && pi >= 0) { g.fillRect(xa, RULER, 22, 14); g.fillStyle = '#0b0b0d'; g.font = '700 10px JetBrains Mono, monospace'; g.textAlign = 'left'; g.fillText(String(pi + 1), xa + 6, RULER + 11); }
+    });
+
     // selection: dim the rest, tint the grab, add edge grips and a length tag
     if (selA != null) {
       var x0 = t2x(selA, w), x1 = t2x(selB, w);
@@ -640,7 +711,7 @@
     var s0 = Math.max(0, selA - PAD_PAD), s1 = Math.min(buf.duration, selB + PAD_PAD);
     var i0 = Math.floor(s0 * buf.sampleRate), i1 = Math.floor(s1 * buf.sampleRate), data = [];
     for (var c = 0; c < buf.numberOfChannels; c++) data.push(buf.getChannelData(c).slice(i0, i1));
-    var item = { id: 's' + Date.now() + Math.floor(Math.random() * 1000), stem: bufInst, name: name, sr: buf.sampleRate, data: data, inT: selA - s0, outT: selB - s0, vol: 1, semi: 0 };
+    var item = { id: 's' + Date.now() + Math.floor(Math.random() * 1000), stem: bufInst, name: name, sr: buf.sampleRate, data: data, inT: selA - s0, outT: selB - s0, vol: 1, semi: 0, srcSong: bufName, srcOff: s0 };
     lib.push(item); await idbPut(item);
     grid[sel] = item.id; saveGrid(); mixerAssign(bufInst, item.id);
     if (!isPremium) freeBump();
@@ -735,6 +806,26 @@
   $('vol').addEventListener('change', persist);
   $('semi').addEventListener('input', function () { if (!cur) return; cur.semi = +this.value; $('semiV').textContent = this.value + ' st'; });
   $('semi').addEventListener('change', persist);
+  function bindKnob(kid, inputId, fmtFn, dflt) {
+    var el = $(kid), inp = $(inputId), dial = el.querySelector('.dial'), needle = dial.querySelector('i'), out = el.querySelector('.kv');
+    function paint() {
+      var mn = +inp.min, mx = +inp.max, f = (+inp.value - mn) / (mx - mn);
+      dial.style.setProperty('--f', f); needle.style.transform = 'rotate(' + (-135 + 270 * f) + 'deg)'; out.textContent = fmtFn(+inp.value);
+    }
+    var drag = null;
+    dial.addEventListener('pointerdown', function (e) { drag = { y: e.clientY, v: +inp.value }; dial.setPointerCapture(e.pointerId); });
+    dial.addEventListener('pointermove', function (e) {
+      if (!drag) return;
+      var range = +inp.max - +inp.min, nv = Math.round(Math.min(+inp.max, Math.max(+inp.min, drag.v + (drag.y - e.clientY) / 160 * range)));
+      if (nv !== +inp.value) { inp.value = nv; inp.dispatchEvent(new Event('input', { bubbles: true })); paint(); }
+    });
+    function end() { if (drag) { drag = null; inp.dispatchEvent(new Event('change', { bubbles: true })); } }
+    dial.addEventListener('pointerup', end); dial.addEventListener('pointercancel', end);
+    dial.addEventListener('dblclick', function () { inp.value = dflt; inp.dispatchEvent(new Event('input', { bubbles: true })); inp.dispatchEvent(new Event('change', { bubbles: true })); paint(); });
+    paint(); setInterval(paint, 250);
+  }
+  bindKnob('kVol', 'vol', function (v) { return v + '%'; }, 100);
+  bindKnob('kSemi', 'semi', function (v) { return (v > 0 ? '+' : '') + v + ' st'; }, 0);
   $('padPlay').onclick = function () { if (sel >= 0) firePad(sel); };
   $('padLoop').onclick = function () { if (!cur) return; cur.loop = !cur.loop; this.classList.toggle('on', cur.loop); persist(); };
   $('padHp').onclick = function () {
