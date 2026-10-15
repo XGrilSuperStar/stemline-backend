@@ -111,7 +111,7 @@
     border: 1px solid var(--concrete-line);
     box-shadow: 0 10px 30px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06);
   }
-  #wave { display: block; width: 100%; height: 230px; background: #08080a; border-radius: 3px; touch-action: none; cursor: crosshair; }
+  #wave { display: block; width: 100%; height: 340px; background: #08080a; border-radius: 3px; touch-action: none; cursor: crosshair; }
   .readout { display: flex; flex-wrap: wrap; gap: 1.2rem; margin: 0.5rem 0 0.8rem; font: 500 0.72rem 'JetBrains Mono', monospace; color: var(--chrome-dim); }
   .readout b { color: var(--vu-amber); font-weight: 700; }
 
@@ -166,7 +166,7 @@
     .logo-text { font-size: 1.05rem; }
     main { padding: 1rem; }
     select { min-width: 0; flex: 1 1 100%; }
-    #wave { height: 180px; }
+    #wave { height: 240px; }
     .pads { gap: 6px; }
   }
 </style>
@@ -470,22 +470,69 @@
   function x2t(x, w) { return viewA + x / w * (viewB - viewA); }
 
   function drawWave() {
-    var c = sizeCanvas(wave), g = c.g, w = c.w, h = c.h;
+    var c = sizeCanvas(wave), g = c.g, w = c.w, h = c.h, RULER = 24;
     g.clearRect(0, 0, w, h);
-    g.fillStyle = '#08080a'; g.fillRect(0, 0, w, h);
-    g.strokeStyle = 'rgba(216,220,226,0.08)'; g.beginPath(); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.stroke();
-    if (!buf) { g.fillStyle = 'rgba(216,220,226,0.4)'; g.font = '600 13px JetBrains Mono, monospace'; g.textAlign = 'center'; g.fillText('Load a stem to see its waveform', w / 2, h / 2); return; }
-    var sr = buf.sampleRate, col = COLORS[bufInst] || '#E7A33E';
-    peaksDraw(g, buf.getChannelData(0), Math.floor(viewA * sr), Math.floor(viewB * sr), w, h, col);
+    var bg = g.createLinearGradient(0, 0, 0, h); bg.addColorStop(0, '#0e0e11'); bg.addColorStop(1, '#060608');
+    g.fillStyle = bg; g.fillRect(0, 0, w, h);
+    if (!buf) {
+      g.fillStyle = 'rgba(216,220,226,0.4)'; g.font = '600 13px JetBrains Mono, monospace'; g.textAlign = 'center';
+      g.fillText('Load a stem to see its waveform', w / 2, h / 2); return;
+    }
+    var sr = buf.sampleRate, col = COLORS[bufInst] || '#E7A33E', dur = viewB - viewA;
+
+    // time ruler + vertical grid
+    var steps = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60], step = 60;
+    for (var si = 0; si < steps.length; si++) { if (dur / steps[si] <= 10) { step = steps[si]; break; } }
+    g.fillStyle = 'rgba(255,255,255,0.035)'; g.fillRect(0, 0, w, RULER);
+    g.fillStyle = 'rgba(216,220,226,0.1)'; g.fillRect(0, RULER - 1, w, 1);
+    g.font = '500 10px JetBrains Mono, monospace'; g.textAlign = 'left';
+    for (var t0 = Math.ceil(viewA / step) * step; t0 < viewB; t0 += step) {
+      var gx = Math.round(t2x(t0, w)) + 0.5;
+      g.fillStyle = 'rgba(216,220,226,0.06)'; g.fillRect(gx, RULER, 1, h - RULER);
+      g.fillStyle = 'rgba(216,220,226,0.35)'; g.fillRect(gx, RULER - 7, 1, 7);
+      g.fillStyle = 'rgba(216,220,226,0.55)'; g.fillText(step < 1 ? t0.toFixed(2) + 's' : fmt(t0).replace(/\.00$/, ''), gx + 4, 14);
+    }
+
+    // waveform lanes (stereo drawn as two stacked channels)
+    var lanes = buf.numberOfChannels > 1 ? 2 : 1, laneH = (h - RULER) / lanes;
+    for (var li = 0; li < lanes; li++) {
+      g.save(); g.translate(0, RULER + li * laneH);
+      peaksDraw(g, buf.getChannelData(Math.min(li, buf.numberOfChannels - 1)), Math.floor(viewA * sr), Math.floor(viewB * sr), w, laneH, col);
+      g.restore();
+      g.fillStyle = 'rgba(216,220,226,0.07)'; g.fillRect(0, RULER + li * laneH + laneH / 2, w, 1);
+      if (li > 0) { g.fillStyle = 'rgba(216,220,226,0.14)'; g.fillRect(0, RULER + li * laneH, w, 1); }
+    }
+
+    // selection: dim the rest, tint the grab, add edge grips and a length tag
     if (selA != null) {
       var x0 = t2x(selA, w), x1 = t2x(selB, w);
-      g.fillStyle = 'rgba(231,163,62,0.18)'; g.fillRect(x0, 0, x1 - x0, h);
-      g.fillStyle = '#E7A33E'; g.fillRect(x0 - 1, 0, 3, h); g.fillRect(x1 - 1, 0, 3, h);
+      g.fillStyle = 'rgba(0,0,0,0.5)';
+      if (x0 > 0) g.fillRect(0, RULER, Math.min(w, x0), h - RULER);
+      if (x1 < w) g.fillRect(Math.max(0, x1), RULER, w - Math.max(0, x1), h - RULER);
+      g.fillStyle = 'rgba(231,163,62,0.16)'; g.fillRect(x0, RULER, x1 - x0, h - RULER);
+      g.fillStyle = '#E7A33E';
+      g.fillRect(x0, RULER, x1 - x0, 2); g.fillRect(x0, h - 2, x1 - x0, 2);
+      g.fillRect(x0 - 1, RULER, 3, h - RULER); g.fillRect(x1 - 1, RULER, 3, h - RULER);
+      [x0, x1].forEach(function (ex) {
+        g.fillStyle = '#E7A33E'; g.fillRect(ex - 5, RULER, 11, 16); g.fillRect(ex - 5, h - 16, 11, 16);
+        g.fillStyle = 'rgba(26,18,4,0.7)'; g.fillRect(ex - 2, RULER + 4, 1, 8); g.fillRect(ex + 1, RULER + 4, 1, 8);
+        g.fillRect(ex - 2, h - 12, 1, 8); g.fillRect(ex + 1, h - 12, 1, 8);
+      });
+      if (x1 - x0 > 70) {
+        var label = (selB - selA).toFixed(2) + 's', lw = g.measureText(label).width + 14, lx = (x0 + x1) / 2 - lw / 2;
+        g.font = '700 10px JetBrains Mono, monospace'; lw = g.measureText(label).width + 14; lx = (x0 + x1) / 2 - lw / 2;
+        g.fillStyle = '#E7A33E'; g.fillRect(lx, 4, lw, 16);
+        g.fillStyle = '#1a1204'; g.textAlign = 'center'; g.fillText(label, (x0 + x1) / 2, 15); g.textAlign = 'left';
+      }
     }
+
     if (playhead && ctx) {
       var t = playhead.from + (ctx.currentTime - playhead.t0) * playhead.rate;
       if (playhead.loop) { var L = playhead.to - playhead.from; t = playhead.from + ((t - playhead.from) % L + L) % L; }
-      if (t >= playhead.from && t <= playhead.to) { var px = t2x(t, w); g.fillStyle = '#3CFDE0'; g.fillRect(px, 0, 2, h); }
+      if (t >= playhead.from && t <= playhead.to) {
+        var px = t2x(t, w); g.fillStyle = '#3CFDE0'; g.fillRect(px, RULER, 2, h - RULER);
+        g.beginPath(); g.moveTo(px - 5, RULER); g.lineTo(px + 7, RULER); g.lineTo(px + 1, RULER + 8); g.closePath(); g.fill();
+      }
     }
   }
   function readout() {
