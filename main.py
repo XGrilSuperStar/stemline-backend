@@ -2543,7 +2543,6 @@ async def robots_txt():
         "Allow: /\n"
         "Disallow: /admin\n"
         "Disallow: /api/\n"
-        "Disallow: /notation-viewer\n"
         "\n"
         "Sitemap: https://stemline101.com/sitemap.xml\n"
     )
