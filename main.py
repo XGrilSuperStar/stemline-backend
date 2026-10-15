@@ -2553,12 +2553,15 @@ async def robots_txt():
 async def sitemap_xml():
     pages = [
         "", "about", "faq", "privacy", "terms",
+        "sampler",
         "guides",
         "guides/what-are-stems",
         "guides/how-ai-stem-separation-works",
         "guides/mixing-stems-bpm-and-key",
         "guides/getting-cleaner-stems",
     ]
+    if NOTATION_ENABLED:
+        pages.insert(6, "notation-viewer")
     urls = "".join(
         f"  <url><loc>https://stemline101.com/{p}</loc></url>\n" for p in pages
     )
@@ -2688,6 +2691,11 @@ def stem_notation(stem_id: int, instrument: str, fmt: str = "musicxml", token: s
                         headers={"Content-Disposition": f'attachment; filename="{base}.mid"'})
     return Response(content=result["musicxml"], media_type="application/vnd.recordare.musicxml+xml",
                     headers={"Content-Disposition": f'inline; filename="{base}.musicxml"'})
+
+
+@app.get("/sampler", response_class=HTMLResponse)
+async def sampler_page():
+    return FileResponse("sampler.html", media_type="text/html")
 
 
 @app.get("/notation-viewer", response_class=HTMLResponse)

@@ -1544,7 +1544,7 @@
             <span class="screen-tabs">
               <button type="button" class="screen-tab active" data-view="waves">WAVES</button>
               <button type="button" class="screen-tab" data-view="stems" id="screenStemsTab">MY STEMS <span id="screenCount">(0)</span></button>
-              <button type="button" class="screen-tab" data-view="samples" id="screenSamplesTab">SAMPLES</button>
+              <button type="button" class="screen-tab" data-view="samples" id="screenSamplesTab">MIXES</button>
             </span>
           </div>
           <div class="transport" role="group" aria-label="Playback transport">
@@ -1632,7 +1632,6 @@
               <button class="cue-btn" type="button" title="Solo: isolate this channel, mute all others" aria-label="Solo">S</button>
               <button class="mute-btn" type="button" title="Mute this channel (stays out of main mix)">M</button>
             </div>
-            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="vocals" style="--pc:#ff5540" aria-label="Sample pad"><span class="pad-label">SAMPLE</span><span></span></button><button type="button" class="pad-hp" data-hp="vocals" title="On = pad plays in headphones only">🎧</button></div>
           </div>
           <div class="channel" data-stem="drums">
             <div class="name">Drums</div>
@@ -1669,7 +1668,6 @@
               <button class="cue-btn" type="button" title="Solo: isolate this channel, mute all others" aria-label="Solo">S</button>
               <button class="mute-btn" type="button" title="Mute this channel (stays out of main mix)">M</button>
             </div>
-            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="drums" style="--pc:#ffa022" aria-label="Sample pad"><span class="pad-label">SAMPLE</span><span></span></button><button type="button" class="pad-hp" data-hp="drums" title="On = pad plays in headphones only">🎧</button></div>
           </div>
           <div class="channel" data-stem="bass">
             <div class="name">Bass</div>
@@ -1706,7 +1704,6 @@
               <button class="cue-btn" type="button" title="Solo: isolate this channel, mute all others" aria-label="Solo">S</button>
               <button class="mute-btn" type="button" title="Mute this channel (stays out of main mix)">M</button>
             </div>
-            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="bass" style="--pc:#2fe08a" aria-label="Sample pad"><span class="pad-label">SAMPLE</span><span></span></button><button type="button" class="pad-hp" data-hp="bass" title="On = pad plays in headphones only">🎧</button></div>
           </div>
           <div class="channel" data-stem="guitar">
             <div class="name">Guitar</div>
@@ -1743,7 +1740,6 @@
               <button class="cue-btn" type="button" title="Solo: isolate this channel, mute all others" aria-label="Solo">S</button>
               <button class="mute-btn" type="button" title="Mute this channel (stays out of main mix)">M</button>
             </div>
-            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="guitar" style="--pc:#9b6dff" aria-label="Sample pad"><span class="pad-label">SAMPLE</span><span></span></button><button type="button" class="pad-hp" data-hp="guitar" title="On = pad plays in headphones only">🎧</button></div>
           </div>
           <div class="channel" data-stem="piano">
             <div class="name">Synth</div>
@@ -1780,7 +1776,6 @@
               <button class="cue-btn" type="button" title="Solo: isolate this channel, mute all others" aria-label="Solo">S</button>
               <button class="mute-btn" type="button" title="Mute this channel (stays out of main mix)">M</button>
             </div>
-            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="piano" style="--pc:#ff5cb0" aria-label="Sample pad"><span class="pad-label">SAMPLE</span><span></span></button><button type="button" class="pad-hp" data-hp="piano" title="On = pad plays in headphones only">🎧</button></div>
           </div>
           <div class="channel" data-stem="other">
             <div class="name">Other</div>
@@ -1817,7 +1812,6 @@
               <button class="cue-btn" type="button" title="Solo: isolate this channel, mute all others" aria-label="Solo">S</button>
               <button class="mute-btn" type="button" title="Mute this channel (stays out of main mix)">M</button>
             </div>
-            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="other" style="--pc:#3ab6ff" aria-label="Sample pad"><span class="pad-label">SAMPLE</span><span></span></button><button type="button" class="pad-hp" data-hp="other" title="On = pad plays in headphones only">🎧</button></div>
           </div>
         </div>
 
@@ -1907,19 +1901,7 @@
       
 
       <div class="wood-trim"></div>
-      <div class="sample-help-wrap"><button type="button" class="sample-help-pill" id="sampleHelpBtn">HOW TO SAMPLE</button><a class="sample-help-pill" id="sheetMusicLink" href="/notation-viewer" style="text-decoration:none;margin-left:0.5rem;">SHEET MUSIC</a><div class="sample-help-pop" id="sampleHelpPop" style="display:none;">
-      <button type="button" class="sample-help-close" id="sampleHelpClose" aria-label="Close">&#10005;</button>
-      <div class="sample-help-title">HOW TO SAMPLE</div>
-      <ol class="sample-help-steps">
-        <li>Hold Shift and drag across any track's waveform to grab a piece of it.</li>
-        <li>Right-click your selection and choose Save Sample.</li>
-        <li>Double-click a saved piece on the waveform to rename it.</li>
-        <li>Click that track's colored square to play the sample back.</li>
-        <li>The headphone icon next to the square sends it to headphones only.</li>
-        <li>Press Delete or Backspace to remove the highlighted selection from the timeline (doesn't touch the audio).</li>
-      </ol>
-      <div class="sample-help-tip" style="margin-top:0.6rem;font-size:0.68rem;color:var(--sci-glow,#3CFDE0);">Great for ringtones — chop your favorite hook and save it.</div>
-    </div></div>
+      <div class="sample-help-wrap"><a class="sample-help-pill" id="samplerLink" href="/sampler" style="text-decoration:none;">SAMPLER</a><a class="sample-help-pill" id="sheetMusicLink" href="/notation-viewer" style="text-decoration:none;margin-left:0.5rem;">SHEET MUSIC</a></div>
     </div>
   </div>
 </section>
@@ -3588,7 +3570,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     canvas.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
-      if (!(e.shiftKey || sampleModeByStem[stem])) return; // scrub handler takes this drag instead
+      return; // sampling moved to the Sampler page (/sampler); scrub handler takes this drag
       canvas.setPointerCapture(e.pointerId);
       selecting = true;
       startX = e.clientX;
@@ -3639,7 +3621,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (sampleLib) { sampleLib.style.display = view === 'samples' ? 'flex' : 'none'; if (view === 'samples' && window.__renderLibrary) window.__renderLibrary(); }
       const browseBar = document.getElementById('screenBrowse');
       if (browseBar) browseBar.style.display = view === 'stems' ? 'flex' : 'none';
-      if (screenTitle) screenTitle.textContent = view === 'waves' ? 'STEM WAVEFORMS' : (view === 'samples' ? 'SAMPLE LIBRARY' : 'MY STEMS');
+      if (screenTitle) screenTitle.textContent = view === 'waves' ? 'STEM WAVEFORMS' : (view === 'samples' ? 'SAVED MIXES' : 'MY STEMS');
     });
   });
 
@@ -4703,7 +4685,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         chopBtn.addEventListener('click', (e) => {
           e.stopPropagation();
-          if (window.__openStemChop) window.__openStemChop(stemId, chan, trackName);
+          window.location.href = '/sampler';
         });
 
         cueJack.addEventListener('click', () => {
@@ -5696,9 +5678,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     if (!lib.length) {
       const e = document.createElement('div'); e.className = 'lib-empty mono';
-      e.textContent = 'No samples yet. Cut a region on a waveform, right-click it, Save sample.';
-      root.appendChild(e); return;
+      e.textContent = mixes.length ? '' : 'No saved mixes yet.';
+      if (!mixes.length) root.appendChild(e);
+      return; // samples now live on the Sampler page (/sampler)
     }
+    return; // samples now live on the Sampler page (/sampler)
     const a = getAssign();
     const TYPE_ORDER = ['vocals', 'drums', 'bass', 'guitar', 'piano', 'other'];
     const sortedLib = lib.slice().sort((x, y) => {
