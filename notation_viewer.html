@@ -73,6 +73,9 @@
     font-size: 1.25rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--chrome);
   }
   .intro p { margin: 0 0 0.7rem; color: var(--chrome-dim); font-size: 0.92rem; max-width: 62ch; }
+  .howto { margin: 0 0 0.8rem; padding-left: 1.3rem; max-width: 62ch; color: var(--chrome-dim); font-size: 0.88rem; line-height: 1.5; }
+  .howto li { margin: 0 0 0.2rem; padding-left: 0.2rem; }
+  .howto b { color: var(--chrome); font-weight: 600; }
   .facts { display: flex; flex-wrap: wrap; gap: 0.5rem; list-style: none; margin: 0; padding: 0; }
   .facts li {
     font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; letter-spacing: 0.03em;
@@ -210,7 +213,13 @@
 <main>
 <section class="intro">
   <h2>Turn any stem into sheet music</h2>
-  <p>Choose one of your split songs and an instrument, then press Show sheet music.</p>
+  <ol class="howto">
+    <li><b>Pick a song.</b> Choose one of your split songs. (Log in on the main page first.)</li>
+    <li><b>Pick a stem.</b> Bass, Vocals, Guitar or Other. Drums can't be written out.</li>
+    <li><b>Press Show sheet music.</b> It listens to the stem and writes out the notes. This can take a minute.</li>
+    <li><b>Read it.</b> Bass shows tablature only: each line is a string and each number is the fret to press. Zero means an open string.</li>
+    <li><b>Download (Premium).</b> Save the music as MusicXML or MIDI to open in your own notation software.</li>
+  </ol>
   <ul class="facts">
     <li>Notes are detected automatically &mdash; expect some mistakes on busy stems</li>
     <li>Free: 2 short previews a month</li>

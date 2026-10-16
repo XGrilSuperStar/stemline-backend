@@ -296,10 +296,12 @@ TUNINGS = {
 _STEP = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
 
 
-def _add_tablature(xml, instrument):
-    """Add a TAB staff under the notation staff (MusicXML string/fret).
-    Only for bass/guitar, and only when the score is a single simple voice per
-    measure. Any problem -> return the plain notation untouched."""
+def _add_tablature(xml, instrument, tab_only=False):
+    """Add tablature (MusicXML string/fret).
+    By default a TAB staff is added under the notation staff. With tab_only the
+    notation staff is replaced by a single TAB staff, so each note is shown once.
+    Only when the score is a single simple voice per measure. Any problem ->
+    return the input untouched."""
     tuning = TUNINGS.get(instrument)
     if not tuning:
         return xml
@@ -357,6 +359,40 @@ def _add_tablature(xml, instrument):
             note.append(el)
 
         first = measures[0].find("attributes")
+        if tab_only:
+            # one TAB staff: the existing notes just gain string/fret, nothing is duplicated
+            for tag in ("staves", "clef", "staff-details"):
+                for old in first.findall(tag):
+                    first.remove(old)
+            c = ET.SubElement(first, "clef")
+            ET.SubElement(c, "sign").text = "TAB"; ET.SubElement(c, "line").text = "5"
+            sd = ET.SubElement(first, "staff-details")
+            ET.SubElement(sd, "staff-lines").text = str(nstr)
+            for m in measures:
+                groups = []
+                for n in m.findall("note"):
+                    if n.find("chord") is not None and groups:
+                        groups[-1].append(n)
+                    else:
+                        groups.append([n])
+                for g in groups:
+                    pitches = [midi_of(n) for n in g if midi_of(n) is not None]
+                    assign = place(pitches) if pitches else {}
+                    for n in g:
+                        for tag in ("accidental", "lyric"):
+                            for e in n.findall(tag):
+                                n.remove(e)
+                        p = midi_of(n)
+                        if p is not None and p in assign:
+                            si, fret = assign[p]
+                            nt = n.find("notations")
+                            if nt is None:
+                                nt = ET.SubElement(n, "notations")
+                            tech = ET.SubElement(nt, "technical")
+                            ET.SubElement(tech, "string").text = str(nstr - si)  # MusicXML: 1 = highest string
+                            ET.SubElement(tech, "fret").text = str(fret)
+            return ET.tostring(root, encoding="unicode", xml_declaration=True)
+
         for tag in ("staves", "clef", "staff-details"):
             for old in first.findall(tag):
                 first.remove(old)
@@ -553,8 +589,13 @@ def transcribe(audio_bytes, ext, instrument):
     midi_bytes = buf.getvalue()
 
     xml = _midi_to_musicxml(midi_bytes, settings["title"], bpm, beats)
-    xml = _add_letters(xml)
-    xml = _add_tablature(xml, instrument)
+    if instrument == "bass":
+        # bass: tablature only, so every note shows once (fall back to plain notation)
+        tab = _add_tablature(xml, instrument, tab_only=True)
+        xml = tab if tab != xml else _add_letters(xml)
+    else:
+        xml = _add_letters(xml)
+        xml = _add_tablature(xml, instrument)
     return {"midi": midi_bytes, "musicxml": xml, "bpm": bpm, "note_count": note_count}
 
 
