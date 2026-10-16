@@ -639,7 +639,7 @@
       if (!r.ok) { var m = 'Could not load that stem.'; try { m = (await r.json()).detail || m; } catch (e) {} throw new Error(m); }
       var ab = await engine().decodeAudioData(await r.arrayBuffer());
       buf = ab; bufInst = inst; bufName = s.track_name;
-      viewA = 0; viewB = ab.duration; selA = selB = null;
+      viewA = 0; viewB = ab.duration; selA = selB = null; seekT = 0; stopKey('prev'); playhead = null;
       $('sampName').value = s.track_name + ' ' + (inst === 'piano' ? 'synth' : inst);
       setStatus('Loaded. Drag across the waveform to grab a piece.');
       ['prev', 'loopSel', 'zoomSel', 'zoomAll', 'save'].forEach(function (id) { $(id).disabled = false; });
@@ -774,6 +774,18 @@
     if (!buf) return;
     var r = wave.getBoundingClientRect(), w = r.width, x = e.clientX - r.left;
     var drag = null;
+    if (e.clientY - r.top < 24) { // 24 = ruler height in drawWave
+      // drag the ruler to scroll the view left/right
+      var span0 = viewB - viewA, startX = e.clientX, startA = viewA;
+      wave.setPointerCapture(e.pointerId);
+      var pan = function (ev) {
+        var dt = -(ev.clientX - startX) / w * span0;
+        viewA = Math.max(0, Math.min(buf.duration - span0, startA + dt)); viewB = viewA + span0; drawWave();
+      };
+      var panUp = function () { wave.removeEventListener('pointermove', pan); wave.removeEventListener('pointerup', panUp); wave.removeEventListener('pointercancel', panUp); };
+      wave.addEventListener('pointermove', pan); wave.addEventListener('pointerup', panUp); wave.addEventListener('pointercancel', panUp);
+      return;
+    }
     if (selA != null) {
       var d0 = Math.abs(x - t2x(selA, w)), d1 = Math.abs(x - t2x(selB, w));
       if (Math.min(d0, d1) <= 10) drag = d0 <= d1 ? 'a' : 'b';
@@ -790,13 +802,19 @@
     }
     function up() {
       wave.removeEventListener('pointermove', move); wave.removeEventListener('pointerup', up); wave.removeEventListener('pointercancel', up);
-      if (selA != null && selB - selA < 0.02) { selA = selB = null; }
+      if (selA != null && selB - selA < 0.02) { seekT = selA; selA = selB = null; }
       drawWave(); readout();
     }
     wave.addEventListener('pointermove', move); wave.addEventListener('pointerup', up); wave.addEventListener('pointercancel', up);
   });
+  var seekT = 0; // where plain Play starts when nothing is selected
   wave.addEventListener('wheel', function (e) {
     if (!buf) return; e.preventDefault();
+    if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+      // sideways scroll
+      var sp = viewB - viewA, d = (e.deltaX || e.deltaY) / wave.getBoundingClientRect().width * sp;
+      viewA = Math.max(0, Math.min(buf.duration - sp, viewA + d)); viewB = viewA + sp; drawWave(); return;
+    }
     var r = wave.getBoundingClientRect(), t = x2t(e.clientX - r.left, r.width), k = e.deltaY > 0 ? 1.25 : 0.8;
     var span = Math.min(buf.duration, Math.max(0.05, (viewB - viewA) * k));
     var frac = (t - viewA) / (viewB - viewA);
@@ -838,12 +856,14 @@
   }
 
   $('prev').onclick = function () {
-    if (!buf || selA == null) { toast('Select a piece first'); return; }
+    if (!buf) { toast('Load a stem first'); return; }
     if (playing.prev) { stopKey('prev'); playhead = null; drawWave(); return; }
+    // no selection: play the whole stem from the last click point
+    var hasSel = selA != null, from = hasSel ? selA : Math.min(seekT || 0, Math.max(0, buf.duration - 0.05)), to = hasSel ? selB : buf.duration;
     var data = []; for (var ch = 0; ch < buf.numberOfChannels; ch++) data.push(buf.getChannelData(ch));
-    var item = { sr: buf.sampleRate, data: data, inT: selA, outT: selB, _buf: buf };
-    var h = playItem('prev', item, { loop: loopSel, onEnd: function () { playhead = null; drawWave(); } });
-    if (h) playhead = { t0: h.t0, from: selA, to: selB, rate: 1, loop: loopSel };
+    var item = { sr: buf.sampleRate, data: data, inT: from, outT: to, _buf: buf };
+    var h = playItem('prev', item, { loop: hasSel && loopSel, onEnd: function () { playhead = null; drawWave(); } });
+    if (h) playhead = { t0: h.t0, from: from, to: to, rate: 1, loop: hasSel && loopSel };
   };
   $('loopSel').onclick = function () { loopSel = !loopSel; this.classList.toggle('on', loopSel); };
 
