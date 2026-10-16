@@ -5751,10 +5751,15 @@ document.addEventListener('DOMContentLoaded', () => {
       const ph = document.createElement('option'); ph.value = ''; ph.textContent = onChans.length ? ('ON: ' + onChans.map(nice).join(', ')) : 'LOAD TO...';
       asg.appendChild(ph);
       Object.keys(COLORS).forEach(k => { const o = document.createElement('option'); o.value = k; o.textContent = nice(k); asg.appendChild(o); });
+      if (onChans.length) { const un = document.createElement('option'); un.value = '__none'; un.textContent = 'UNLOAD'; asg.appendChild(un); }
       asg.onchange = () => {
         const k = asg.value; if (!k) return;
-        const x = getAssign(); x[k] = item.id; setAssign(x); refreshPads(); renderLibrary();
-        toast('Loaded onto ' + nice(k) + ' pad');
+        const x = getAssign();
+        // a sample lives on ONE pad: take it off any other pad first
+        Object.keys(x).forEach(c => { if (x[c] === item.id) delete x[c]; });
+        if (k !== '__none') x[k] = item.id;
+        setAssign(x); refreshPads(); renderLibrary();
+        toast(k === '__none' ? 'Unloaded from pads' : 'Loaded onto ' + nice(k) + ' pad');
       };
       const dur = document.createElement('span'); dur.className = 'lib-stem mono'; dur.textContent = (item.outT - item.inT).toFixed(1) + 's';
       const dl = document.createElement('button'); dl.type = 'button'; dl.textContent = 'DOWNLOAD'; dl.title = 'Save this sample to your device as an MP3 (Premium)';
