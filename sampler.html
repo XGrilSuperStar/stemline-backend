@@ -831,7 +831,7 @@
     var loop = !!opts.loop;
     if (loop) { src.loop = true; src.loopStart = item.inT; src.loopEnd = item.outT; }
     src.onended = function () { try { g.disconnect(); } catch (e) {} if (playing[key] && playing[key].src === src) { delete playing[key]; if (opts.onEnd) opts.onEnd(); } };
-    src.start(0, item.inT, loop ? undefined : Math.max(0.02, (item.outT - item.inT) / rate));
+    src.start(0, item.inT, loop ? undefined : Math.max(0.02, item.outT - item.inT));
     var h = { src: src, g: g, t0: c.currentTime, rate: rate, loop: loop };
     playing[key] = h;
     return h;
@@ -947,9 +947,15 @@
   function persist() { if (cur) idbPut(strip(cur)); }
 
   $('padName').addEventListener('change', function () { if (!cur) return; var v = this.value.trim(); if (v) { cur.name = v; persist(); renderPads(); renderLib(); } });
-  $('vol').addEventListener('input', function () { if (!cur) return; cur.vol = this.value / 100; $('volV').textContent = this.value + '%'; });
+  $('vol').addEventListener('input', function () {
+    if (!cur) return; cur.vol = this.value / 100; $('volV').textContent = this.value + '%';
+    var h = playing[sel]; if (h) h.g.gain.value = cur.vol * 0.95;
+  });
   $('vol').addEventListener('change', persist);
-  $('semi').addEventListener('input', function () { if (!cur) return; cur.semi = +this.value; $('semiV').textContent = this.value + ' st'; });
+  $('semi').addEventListener('input', function () {
+    if (!cur) return; cur.semi = +this.value; $('semiV').textContent = this.value + ' st';
+    var h = playing[sel]; if (h) { h.rate = Math.pow(2, cur.semi / 12); h.src.playbackRate.value = h.rate; }
+  });
   $('semi').addEventListener('change', persist);
   function bindKnob(kid, inputId, fmtFn, dflt) {
     var el = $(kid), inp = $(inputId), dial = el.querySelector('.dial'), needle = dial.querySelector('i'), out = el.querySelector('.kv');
