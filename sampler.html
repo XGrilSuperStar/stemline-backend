@@ -411,7 +411,6 @@
           <option value="drums">Drums</option>
           <option value="bass">Bass</option>
           <option value="guitar">Guitar</option>
-          <option value="piano">Keys / Synth</option>
           <option value="other">Other</option>
         </select>
         <button id="load">Load stem</button>
@@ -517,7 +516,7 @@
 <script>
 (function () {
   'use strict';
-  var COLORS = { vocals:'#ff5540', drums:'#ffa022', bass:'#2fe08a', guitar:'#9b6dff', piano:'#ff5cb0', other:'#3ab6ff' };
+  var COLORS = { vocals:'#ff5540', drums:'#ffa022', bass:'#2fe08a', guitar:'#9b6dff', other:'#3ab6ff' };
   var KEYS = ['1','2','3','4','q','w','e','r','a','s','d','f','z','x','c','v'];
   var PAD_PAD = 2;                 // seconds of extra audio kept each side for retrimming (same as the mixer)
   var GRID_KEY = 'stemline_pad_grid';
@@ -629,7 +628,7 @@
   }
   function syncInst() {
     var s = rows[songSel.value];
-    if (s && s.instrument) { instSel.value = s.instrument === 'synth' ? 'piano' : s.instrument; instSel.disabled = true; }
+    if (s && s.instrument) { instSel.value = (s.instrument === 'synth' || s.instrument === 'piano') ? 'other' : s.instrument; instSel.disabled = true; }
     else instSel.disabled = false;
   }
   songSel.addEventListener('change', syncInst);
@@ -644,7 +643,7 @@
       var ab = await engine().decodeAudioData(await r.arrayBuffer());
       buf = ab; bufInst = inst; bufName = s.track_name;
       viewA = 0; viewB = ab.duration; selA = selB = null; seekT = 0; stopKey('prev'); playhead = null;
-      $('sampName').value = s.track_name + ' ' + (inst === 'piano' ? 'synth' : inst);
+      $('sampName').value = s.track_name + ' ' + inst;
       setStatus('Loaded. Drag across the waveform to grab a piece.');
       ['prev', 'loopSel', 'zoomSel', 'zoomAll', 'save'].forEach(function (id) { $(id).disabled = false; });
       drawWave(); readout();
@@ -935,7 +934,7 @@
     $('inspEmpty').textContent = sel >= 0 ? 'Pad ' + (sel + 1) + ' is empty. Grab a piece of a stem above and press Save to selected pad.' : 'Click a pad to edit its sample.';
     if (!cur) return;
     $('padName').value = cur.name;
-    $('padStem').textContent = cur.stem === 'piano' ? 'synth' : cur.stem;
+    $('padStem').textContent = cur.stem;
     $('vol').value = Math.round((cur.vol == null ? 1 : cur.vol) * 100); $('volV').textContent = $('vol').value + '%';
     $('semi').value = cur.semi || 0; $('semiV').textContent = (cur.semi || 0) + ' st';
     $('padLoop').classList.toggle('on', !!cur.loop);
@@ -1019,12 +1018,12 @@
   function renderLib() {
     var root = $('lib'); root.innerHTML = '';
     if (!lib.length) { var e = document.createElement('div'); e.className = 'empty'; e.textContent = 'No samples yet. Load a stem, grab a piece, and save it to a pad.'; root.appendChild(e); return; }
-    var order = ['vocals', 'drums', 'bass', 'guitar', 'piano', 'other'];
+    var order = ['vocals', 'drums', 'bass', 'guitar', 'other'];
     lib.slice().sort(function (a, b) { var x = order.indexOf(a.stem), y = order.indexOf(b.stem); return (x < 0 ? 99 : x) - (y < 0 ? 99 : y); }).forEach(function (item) {
       var row = document.createElement('div'); row.className = 'lib-item'; row.style.setProperty('--pc', COLORS[item.stem] || '#888');
       var dot = document.createElement('span'); dot.className = 'lib-dot';
       var nm = document.createElement('span'); nm.className = 'lib-name'; nm.textContent = item.name; nm.title = item.name;
-      var st = document.createElement('span'); st.className = 'lib-stem'; st.textContent = item.stem === 'piano' ? 'synth' : item.stem;
+      var st = document.createElement('span'); st.className = 'lib-stem'; st.textContent = item.stem;
       var play = document.createElement('button'); play.type = 'button'; play.className = 'secondary'; play.textContent = '▶';
       play.onclick = function () { playItem('lib', item, {}); };
       var put = document.createElement('button'); put.type = 'button'; put.className = 'secondary'; put.textContent = 'To pad';
@@ -1103,6 +1102,8 @@
   (async function init() {
     grid = loadGrid();
     lib = await idbAll();
+    // synth channel was removed: move any old synth samples over to Other
+    lib.forEach(function (it) { if (it.stem === 'piano') { it.stem = 'other'; idbPut(it); } });
     grid = grid.map(function (g) { return g && byId(g) ? g : null; });
     renderPads(); renderLib(); drawWave();
     loadSongs(); loadMe();

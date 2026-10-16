@@ -224,7 +224,6 @@
     <option value="bass">Bass</option>
     <option value="vocals">Vocals</option>
     <option value="guitar">Guitar</option>
-    <option value="piano">Keys / Synth</option>
     <option value="other">Other</option>
   </select></label>
   <button id="go">Show sheet music</button>
@@ -292,7 +291,7 @@
 
   function syncInst() {
     var s = rows[songSel.value];
-    if (s && s.instrument) { instSel.value = s.instrument === 'synth' ? 'piano' : s.instrument; instSel.disabled = true; }
+    if (s && s.instrument) { instSel.value = (s.instrument === 'synth' || s.instrument === 'piano') ? 'other' : s.instrument; instSel.disabled = true; }
     else { instSel.disabled = false; }
   }
   songSel.addEventListener('change', syncInst);

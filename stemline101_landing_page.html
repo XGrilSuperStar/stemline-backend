@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Stemline 101 — Split any song into its parts</title>
-<meta name="description" content="Stemline101 splits any song into vocals, drums, bass, guitar, synth and more, then lets you mix stems from different songs on one mixer. Free to start.">
+<meta name="description" content="Stemline101 splits any song into vocals, drums, bass, guitar and more, then lets you mix stems from different songs on one mixer. Free to start.">
 <link rel="canonical" href="https://stemline101.com/">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -427,7 +427,6 @@
   .wave-row[data-stem="drums"]  { --row-accent: #ffa022; }
   .wave-row[data-stem="bass"]   { --row-accent: #2fe08a; }
   .wave-row[data-stem="guitar"] { --row-accent: #9b6dff; }
-  .wave-row[data-stem="piano"]  { --row-accent: #ff5cb0; }
   .wave-row[data-stem="other"]  { --row-accent: #3ab6ff; }
   .screen-list {
     height: 172px; overflow-y: auto; padding-right: 2px; position: relative;
@@ -619,7 +618,7 @@
   .rack-screw.br { bottom: 7px; right: 7px; }
 
 
-  .channels { display: grid; grid-template-columns: repeat(6, minmax(52px, 1fr)); gap: 5px; }
+  .channels { display: grid; grid-template-columns: repeat(5, minmax(52px, 1fr)); gap: 5px; }
   .channel {
     background:
       repeating-linear-gradient(90deg, rgba(255,255,255,0.022) 0px, transparent 1px, transparent 3px),
@@ -640,8 +639,7 @@
   .channel:nth-child(2) { --ch-accent: #ffa022; }
   .channel:nth-child(3) { --ch-accent: #2fe08a; }
   .channel:nth-child(4) { --ch-accent: #9b6dff; }
-  .channel:nth-child(5) { --ch-accent: #ff5cb0; }
-  .channel:nth-child(6) { --ch-accent: #3ab6ff; }
+  .channel:nth-child(5) { --ch-accent: #3ab6ff; }
 
   .channel .name {
     font-family: 'Inter', sans-serif; font-weight: 700; font-size: 0.56rem;
@@ -1103,7 +1101,7 @@
 
   @media (max-width: 700px) {
     .mixer-row { flex-wrap: wrap; overflow-x: visible; }
-    .channel[data-stem="guitar"], .channel[data-stem="piano"] { display: none; }
+    .channel[data-stem="guitar"] { display: none; }
     .channels {
       grid-template-columns: repeat(2, minmax(0, 1fr));
       flex: 1 1 100%; width: 100%; gap: 10px;
@@ -1490,7 +1488,7 @@
         <div class="step">
           <span class="num mono">03 —</span>
           <h3>Splits into stems</h3>
-          <p>The track separates into six clean stems: vocals, drums, bass, guitar, synth, and everything else, ready to use individually.</p>
+          <p>The track separates into six clean stems: vocals, drums, bass, guitar, and everything else, ready to use individually.</p>
         </div>
         <div class="step">
           <span class="num mono">04 —</span>
@@ -1570,7 +1568,6 @@
             <div class="wave-row" data-stem="drums"><span class="wave-row-label">DRUMS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="sample-toggle-btn" data-stem="drums" title="Toggle sample mode: click-drag on the wave chops a triggerable sample">SAMPLE</button><button class="add-marker-btn" data-stem="drums" title="Add a cue marker here">+CUE</button></div>
             <div class="wave-row" data-stem="bass"><span class="wave-row-label">BASS</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="sample-toggle-btn" data-stem="bass" title="Toggle sample mode: click-drag on the wave chops a triggerable sample">SAMPLE</button><button class="add-marker-btn" data-stem="bass" title="Add a cue marker here">+CUE</button></div>
             <div class="wave-row" data-stem="guitar"><span class="wave-row-label">GUITAR</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="sample-toggle-btn" data-stem="guitar" title="Toggle sample mode: click-drag on the wave chops a triggerable sample">SAMPLE</button><button class="add-marker-btn" data-stem="guitar" title="Add a cue marker here">+CUE</button></div>
-            <div class="wave-row" data-stem="piano"><span class="wave-row-label">SYNTH</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="sample-toggle-btn" data-stem="piano" title="Toggle sample mode: click-drag on the wave chops a triggerable sample">SAMPLE</button><button class="add-marker-btn" data-stem="piano" title="Add a cue marker here">+CUE</button></div>
             <div class="wave-row" data-stem="other"><span class="wave-row-label">OTHER</span><div class="wave-canvas-wrap"><canvas class="wave-canvas"></canvas></div><button class="sample-toggle-btn" data-stem="other" title="Toggle sample mode: click-drag on the wave chops a triggerable sample">SAMPLE</button><button class="add-marker-btn" data-stem="other" title="Add a cue marker here">+CUE</button></div>
             <div class="wave-playhead" id="wavePlayhead"></div>
           </div>
@@ -1746,43 +1743,6 @@
               <button class="mute-btn" type="button" title="Mute this channel (stays out of main mix)">M</button>
             </div>
             <div class="pad-row"><button type="button" class="sampler-pad" data-pad="guitar" style="--pc:#9b6dff" aria-label="Sample pad"><span class="pad-label">SAMPLE</span><span></span></button><button type="button" class="pad-hp" data-hp="guitar" title="On = pad plays in headphones only">🎧</button></div>
-          </div>
-          <div class="channel" data-stem="piano">
-            <div class="name">Synth</div>
-            <div class="status-led" data-stem-led title="Channel status"></div>
-            <div class="assigned-badge mono"></div>
-            <div class="ch-btn-row"><button type="button" class="ch-browse" data-browse="piano">BROWSE</button><button type="button" class="ch-save" data-save="piano" title="Save this channel">SAVE</button><button type="button" class="ch-clear" data-clear="piano" title="Clear this channel">CLR</button></div>
-            <div class="stem-pop" data-pop="piano" style="display:none;">
-              <div class="stem-pop-head"><span class="stem-pop-title">PIANO</span><button type="button" class="stem-pop-x" data-popclose="piano">&#10005;</button></div>
-              <input type="text" class="stem-pop-search" data-popsearch="piano" placeholder="type to find…" autocomplete="off" spellcheck="false">
-              <div class="stem-pop-list" data-poplist="piano"><div class="stem-pop-empty">no stems</div></div>
-              <div class="stem-pop-foot"><button type="button" class="stem-pop-btn" data-popup2="piano">&#9650;</button><button type="button" class="stem-pop-btn" data-popdown="piano">&#9660;</button><button type="button" class="stem-pop-btn wide" data-popload="piano">LOAD</button><button type="button" class="stem-pop-btn" data-popeject="piano" title="Unload">&#9167;</button><button type="button" class="stem-pop-btn" data-poprename="piano" title="Rename">&#9998;</button></div>
-            </div>
-            <div class="knob" data-role="gain"></div>
-            <div class="knob-tag">GAIN</div>
-            <div class="ch-pitch">
-              <button type="button" class="ch-pitch-btn" data-pitch="down">&#9660;</button>
-              <span class="ch-pitch-val" data-pitch-val>&#177;0 · C</span>
-              <button type="button" class="ch-pitch-btn" data-pitch="up">&#9650;</button>
-            </div>
-            <div class="ch-pitch-tag">KEY / PITCH</div>
-            <div class="eq-stack">
-              <div class="eq-row"><span class="eq-label">HI</span><div class="knob-xs" data-eq="high"></div></div>
-              <div class="eq-row"><span class="eq-label">MID</span><div class="knob-xs" data-eq="mid"></div></div>
-              <div class="eq-row"><span class="eq-label">LOW</span><div class="knob-xs" data-eq="low"></div></div>
-            </div>
-            <div class="meter">
-              <div class="meter-seg green"></div><div class="meter-seg green"></div><div class="meter-seg green"></div>
-              <div class="meter-seg green"></div><div class="meter-seg green"></div><div class="meter-seg green"></div>
-              <div class="meter-seg yellow"></div><div class="meter-seg yellow"></div>
-              <div class="meter-seg red"></div><div class="meter-seg red"></div>
-            </div>
-            <div class="fader-slot"><div class="fader-cap"></div></div>
-            <div class="btn-row">
-              <button class="cue-btn" type="button" title="Solo: isolate this channel, mute all others" aria-label="Solo">S</button>
-              <button class="mute-btn" type="button" title="Mute this channel (stays out of main mix)">M</button>
-            </div>
-            <div class="pad-row"><button type="button" class="sampler-pad" data-pad="piano" style="--pc:#ff5cb0" aria-label="Sample pad"><span class="pad-label">SAMPLE</span><span></span></button><button type="button" class="pad-hp" data-hp="piano" title="On = pad plays in headphones only">🎧</button></div>
           </div>
           <div class="channel" data-stem="other">
             <div class="name">Other</div>
@@ -2016,7 +1976,7 @@ const STEM_SAMPLES = {};
   const DUR_S = 6.0;
   const N = Math.round(SR * DUR_S);
   try {
-    ['vocals', 'drums', 'bass', 'guitar', 'piano', 'other'].forEach(name => {
+    ['vocals', 'drums', 'bass', 'guitar', 'other'].forEach(name => {
       STEM_SAMPLES[name] = new Float32Array(N);
     });
     STEM_SAMPLES._sr = SR;
@@ -2040,7 +2000,7 @@ let isPlaying = false;
 let rafId = null;
 const BASE_BPM = 120;
 let tempoRatio = 1;
-let stemAutoStretch = { vocals: 1, drums: 1, bass: 1, guitar: 1, piano: 1, other: 1 };
+let stemAutoStretch = { vocals: 1, drums: 1, bass: 1, guitar: 1, other: 1 };
 const detectedBpmByStemId = {};
 const detectedBpmPromiseByStemId = {};
 let masterVolPct = 80;
@@ -2049,14 +2009,14 @@ let keyLockOn = true;
 
 let masterOffset = 0;
 let playStartCtxTime = 0;
-const stemNudge = { vocals: 0, drums: 0, bass: 0, guitar: 0, piano: 0, other: 0 };
+const stemNudge = { vocals: 0, drums: 0, bass: 0, guitar: 0, other: 0 };
 const LOOP_DUR = 6.0;
 // New: per-stem SAMPLE-mode toggle state, driven by the visible SAMPLE
 // button on each waveform row. When true for a stem, a plain (non-shift)
 // click-drag on that row chops a sample region instead of nudging the
 // stem's timing — Shift+drag still works as a shortcut regardless of
 // this toggle.
-const sampleModeByStem = { vocals: false, drums: false, bass: false, guitar: false, piano: false, other: false };
+const sampleModeByStem = { vocals: false, drums: false, bass: false, guitar: false, other: false };
 const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 function keyLabel(semis) {
   const idx = ((Math.round(semis) % 12) + 12) % 12;
@@ -2151,7 +2111,7 @@ function updateAllChannelGains() {
 const dbToGain = db => Math.pow(10, db / 20);
 
 // Default EQ starting points per stem, to cut down on vocal bleed into
-// "other"-family instruments separated by Demucs (guitar/piano/other all
+// "other"-family instruments separated by Demucs (guitar/other all
 // come from the same catch-all stem, so they bleed into each other and
 // into vocals). These are just starting knob positions -- still fully
 // adjustable per channel.
@@ -2871,7 +2831,7 @@ function updateNudgeReadout(row, nudgeSec) {
   const label = row.querySelector('.wave-row-label');
   if (!label) return;
   const stem = row.dataset.stem;
-  const stemName = { vocals: 'VOCALS', drums: 'DRUMS', bass: 'BASS', guitar: 'GUITAR', piano: 'SYNTH', other: 'OTHER' }[stem] || stem.toUpperCase();
+  const stemName = { vocals: 'VOCALS', drums: 'DRUMS', bass: 'BASS', guitar: 'GUITAR', other: 'OTHER' }[stem] || stem.toUpperCase();
   if (Math.abs(nudgeSec) < 0.005) {
     label.textContent = stemName;
   } else {
@@ -2992,7 +2952,7 @@ function setupFader(slotEl, capEl, { initial, onChange }) {
   return { set: apply, get: () => pct };
 }
 
-const WAVE_COLORS = { vocals: '#ff5540', drums: '#ffa022', bass: '#2fe08a', guitar: '#9b6dff', piano: '#ff5cb0', other: '#3ab6ff' };
+const WAVE_COLORS = { vocals: '#ff5540', drums: '#ffa022', bass: '#2fe08a', guitar: '#9b6dff', other: '#3ab6ff' };
 
 function drawWaveform(canvas, audioBuffer, color) {
   const data = audioBuffer.getChannelData ? audioBuffer.getChannelData(0) : audioBuffer;
@@ -3061,7 +3021,7 @@ function renderStemWaveforms() {
   });
 }
 
-const stemMarkers = { vocals: [], drums: [], bass: [], guitar: [], piano: [], other: [] };
+const stemMarkers = { vocals: [], drums: [], bass: [], guitar: [], other: [] };
 let markerIdCounter = 0;
 
 function formatMarkerTime(t) {
@@ -3177,7 +3137,7 @@ function renderAllStemMarkers() {
   Object.keys(stemMarkers).forEach(renderStemMarkers);
 }
 
-const stemSampleRegions = { vocals: [], drums: [], bass: [], guitar: [], piano: [], other: [] };
+const stemSampleRegions = { vocals: [], drums: [], bass: [], guitar: [], other: [] };
 let sampleRegionIdCounter = 0;
 let selectedSampleRegion = null;
 
@@ -3688,7 +3648,6 @@ document.addEventListener('DOMContentLoaded', () => {
     { key: 'drums',  label: 'DRUMS',     accent: '#ffa022' },
     { key: 'bass',   label: 'BASS',      accent: '#2fe08a' },
     { key: 'guitar', label: 'GUITAR',    accent: '#9b6dff' },
-    { key: 'piano',  label: 'SYNTH',     accent: '#ff5cb0' },
     { key: 'other',  label: 'OTHER',     accent: '#3ab6ff' }
   ];
   let groupIdx = 0;
@@ -4462,14 +4421,13 @@ document.addEventListener('DOMContentLoaded', () => {
     return div.innerHTML;
   }
 
-  const CHANNEL_LIST = ['vocals', 'drums', 'bass', 'guitar', 'piano', 'other'];
+  const CHANNEL_LIST = ['vocals', 'drums', 'bass', 'guitar', 'other'];
   const channelAssignments = {};
   const STEM_ROW_META = {
     vocals: { label: 'VOCALS', accent: '#ff5540' },
     drums:  { label: 'DRUMS',  accent: '#ffa022' },
     bass:   { label: 'BASS',   accent: '#2fe08a' },
     guitar: { label: 'GUITAR', accent: '#9b6dff' },
-    piano:  { label: 'SYNTH',  accent: '#ff5cb0' },
     other:  { label: 'OTHER',  accent: '#3ab6ff' }
   };
 
@@ -4997,7 +4955,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   (function initMixerConsole() {
-    const STEM_TYPES = ['vocals', 'drums', 'bass', 'guitar', 'piano', 'other'];
+    const STEM_TYPES = ['vocals', 'drums', 'bass', 'guitar', 'other'];
     const lib = {};
     STEM_TYPES.forEach(t => lib[t] = { items: [], filtered: [], selected: 0, loaded: null, query: '' });
 
@@ -5298,7 +5256,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <script>
 /* ===== STEMLINE SAMPLER: one pad per stem + sample library ===== */
 (function () {
-  const COLORS = { vocals:'#ff5540', drums:'#ffa022', bass:'#2fe08a', guitar:'#9b6dff', piano:'#ff5cb0', other:'#3ab6ff' };
+  const COLORS = { vocals:'#ff5540', drums:'#ffa022', bass:'#2fe08a', guitar:'#9b6dff', other:'#3ab6ff' };
   const PAD_KEY = 'stemline_pad_assign';
   const PAD_PAD = 2; // seconds of extra audio kept each side for retrimming
   let lib = [];
@@ -5353,7 +5311,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function playItem(item, dest, onStart, onEnd, padStem) {
     if (dest === 'cue' && !cueReady()) { toast('Pick CUE OUT (headphones) first'); return null; }
+    let audition = false;
     if (dest === 'main-safe') { // library audition: headphones if set, else straight to main (layers over the song if it's playing)
+      audition = true;
       dest = cueReady() ? 'cue' : 'main';
     }
     try { await ensureEngineReady(); } catch (e) {}
@@ -5367,9 +5327,14 @@ document.addEventListener('DOMContentLoaded', () => {
     src.connect(g);
     if (dest === 'cue') { if (!cueBus) return null; g.connect(cueBus); }
     else {
-      // plug in BEFORE the channel fader so volume / mute / solo control the sample
-      const n = stemNodes[padStem || item.stem];
-      g.connect(n && n.gainNode ? n.gainNode : (n && n.analyser ? n.analyser : masterGain));
+      if (audition) {
+        // library preview: straight to master so channel mute / solo / fader can never silence it
+        g.connect(masterGain);
+      } else {
+        // pad fire: plug in BEFORE the channel fader so volume / mute / solo control the sample
+        const n = stemNodes[padStem || item.stem];
+        g.connect(n && n.gainNode ? n.gainNode : (n && n.analyser ? n.analyser : masterGain));
+      }
     }
     const dur = Math.max(0.02, item.outT - item.inT);
     src.onended = () => { try { g.disconnect(); } catch (e) {} if (onEnd) onEnd(); };
@@ -5703,7 +5668,7 @@ document.addEventListener('DOMContentLoaded', () => {
       root.appendChild(e); return;
     }
     const a = getAssign();
-    const TYPE_ORDER = ['vocals', 'drums', 'bass', 'guitar', 'piano', 'other'];
+    const TYPE_ORDER = ['vocals', 'drums', 'bass', 'guitar', 'other'];
     const sortedLib = lib.slice().sort((x, y) => {
       const ix = TYPE_ORDER.indexOf(x.stem), iy = TYPE_ORDER.indexOf(y.stem);
       return (ix < 0 ? 99 : ix) - (iy < 0 ? 99 : iy);
@@ -5714,7 +5679,7 @@ document.addEventListener('DOMContentLoaded', () => {
         lastType = item.stem;
         const gh = document.createElement('div'); gh.className = 'lib-group-head';
         gh.style.setProperty('--pc', COLORS[item.stem] || '#fff');
-        gh.textContent = (item.stem === 'piano' ? 'SYNTH' : String(item.stem).toUpperCase()) + ' SAMPLES';
+        gh.textContent = String(item.stem).toUpperCase() + ' SAMPLES';
         root.appendChild(gh);
       }
       const row = document.createElement('div'); row.className = 'lib-item';
@@ -5723,7 +5688,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const dot = document.createElement('span'); dot.className = 'lib-dot';
       const nm = document.createElement('span'); nm.className = 'lib-name mono'; nm.textContent = item.name; nm.title = 'Click to rename';
       nm.onclick = async () => { const v = (prompt('Rename sample:', item.name) || '').trim(); if (v) { item.name = v; await idbPut(item); renderLibrary(); refreshPads(); } };
-      const st = document.createElement('span'); st.className = 'lib-stem mono'; st.textContent = item.stem === 'piano' ? 'synth' : item.stem;
+      const st = document.createElement('span'); st.className = 'lib-stem mono'; st.textContent = item.stem;
       const play = document.createElement('button'); play.type = 'button'; play.textContent = '▶'; play.title = 'Listen (headphones)';
       play.onclick = async () => {
         // click again while this sample is playing = stop it
@@ -5745,7 +5710,7 @@ document.addEventListener('DOMContentLoaded', () => {
       };
       // Load this sample onto ANY channel's pad (no waveform on the main board - editing lives on the sampler page)
       const onChans = Object.keys(COLORS).filter(k => a[k] === item.id);
-      const nice = (k) => (k === 'piano' ? 'SYNTH' : String(k).toUpperCase());
+      const nice = (k) => String(k).toUpperCase();
       const asg = document.createElement('select'); asg.className = 'lib-load' + (onChans.length ? ' on' : '');
       asg.title = 'Load this sample onto a channel pad';
       const ph = document.createElement('option'); ph.value = ''; ph.textContent = onChans.length ? ('ON: ' + onChans.map(nice).join(', ')) : 'LOAD TO...';
@@ -5845,7 +5810,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const item = { stem: chan, sr: full.sr, data: full.data, inT: 0, outT: Math.min(full.outT, 4) };
     const total = full.data[0].length / full.sr;
     const m = document.createElement('div'); m.id = 'stemChopModal';
-    const label = chan === 'piano' ? 'SYNTH' : chan.toUpperCase();
+    const label = chan.toUpperCase();
     m.innerHTML = '<div class="chop-box"><div class="chop-title"></div><canvas></canvas>' +
       '<div class="chop-row"><button type="button" class="prev">&#9654; PREVIEW</button><input type="text" class="nm" maxlength="60"><button type="button" class="primary save">SAVE SAMPLE</button><button type="button" class="close">CLOSE</button></div></div>';
     m.querySelector('.chop-title').textContent = 'CHOP ' + label + ' - ' + songName + ' (drag the edges)';
@@ -5899,6 +5864,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const dlBtn = document.getElementById('downloadMixBtn');
     if (dlBtn) dlBtn.addEventListener('click', downloadMixNow);
     lib = await idbAll();
+    // synth channel was removed: move any old synth samples over to Other
+    for (const it of lib) { if (it.stem === 'piano') { it.stem = 'other'; idbPut(it); } }
     mixes = await mixAll();
     refreshPads(); renderLibrary();
   }
