@@ -818,6 +818,8 @@
   .lib-stem { color: rgba(216,220,226,0.5); font-size: 0.55rem; text-transform: uppercase; }
   .lib-top button { font: 700 0.55rem 'JetBrains Mono', monospace; color: rgba(216,220,226,0.8); background: rgba(255,255,255,0.06); border: 1px solid rgba(216,220,226,0.25); border-radius: 3px; padding: 2px 6px; cursor: pointer; }
   .lib-top button.on { color: #000; background: var(--pc); border-color: var(--pc); }
+  .lib-load { font: 600 0.62rem 'JetBrains Mono', monospace; background: #101012; color: #d8dce2; border: 1px solid rgba(216,220,226,0.25); border-radius: 4px; padding: 3px 4px; cursor: pointer; }
+  .lib-load.on { color: #0b0b0d; background: var(--pc, #E7A33E); border-color: transparent; }
   .lib-wave { width: 100%; height: 54px; display: block; touch-action: none; cursor: ew-resize; background: rgba(0,0,0,0.3); border-radius: 3px; }
   #samplerMenu { position: fixed; z-index: 10000; background: #1a1a1d; border: 1px solid var(--pc); border-radius: 6px; padding: 3px; display: flex; flex-direction: column; min-width: 130px; box-shadow: 0 6px 20px rgba(0,0,0,0.6); }
   #samplerMenu button { text-align: left; background: none; border: 0; color: #eee; font: 600 0.75rem 'JetBrains Mono', monospace; padding: 7px 10px; cursor: pointer; border-radius: 4px; }
@@ -5366,7 +5368,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (dest === 'cue') { if (!cueBus) return null; g.connect(cueBus); }
     else {
       // plug in BEFORE the channel fader so volume / mute / solo control the sample
-      const n = stemNodes[item.stem];
+      const n = stemNodes[padStem || item.stem];
       g.connect(n && n.gainNode ? n.gainNode : (n && n.analyser ? n.analyser : masterGain));
     }
     const dur = Math.max(0.02, item.outT - item.inT);
@@ -5741,10 +5743,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const h = await playItem(item, 'cue', null, () => { if (libPlaying === h) libPlaying = null; });
         libPlaying = h;
       };
-      const asg = document.createElement('button'); asg.type = 'button';
-      asg.textContent = a[item.stem] === item.id ? 'ON PAD' : 'PUT ON PAD';
-      asg.className = a[item.stem] === item.id ? 'on' : '';
-      asg.onclick = () => { const x = getAssign(); x[item.stem] = item.id; setAssign(x); refreshPads(); renderLibrary(); };
+      // Load this sample onto ANY channel's pad (no waveform on the main board - editing lives on the sampler page)
+      const onChans = Object.keys(COLORS).filter(k => a[k] === item.id);
+      const nice = (k) => (k === 'piano' ? 'SYNTH' : String(k).toUpperCase());
+      const asg = document.createElement('select'); asg.className = 'lib-load' + (onChans.length ? ' on' : '');
+      asg.title = 'Load this sample onto a channel pad';
+      const ph = document.createElement('option'); ph.value = ''; ph.textContent = onChans.length ? ('ON: ' + onChans.map(nice).join(', ')) : 'LOAD TO...';
+      asg.appendChild(ph);
+      Object.keys(COLORS).forEach(k => { const o = document.createElement('option'); o.value = k; o.textContent = nice(k); asg.appendChild(o); });
+      asg.onchange = () => {
+        const k = asg.value; if (!k) return;
+        const x = getAssign(); x[k] = item.id; setAssign(x); refreshPads(); renderLibrary();
+        toast('Loaded onto ' + nice(k) + ' pad');
+      };
+      const dur = document.createElement('span'); dur.className = 'lib-stem mono'; dur.textContent = (item.outT - item.inT).toFixed(1) + 's';
       const dl = document.createElement('button'); dl.type = 'button'; dl.textContent = 'DOWNLOAD'; dl.title = 'Save this sample to your device as an MP3 (Premium)';
       dl.onclick = () => downloadSampleNow(item, dl);
       const del = document.createElement('button'); del.type = 'button'; del.textContent = '✕'; del.title = 'Delete';
@@ -5754,25 +5766,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const x = getAssign(); Object.keys(x).forEach(k => { if (x[k] === item.id) delete x[k]; }); setAssign(x);
         refreshPads(); renderLibrary();
       };
-      top.append(dot, nm, st, play, hp, asg, dl, del);
-      const cv = document.createElement('canvas'); cv.className = 'lib-wave';
-      row.append(top, cv); root.appendChild(row);
-      drawWave(cv, item);
-      // retrim by dragging edges
-      cv.addEventListener('pointerdown', (e) => {
-        const r = cv.getBoundingClientRect(), total = item.data[0].length / item.sr;
-        const x = e.clientX - r.left, x0 = item.inT / total * r.width, x1 = item.outT / total * r.width;
-        const which = Math.abs(x - x0) <= Math.abs(x - x1) ? 'in' : 'out';
-        if (Math.min(Math.abs(x - x0), Math.abs(x - x1)) > 18) return;
-        cv.setPointerCapture(e.pointerId);
-        const move = (ev) => {
-          const t = Math.min(total, Math.max(0, (ev.clientX - r.left) / r.width * total));
-          if (which === 'in') item.inT = Math.min(t, item.outT - 0.03); else item.outT = Math.max(t, item.inT + 0.03);
-          drawWave(cv, item);
-        };
-        const up = async () => { cv.removeEventListener('pointermove', move); cv.removeEventListener('pointerup', up); cv.removeEventListener('pointercancel', up); await idbPut(item); };
-        cv.addEventListener('pointermove', move); cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
-      });
+      top.append(dot, nm, st, dur, play, hp, asg, dl, del);
+      row.append(top); root.appendChild(row);
     });
   }
   window.__renderLibrary = renderLibrary;
