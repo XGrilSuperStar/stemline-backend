@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.env
+.DS_Store
+vendor/mvsep_mdx23/models/*
+!vendor/mvsep_mdx23/models/.gitkeep

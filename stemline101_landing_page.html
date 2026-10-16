@@ -2001,8 +2001,6 @@ let rafId = null;
 const BASE_BPM = 120;
 let tempoRatio = 1;
 let stemAutoStretch = { vocals: 1, drums: 1, bass: 1, guitar: 1, other: 1 };
-const detectedBpmByStemId = {};
-const detectedBpmPromiseByStemId = {};
 let masterVolPct = 80;
 let keySemitones = 0;
 let keyLockOn = true;
@@ -2045,55 +2043,6 @@ function applyKeyShift() {
       node._pitchConnectedToGain = false;
     }
   });
-}
-
-function detectBpm(audioBuffer) {
-  try {
-    const data = audioBuffer.getChannelData(0);
-    const sr = audioBuffer.sampleRate;
-    const maxSamples = Math.min(data.length, sr * 45);
-    const frameSize = Math.round(sr * 0.023);
-    const frameCount = Math.floor(maxSamples / frameSize);
-    if (frameCount < 20) return null;
-
-    const energy = new Float32Array(frameCount);
-    for (let i = 0; i < frameCount; i++) {
-      let sum = 0;
-      const start = i * frameSize;
-      for (let j = 0; j < frameSize; j++) {
-        const s = data[start + j] || 0;
-        sum += s * s;
-      }
-      energy[i] = Math.sqrt(sum / frameSize);
-    }
-    const onset = new Float32Array(frameCount);
-    for (let i = 1; i < frameCount; i++) {
-      onset[i] = Math.max(0, energy[i] - energy[i - 1]);
-    }
-
-    const frameRate = sr / frameSize;
-    let bestBpm = null, bestScore = -Infinity;
-    for (let bpm = 60; bpm <= 200; bpm += 0.5) {
-      const lag = Math.round((60 / bpm) * frameRate);
-      if (lag < 1 || lag >= frameCount) continue;
-      let score = 0, count = 0;
-      for (let i = 0; i + lag < frameCount; i++) {
-        score += onset[i] * onset[i + lag];
-        count++;
-      }
-      if (count === 0) continue;
-      score /= count;
-      if (score > bestScore) { bestScore = score; bestBpm = bpm; }
-    }
-    if (!bestBpm) return null;
-
-    while (bestBpm > 180) bestBpm /= 2;
-    while (bestBpm < 70) bestBpm *= 2;
-    return bestBpm;
-  } catch (e) {
-    console.warn('BPM detection failed', e);
-    return null;
-  }
 }
 
 function updateAllChannelGains() {
@@ -2448,30 +2397,6 @@ function updateFaders() {
 
 const originalStemBuffers = {};
 const currentStemMeta = {};
-
-async function ensureBpmForStemId(stemId) {
-  if (detectedBpmByStemId[stemId] !== undefined) return detectedBpmByStemId[stemId];
-  if (!detectedBpmPromiseByStemId[stemId]) {
-    detectedBpmPromiseByStemId[stemId] = (async () => {
-      try {
-        const url = window.API_BASE + '/api/v1/my-stems/' + encodeURIComponent(stemId)
-                  + '/download/drums?token=' + encodeURIComponent(getToken());
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('drums fetch failed: ' + res.status);
-        const arrayBuf = await res.arrayBuffer();
-        const drumsBuffer = await audioCtx.decodeAudioData(arrayBuf);
-        const bpm = detectBpm(drumsBuffer);
-        detectedBpmByStemId[stemId] = bpm;
-        return bpm;
-      } catch (e) {
-        console.warn('Drums-based BPM detection failed, no auto-stretch applied for this song', e);
-        detectedBpmByStemId[stemId] = null;
-        return null;
-      }
-    })();
-  }
-  return detectedBpmPromiseByStemId[stemId];
-}
 
 async function loadBackendStemToChannel(channelKey, stemId, trackName) {
   const status = document.getElementById('uploadStatus');
@@ -2954,11 +2879,6 @@ function setupFader(slotEl, capEl, { initial, onChange }) {
 
 const WAVE_COLORS = { vocals: '#ff5540', drums: '#ffa022', bass: '#2fe08a', guitar: '#9b6dff', other: '#3ab6ff' };
 
-function drawWaveform(canvas, audioBuffer, color) {
-  const data = audioBuffer.getChannelData ? audioBuffer.getChannelData(0) : audioBuffer;
-  drawWaveformFromSamples(canvas, data, color);
-}
-
 function drawWaveformFromSamples(canvas, data, color) {
   const dpr = window.devicePixelRatio || 1;
   const rect = canvas.getBoundingClientRect();
@@ -3376,10 +3296,6 @@ function renderAllStemSampleRegions() {
   const GRAB_PX = 10;
   let scrubbing = false;
 
-  const playheadX = () => {
-    const ph = document.getElementById('wavePlayhead');
-    return ph ? parseFloat(ph.style.left) || 0 : 0;
-  };
   const scrubTo = (clientX) => {
     // FIX: same canvas-width bug as updatePlayheadPosition -- scrub range
     // was capped at the canvas edge, so you couldn't drag the playhead
@@ -5542,24 +5458,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const end = enc.flush(); if (end.length) parts.push(new Uint8Array(end));
     return new Blob(parts, { type: 'audio/mpeg' });
-  }
-
-  async function saveMix() {
-    if (mixBusy) return;
-    if (!audioCtx || !hasRealSong()) { toast('Load a song first'); return; }
-    const name = (window.prompt('Name your mix:', 'My Mix') || '').trim();
-    if (!name) return;
-    mixBusy = true; renderLibrary(); toast('Rendering your mix...');
-    try {
-      const r = await renderMixBuffer();
-      if (!r) { toast('Nothing audible to save (all channels muted?)'); return; }
-      const blob = await encodeMp3(r.buffer);
-      const item = { id: 'm' + Date.now() + Math.floor(Math.random() * 1000), name, blob, dur: r.buffer.duration, created: Date.now() };
-      mixes.push(item); await mixPut(item);
-      toast(r.pitchSkipped ? 'Mix saved (key shift not applied)' : 'Mix saved - hit download in the library');
-    } catch (e) {
-      console.warn('save mix failed', e); toast('Could not save mix');
-    } finally { mixBusy = false; renderLibrary(); }
   }
 
   function downloadMix(item) {
