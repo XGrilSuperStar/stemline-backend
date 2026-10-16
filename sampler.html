@@ -233,6 +233,134 @@
     .dev-grid { grid-template-columns: 1fr; }
     .readout .muted { margin-left: 0; }
   }
+
+  html { background: #070708; }
+  /* ===== hardware skin: depth, shading, glow ===== */
+  body {
+    background:
+      radial-gradient(1200px 600px at 50% -10%, rgba(231,163,62,0.07), transparent 60%),
+      radial-gradient(900px 500px at 100% 100%, rgba(184,86,46,0.06), transparent 60%),
+      linear-gradient(180deg, #0f0f12, #070708 60%);
+    background-attachment: fixed;
+  }
+  header {
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.09), rgba(255,255,255,0) 40%),
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 3px),
+      linear-gradient(180deg, #2a2a2f, #121214);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.12);
+  }
+  .panel {
+    position: relative;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0) 28px),
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.022) 0 1px, transparent 1px 3px),
+      linear-gradient(180deg, #25252a 0%, #19191c 55%, #121214 100%);
+    border: 1px solid #0a0a0b; border-radius: 8px;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.12),
+      inset 0 0 0 1px rgba(216,220,226,0.07),
+      inset 0 -8px 16px rgba(0,0,0,0.35),
+      0 10px 26px rgba(0,0,0,0.6), 0 2px 0 rgba(0,0,0,0.8);
+  }
+  /* corner screws */
+  .panel::before, .panel::after {
+    content: ''; position: absolute; top: 7px; width: 7px; height: 7px; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(circle at 35% 30%, #8a8e96, #2c2d31 60%, #101012);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.12), inset 0 0 1px #000;
+  }
+  .panel::before { left: 7px; } .panel::after { right: 7px; }
+  .panel.pick::before, .panel.pick::after { display: none; }
+  h2 {
+    display: inline-block; padding: 0.15rem 0.7rem 0.1rem; border-radius: 3px;
+    background: linear-gradient(180deg, #060607, #121214); border: 1px solid #000;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.9), 0 1px 0 rgba(255,255,255,0.08);
+    text-shadow: 0 0 8px rgba(231,163,62,0.55);
+  }
+  select, input[type=text] {
+    background: linear-gradient(180deg, #050506, #101012);
+    border: 1px solid #000; box-shadow: inset 0 3px 8px rgba(0,0,0,0.9), 0 1px 0 rgba(255,255,255,0.09);
+  }
+  button {
+    background: linear-gradient(180deg, #ffd27a 0%, #f0b250 18%, var(--vu-amber) 55%, #b87a22 100%);
+    border: 1px solid #6e4710; border-radius: 5px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.55), inset 0 -2px 0 rgba(0,0,0,0.25), 0 3px 0 #4f3209, 0 5px 10px rgba(0,0,0,0.55);
+    text-shadow: 0 1px 0 rgba(255,255,255,0.3);
+  }
+  button:active:not(:disabled) { transform: translateY(3px); box-shadow: inset 0 1px 3px rgba(0,0,0,0.4), 0 0 0 #4f3209, 0 1px 2px rgba(0,0,0,0.5); }
+  button.secondary {
+    background: linear-gradient(180deg, #4a4a52 0%, #2f2f34 18%, #232327 60%, #17171a 100%);
+    border: 1px solid #060607; text-shadow: none;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -2px 0 rgba(0,0,0,0.35), 0 3px 0 #050506, 0 5px 10px rgba(0,0,0,0.55);
+  }
+  button.secondary:active:not(:disabled) { box-shadow: inset 0 1px 3px rgba(0,0,0,0.6), 0 0 0 #050506; }
+  button.secondary.on { box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), 0 0 14px rgba(60,253,224,0.6), 0 3px 0 #0d6b5f; }
+  #status {
+    background: linear-gradient(180deg, #050506, #0d0e0f); border: 1px solid #000; border-left: 3px solid var(--ember);
+    box-shadow: inset 0 2px 8px rgba(0,0,0,0.9), 0 1px 0 rgba(255,255,255,0.07);
+    text-shadow: 0 0 8px rgba(231,163,62,0.6);
+  }
+  .bezel {
+    padding: 10px; border-radius: 10px;
+    background: linear-gradient(180deg, #34343a, #1a1a1d 40%, #0d0d0f);
+    border: 1px solid #050506;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 12px 30px rgba(0,0,0,0.7), 0 2px 0 rgba(0,0,0,0.9);
+  }
+  #wave, #trim {
+    border-radius: 4px; box-shadow: inset 0 0 0 1px #000, inset 0 6px 18px rgba(0,0,0,0.85), 0 1px 0 rgba(255,255,255,0.08);
+  }
+  .readout b { text-shadow: 0 0 8px rgba(231,163,62,0.7); font-size: 0.8rem; }
+  /* pads: glossy rubber */
+  .pad {
+    border-radius: 9px; border: 1px solid #000;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0) 38%),
+      radial-gradient(120% 120% at 50% 0%, #34343a, #17171a 70%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -4px 8px rgba(0,0,0,0.5), 0 4px 0 #050506, 0 7px 12px rgba(0,0,0,0.55);
+  }
+  .pad:active:not(:disabled) { transform: translateY(3px); box-shadow: inset 0 3px 8px rgba(0,0,0,0.7), 0 1px 0 #050506; }
+  .pad.has {
+    border: 1px solid color-mix(in srgb, var(--pc) 70%, #000);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.2), rgba(255,255,255,0) 40%),
+      radial-gradient(120% 120% at 50% 0%, color-mix(in srgb, var(--pc) 45%, #26262a), color-mix(in srgb, var(--pc) 14%, #121214) 75%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -4px 8px rgba(0,0,0,0.45), 0 4px 0 #050506, 0 0 14px color-mix(in srgb, var(--pc) 40%, transparent);
+  }
+  .pad.lit, .pad.flash {
+    background: linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0) 50%), var(--pc);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), 0 0 26px var(--pc), 0 0 8px var(--pc), 0 1px 0 #050506;
+  }
+  /* knobs: machined metal */
+  .knob .dial {
+    background:
+      radial-gradient(circle at 50% 50%, transparent 0 56%, rgba(0,0,0,0.55) 62%, transparent 63%),
+      repeating-conic-gradient(from 0deg, #5a5a62 0 4deg, #1d1d21 4deg 8deg);
+    border: 0;
+    box-shadow:
+      0 8px 14px rgba(0,0,0,0.75), 0 2px 3px rgba(0,0,0,0.9),
+      inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -3px 5px rgba(0,0,0,0.6),
+      0 0 0 3px #0a0a0b, 0 0 0 4px rgba(216,220,226,0.14);
+  }
+  .knob .dial::after {
+    content: ''; position: absolute; inset: 9px; border-radius: 50%; pointer-events: none;
+    background:
+      radial-gradient(circle at 34% 26%, rgba(255,255,255,0.45), rgba(255,255,255,0) 42%),
+      radial-gradient(circle at 50% 60%, #3d3d44, #1a1a1e 75%);
+    box-shadow: inset 0 -3px 6px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.25), 0 2px 5px rgba(0,0,0,0.7);
+  }
+  .knob .dial i { z-index: 2; top: 10px; height: 16px; background: linear-gradient(180deg, #fff1cf, var(--vu-amber)); box-shadow: 0 0 8px rgba(231,163,62,0.9); }
+  .knob .kv { text-shadow: 0 0 8px rgba(231,163,62,0.7); }
+  .dev-right { padding: 0.8rem 1rem; border-radius: 8px; background: linear-gradient(180deg, #0a0a0b, #151517); box-shadow: inset 0 3px 10px rgba(0,0,0,0.85), 0 1px 0 rgba(255,255,255,0.08); }
+  .ctl input[type=range] { height: 6px; }
+  /* sample browser rows */
+  .lib-item {
+    border: 1px solid #000; border-radius: 6px;
+    background: linear-gradient(180deg, #2c2c31, #1b1b1e);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), inset 3px 0 0 var(--pc), 0 3px 6px rgba(0,0,0,0.5);
+  }
+  .lib-item:hover { background: linear-gradient(180deg, #36363c, #212125); }
+  .lib-dot { box-shadow: 0 0 8px var(--pc), inset 0 1px 1px rgba(255,255,255,0.6); }
+  .browser .lib { padding-right: 4px; }
 </style>
 </head>
 <body>
@@ -541,6 +669,20 @@
   function t2x(t, w) { return (t - viewA) / (viewB - viewA) * w; }
   function x2t(x, w) { return viewA + x / w * (viewB - viewA); }
 
+  // Bitwig-style slice: soft glowing edges fading toward the middle
+  function glowRegion(g, xa, xb, top, h, color, k) {
+    var wd = Math.max(2, xb - xa), edge = Math.min(46, wd / 2);
+    g.save(); g.beginPath(); g.rect(xa, top, wd, h - top); g.clip();
+    g.globalAlpha = 0.14 * k + 0.06; g.fillStyle = color; g.fillRect(xa, top, wd, h - top);
+    var l = g.createLinearGradient(xa, 0, xa + edge, 0); l.addColorStop(0, color); l.addColorStop(1, 'rgba(0,0,0,0)');
+    var r = g.createLinearGradient(xb, 0, xb - edge, 0); r.addColorStop(0, color); r.addColorStop(1, 'rgba(0,0,0,0)');
+    g.globalAlpha = 0.5 * k; g.fillStyle = l; g.fillRect(xa, top, edge, h - top);
+    g.fillStyle = r; g.fillRect(xb - edge, top, edge, h - top);
+    var v = g.createLinearGradient(0, top, 0, h); v.addColorStop(0, 'rgba(255,255,255,0.12)'); v.addColorStop(0.5, 'rgba(255,255,255,0)'); v.addColorStop(1, 'rgba(0,0,0,0.25)');
+    g.globalAlpha = 1; g.fillStyle = v; g.fillRect(xa, top, wd, h - top);
+    g.restore();
+  }
+
   function drawWave() {
     var c = sizeCanvas(wave), g = c.g, w = c.w, h = c.h, RULER = 24;
     g.clearRect(0, 0, w, h);
@@ -581,7 +723,7 @@
       var sa = it.srcOff + it.inT, sb = it.srcOff + it.outT;
       if (sb < viewA || sa > viewB) return;
       var xa = t2x(sa, w), xb = t2x(sb, w), pc = COLORS[it.stem] || '#E7A33E', pi = grid.indexOf(it.id);
-      g.globalAlpha = 0.3; g.fillStyle = pc; g.fillRect(xa, RULER, Math.max(2, xb - xa), h - RULER); g.globalAlpha = 1;
+      glowRegion(g, xa, xb, RULER, h, pc, 0.55);
       g.fillStyle = pc; g.fillRect(xa, RULER, 2, h - RULER); g.fillRect(xb - 2, RULER, 2, h - RULER);
       if (xb - xa > 26 && pi >= 0) { g.fillRect(xa, RULER, 22, 14); g.fillStyle = '#0b0b0d'; g.font = '700 10px JetBrains Mono, monospace'; g.textAlign = 'left'; g.fillText(String(pi + 1), xa + 6, RULER + 11); }
     });
@@ -592,7 +734,7 @@
       g.fillStyle = 'rgba(0,0,0,0.5)';
       if (x0 > 0) g.fillRect(0, RULER, Math.min(w, x0), h - RULER);
       if (x1 < w) g.fillRect(Math.max(0, x1), RULER, w - Math.max(0, x1), h - RULER);
-      g.fillStyle = 'rgba(231,163,62,0.16)'; g.fillRect(x0, RULER, x1 - x0, h - RULER);
+      glowRegion(g, x0, x1, RULER, h, '#E7A33E', 0.8);
       g.fillStyle = '#E7A33E';
       g.fillRect(x0, RULER, x1 - x0, 2); g.fillRect(x0, h - 2, x1 - x0, 2);
       g.fillRect(x0 - 1, RULER, 3, h - RULER); g.fillRect(x1 - 1, RULER, 3, h - RULER);
@@ -608,6 +750,9 @@
         g.fillStyle = '#1a1204'; g.textAlign = 'center'; g.fillText(label, (x0 + x1) / 2, 15); g.textAlign = 'left';
       }
     }
+
+    var sh = g.createLinearGradient(0, RULER, 0, h); sh.addColorStop(0, 'rgba(255,255,255,0.05)'); sh.addColorStop(0.18, 'rgba(255,255,255,0)'); g.fillStyle = sh; g.fillRect(0, RULER, w, h - RULER);
+    var vg = g.createLinearGradient(0, 0, w, 0); vg.addColorStop(0, 'rgba(0,0,0,0.45)'); vg.addColorStop(0.04, 'rgba(0,0,0,0)'); vg.addColorStop(0.96, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.45)'); g.fillStyle = vg; g.fillRect(0, RULER, w, h - RULER);
 
     if (playhead && ctx) {
       var t = playhead.from + (ctx.currentTime - playhead.t0) * playhead.rate;
