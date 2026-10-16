@@ -130,7 +130,7 @@ WHAT_ARE_STEMS_BODY = """
 <p>Separating a song does not change who owns it. Use stems from music you own or have permission to use, and check the licensing before you release or perform anything built from someone else's recording.</p>
 
 <h2>Try it</h2>
-<p>Stemline101 splits a track into six stems (vocals, drums, bass, guitar, synth, and other) and lets you mix stems from different songs on one board. <a href="/">Open the mixer</a>.</p>
+<p>Stemline101 splits a track into five stems (vocals, drums, bass, guitar, and other) and lets you mix stems from different songs on one board. <a href="/">Open the mixer</a>.</p>
 """
 
 AI_SEPARATION_BODY = """
@@ -158,7 +158,7 @@ AI_SEPARATION_BODY = """
 <ul>
   <li><strong>Bleed:</strong> a faint trace of drums in the vocal stem, or a ghost of the vocal in the "other" stem.</li>
   <li><strong>Artifacts:</strong> a slightly watery or phasey quality, most noticeable on isolated vocals and cymbals.</li>
-  <li><strong>Misplaced sounds:</strong> a keyboard part landing in the "other" stem when you expected it in synth, because the model has to decide where a sound belongs.</li>
+  <li><strong>Misplaced sounds:</strong> a keyboard or synth part landing in the "other" stem when you expected it elsewhere, because the model has to decide where a sound belongs.</li>
 </ul>
 <p>Dense mixes, heavy reverb, and instruments that sound alike are the hardest cases.</p>
 

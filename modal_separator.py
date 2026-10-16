@@ -3,7 +3,8 @@ Stemline GPU separation service on Modal.
 
 Vocals come from BS-Roformer (much cleaner than Demucs' vocal stem).
 Drums / bass / guitar / piano / other come from Demucs htdemucs_6s.
-Returns a zip of six mp3s named vocals, drums, bass, guitar, piano, other.
+Returns a zip of six mp3s named vocals, drums, bass, guitar, piano, other
+(the server folds piano into other, so users only ever see five stems).
 
 Deploy:   modal deploy modal_separator.py
 Secret:   modal secret create stemline-auth STEMLINE_SECRET=<long random string>

@@ -150,7 +150,7 @@ class Stem(Base):
     track_name = Column(String)
     zip_path = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
-    # Null for a normal split (zip_path points at the full 6-stem zip).
+    # Null for a normal split (zip_path points at the full 5-stem zip).
     # Set for a single-channel save (zip_path points at just that one wav).
     instrument = Column(String, nullable=True)
     # "processing" while Demucs runs in the background, then "done" or
@@ -1441,7 +1441,7 @@ MODAL_TIMEOUT_SECONDS = int(os.getenv("MODAL_TIMEOUT_SECONDS", "900"))
 def _run_modal_separation(file_path: str, output_dir: str, request_id: str):
     """
     Send the upload to the Modal GPU service, poll until it finishes, and
-    unpack the six stem mp3s into output_dir/modal/<track>/ (the layout the
+    unpack the stem mp3s into output_dir/modal/<track>/ (the layout the
     rest of run_split_job already expects). Raises on any failure so the
     caller can fall back to local Demucs.
     """
@@ -1544,7 +1544,7 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
             if result.returncode != 0:
                 raise Exception(f"BS-RoFormer processing failed: {result.stderr}")
             # The tool also writes a *_instrumental.wav mix — not one of the
-            # six stems, so drop it before the zip is built.
+            # stems, so drop it before the zip is built.
             for _root, _dirs, _files in os.walk(output_dir):
                 for _f in _files:
                     if "_instrumental" in _f:
@@ -1686,6 +1686,37 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
         for _f in sorted(os.listdir(stem_dir)):
             logger.info(f"[job {request_id}] Stem {_f} duration: {_probe_duration(os.path.join(stem_dir, _f))}s")
 
+        # Stemline is a five-stem product (vocals, drums, bass, guitar, other).
+        # The 6-stem models also split out a synth ("piano") stem, so fold it
+        # into "other" here rather than losing that audio.
+        try:
+            _piano_f = next((f for f in os.listdir(stem_dir) if os.path.splitext(f)[0].lower() == "piano"), None)
+            _other_f = next((f for f in os.listdir(stem_dir) if os.path.splitext(f)[0].lower() == "other"), None)
+            if _piano_f and _other_f:
+                _piano_p = os.path.join(stem_dir, _piano_f)
+                _other_p = os.path.join(stem_dir, _other_f)
+                _merge_tmp = _other_p + ".merge_tmp" + os.path.splitext(_other_f)[1]
+                _mix_cmd = ["ffmpeg", "-y", "-i", _other_p, "-i", _piano_p,
+                            "-filter_complex", "amix=inputs=2:duration=longest:normalize=0",
+                            _merge_tmp]
+                _mix = subprocess.run(_mix_cmd, capture_output=True, text=True, timeout=400)
+                if _mix.returncode != 0:
+                    # older ffmpeg has no normalize option: sum, then undo the 1/2 scaling
+                    _mix_cmd[_mix_cmd.index("-filter_complex") + 1] = "amix=inputs=2:duration=longest,volume=2"
+                    _mix = subprocess.run(_mix_cmd, capture_output=True, text=True, timeout=400)
+                if _mix.returncode == 0 and os.path.exists(_merge_tmp):
+                    os.replace(_merge_tmp, _other_p)
+                    os.remove(_piano_p)
+                    logger.info(f"[job {request_id}] Merged synth stem into other")
+                else:
+                    logger.warning(f"[job {request_id}] Synth->other merge failed, leaving stems as-is: {_mix.stderr[-300:]}")
+                    if os.path.exists(_merge_tmp):
+                        os.remove(_merge_tmp)
+            elif _piano_f and not _other_f:
+                os.replace(os.path.join(stem_dir, _piano_f), os.path.join(stem_dir, "other" + os.path.splitext(_piano_f)[1]))
+        except Exception as merge_err:
+            logger.warning(f"[job {request_id}] Synth->other merge error: {merge_err}")
+
         # Post-separation EQ + compression pass. Separation models leave
         # bleed and imbalance on certain stems — this nudges each stem
         # back toward clarity (EQ) and consistency (compression) before
@@ -1703,8 +1734,6 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
             "drums": "highpass=f=30,equalizer=f=3000:t=q:w=1:g=2",
             # Guitar: cut boxy low-mid bleed from bass/drums, lift presence.
             "guitar": "equalizer=f=300:t=q:w=1.5:g=-3,equalizer=f=2500:t=q:w=1:g=2",
-            # Synth (stem key "piano"): clear low-mid mud, add air/sparkle.
-            "piano": "equalizer=f=200:t=q:w=1.5:g=-2,equalizer=f=8000:t=q:w=1:g=2",
             # Other/misc: general rumble cleanup, mild clarity lift.
             "other": "highpass=f=50,equalizer=f=1500:t=q:w=1:g=1",
         }
@@ -1718,7 +1747,6 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
             "bass": "acompressor=threshold=0.1:ratio=4:attack=10:release=150:makeup=2",
             "drums": "acompressor=threshold=0.178:ratio=4:attack=5:release=80:makeup=2",
             "guitar": "acompressor=threshold=0.126:ratio=3:attack=10:release=120:makeup=1.5",
-            "piano": "acompressor=threshold=0.1:ratio=2.5:attack=15:release=150:makeup=1.5",
             "other": "acompressor=threshold=0.126:ratio=3:attack=10:release=120:makeup=1.5",
         }
         # Harmonic exciter for bass and other. Adds audible upper
@@ -1760,7 +1788,6 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
             "drums": f"{_deq(400)},{_mb},{_sat},volume=-1dB",
             "bass": f"{_deq(250)},{_sat},volume=4dB",
             "guitar": f"{_deq(3000)},{_mb},{_sat},stereotools=sbal=-0.25,volume=-2dB",
-            "piano": f"{_deq(400)},{_mb},{_sat},stereotools=sbal=0.25,volume=-2dB",
             "other": f"{_deq(300)},{_mb},{_sat},stereotools=slev=1.25,volume=-3dB",
         }
         if STEM_FX:
@@ -1840,7 +1867,7 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
 
         # The original upload used to be kept permanently alongside the zip
         # so users could re-download the whole song — but keeping a full
-        # copy of every original on top of its 6-stem zip was the main
+        # copy of every original on top of its 5-stem zip was the main
         # thing filling up the disk. Customers need the stems, not the
         # source file, so just delete it once the split is done.
         try:
@@ -1985,7 +2012,7 @@ def get_my_stems(token: str = None, include_unsaved: bool = False, db: Session =
         # zip_path yet and would 404/500 if the frontend tried to load them.
         query = db.query(Stem).filter(Stem.user_id == user_id, Stem.status == "done")
         # A fresh split creates one row with instrument=None (the full
-        # 6-stem zip). That row auto-appearing here was the actual bug
+        # 5-stem zip). That row auto-appearing here was the actual bug
         # Kelly flagged — every split silently "saved itself" whether she
         # wanted to keep it or not. Now My Stems only shows a song once she
         # explicitly hits SAVE on a channel (instrument set on that row).
@@ -2047,11 +2074,13 @@ def download_stem_original(stem_id: int, token: str = None, db: Session = Depend
 
 # Instrument names Demucs' htdemucs_6s model actually outputs, and the only
 # values the mixer's channel keys ever send here.
+# "piano" is kept only so stems from older splits (made when Stemline had a
+# synth channel) can still be downloaded. New splits have five stems.
 STEM_INSTRUMENTS = {"vocals", "drums", "bass", "guitar", "piano", "other"}
 
 @app.get("/api/v1/my-stems/{stem_id}/download/{instrument}")
 def download_stem_instrument(stem_id: int, instrument: str, token: str = None, db: Session = Depends(get_db)):
-    # A split saves all six instruments zipped together as one row. The mixer
+    # A split saves all five instruments zipped together as one row. The mixer
     # channels each need just ONE instrument's audio, so this pulls a single
     # wav back out of that zip on demand instead of the whole bundle.
     user_id = get_current_user(token)
@@ -2415,11 +2444,11 @@ ABOUT_HTML = """
 <body>
 <a href="/" style="display:inline-block;margin-bottom:1.5rem;color:#f0a500;text-decoration:none;">&larr; Back to Stemline101</a>
 <h1>About Stemline101</h1>
-<p>Stemline101 lets you split any song into its individual parts — vocals, drums, bass, guitar, synth, and more — using AI-powered audio source separation. Once a track is split, you can remix it, blend stems from different songs together, and build entirely new mixes right in your browser.</p>
+<p>Stemline101 lets you split any song into its individual parts — vocals, drums, bass, guitar, and more — using AI-powered audio source separation. Once a track is split, you can remix it, blend stems from different songs together, and build entirely new mixes right in your browser.</p>
 
 <h2>What You Can Do</h2>
 <ul>
-  <li><strong>Upload and split</strong> — Drop in an MP3 or WAV and Stemline101 automatically separates it into up to six stems: vocals, drums, bass, guitar, synth, and other instrumentation.</li>
+  <li><strong>Upload and split</strong> — Drop in an MP3 or WAV and Stemline101 automatically separates it into five stems: vocals, drums, bass, guitar, and other instrumentation.</li>
   <li><strong>Build a personal stem library</strong> — Save stems from every track you split so they're ready to load instantly, without re-processing.</li>
   <li><strong>Mix live</strong> — Load stems from multiple songs onto our built-in DJ-style mixing board. Adjust gain, EQ (highs, mids, lows), key, and tempo per channel, then blend them together in real time.</li>
   <li><strong>Key and tempo matching</strong> — Shift the pitch or tempo of any stem so tracks in different keys or BPMs can be mixed cleanly.</li>
@@ -2494,7 +2523,7 @@ FAQ_HTML = """
 <p>Most tracks finish in under two minutes, depending on the song's length and how busy the server is at the time.</p>
 
 <h2>How does stem separation work?</h2>
-<p>Stemline101 uses an AI audio separation model trained to recognize the different instruments and voices layered in a mix. It analyzes the track and pulls each part — vocals, drums, bass, guitar, synth, and other instrumentation — into its own clean audio file, so you can work with them individually instead of the full mix.</p>
+<p>Stemline101 uses an AI audio separation model trained to recognize the different instruments and voices layered in a mix. It analyzes the track and pulls each part — vocals, drums, bass, guitar, and other instrumentation — into its own clean audio file, so you can work with them individually instead of the full mix.</p>
 
 <h2>Is Stemline101 free?</h2>
 <p>Stemline101 is free to use, with ads and up to 5 song splits per month. If you want more, Premium removes ads and unlocks unlimited splits for $5.99/month or $39.99/year.</p>
