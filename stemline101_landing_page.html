@@ -2802,6 +2802,7 @@ function pausePreview() {
 function stopPreview() {
   scrubHold = false;
   stopAllStems();
+  try { if (window.__stopSamples) window.__stopSamples(); } catch (e) {}
   masterOffset = 0;
   transportState = 'idle';
   isPlaying = false;
@@ -5364,8 +5365,9 @@ document.addEventListener('DOMContentLoaded', () => {
     src.connect(g);
     if (dest === 'cue') { if (!cueBus) return null; g.connect(cueBus); }
     else {
+      // plug in BEFORE the channel fader so volume / mute / solo control the sample
       const n = stemNodes[item.stem];
-      g.connect(n && n.analyser ? n.analyser : masterGain);
+      g.connect(n && n.gainNode ? n.gainNode : (n && n.analyser ? n.analyser : masterGain));
     }
     const dur = Math.max(0.02, item.outT - item.inT);
     src.onended = () => { try { g.disconnect(); } catch (e) {} if (onEnd) onEnd(); };
@@ -5722,9 +5724,15 @@ document.addEventListener('DOMContentLoaded', () => {
       const st = document.createElement('span'); st.className = 'lib-stem mono'; st.textContent = item.stem === 'piano' ? 'synth' : item.stem;
       const play = document.createElement('button'); play.type = 'button'; play.textContent = '▶'; play.title = 'Listen (headphones)';
       play.onclick = async () => {
-        if (libPlaying) { try { libPlaying.src.stop(); } catch (e) {} }
+        // click again while this sample is playing = stop it
+        if (libPlaying) {
+          const same = libPlaying.item === item;
+          try { libPlaying.src.stop(); } catch (e) {}
+          libPlaying = null;
+          if (same) return;
+        }
         const h = await playItem(item, 'main-safe', null, () => { if (libPlaying === h) libPlaying = null; });
-        libPlaying = h;
+        if (h) { h.item = item; libPlaying = h; }
       };
       const hp = document.createElement('button'); hp.type = 'button'; hp.textContent = '🎧'; hp.className = 'lib-hp';
       hp.title = 'Listen in headphones only - the room never hears it (pick CUE OUT first)';
@@ -5772,8 +5780,19 @@ document.addEventListener('DOMContentLoaded', () => {
   // Spacebar hook: stop anything the library is auditioning (sample, stem
   // preview, saved mix). Returns true if something was playing, so the
   // spacebar handler stops that first instead of also toggling the song.
+  window.__stopSamples = function () {
+    let any = false;
+    Object.keys(playing).forEach(k => {
+      try { playing[k].src.stop(); } catch (e) {}
+      const p = padEl(k); if (p) p.classList.remove('lit');
+      delete playing[k]; any = true;
+    });
+    if (libPlaying) { try { libPlaying.src.stop(); } catch (e) {} libPlaying = null; any = true; }
+    return any;
+  };
   window.__stopAuditions = function () {
     let any = false;
+    if (window.__stopSamples()) any = true;
     if (libPlaying) { try { libPlaying.src.stop(); } catch (e) {} libPlaying = null; any = true; }
     if (libStemPlaying) { stopLibStem(); any = true; }
     if (mixAudio) {
