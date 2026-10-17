@@ -3859,6 +3859,8 @@ document.addEventListener('DOMContentLoaded', () => {
       navAuthButtons.style.display = 'flex';
       navAccountGroup.style.display = 'none';
     }
+    const pricingSec = document.getElementById('pricing');
+    if (pricingSec) pricingSec.style.display = email ? 'none' : '';
     refreshAdSlot();
   }
   const adSlot = document.getElementById('adSlot');
