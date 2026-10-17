@@ -623,13 +623,8 @@ def transcribe(audio_bytes, ext, instrument):
     midi_bytes = buf.getvalue()
 
     xml = _midi_to_musicxml(midi_bytes, settings["title"], bpm, beats)
-    if instrument == "bass":
-        # bass: tablature only, so every note shows once (fall back to plain notation)
-        tab = _add_tablature(xml, instrument, tab_only=True)
-        xml = tab if tab != xml else _add_letters(xml)
-    else:
-        xml = _add_letters(xml)
-        xml = _add_tablature(xml, instrument)
+    # notation staff with the tablature staff underneath; no note-letter labels
+    xml = _add_tablature(xml, instrument)
     return {"midi": midi_bytes, "musicxml": xml, "bpm": bpm, "note_count": note_count}
 
 
