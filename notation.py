@@ -358,6 +358,21 @@ def _add_tablature(xml, instrument, tab_only=False):
                     return
             note.append(el)
 
+        def set_voice(note, n):
+            """Explicit <voice> on every note, so the tab staff gets its own
+            voice instead of sharing voice 1 with the notation staff."""
+            v = note.find("voice")
+            if v is not None:
+                v.text = str(n)
+                return
+            el = ET.Element("voice")
+            el.text = str(n)
+            pos = 0
+            for i, ch in enumerate(list(note)):
+                if ch.tag in ("pitch", "rest", "unpitched", "duration", "tie", "chord", "grace", "cue"):
+                    pos = i + 1
+            note.insert(pos, el)
+
         first = measures[0].find("attributes")
         if tab_only:
             # one TAB staff: the existing notes just gain string/fret, nothing is duplicated
@@ -413,8 +428,9 @@ def _add_tablature(xml, instrument, tab_only=False):
             notes = m.findall("note")
             total = sum(int(n.findtext("duration") or 0) for n in notes if n.find("chord") is None)
             for n in notes:
+                set_voice(n, 1)
                 insert_staff(n, 1)
-            bk = ET.SubElement(m, "backup")
+            bk =ET.SubElement(m, "backup")
             ET.SubElement(bk, "duration").text = str(total)
             # group chord members so they get distinct strings
             groups = []
@@ -431,9 +447,7 @@ def _add_tablature(xml, instrument, tab_only=False):
                     for tag in ("beam", "notations", "accidental", "staff", "stem", "lyric"):
                         for e in t.findall(tag):
                             t.remove(e)
-                    v = t.find("voice")
-                    if v is not None:
-                        v.text = "2"
+                    set_voice(t, 2)
                     insert_staff(t, 2)
                     p = midi_of(n)
                     if p is not None and p in assign:

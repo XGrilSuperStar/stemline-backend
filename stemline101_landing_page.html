@@ -197,7 +197,7 @@
     pointer-events: none;
   }
   .screen-panel .screen-topline {
-    display: flex; justify-content: space-between; align-items: center;
+    display: flex; justify-content: flex-start; align-items: center; gap: 0.9rem; flex-wrap: wrap;
     font-family: 'JetBrains Mono', monospace; font-size: 0.58rem;
     color: rgba(60,253,224,0.75); letter-spacing: 0.06em; margin-bottom: 0.4rem;
     text-shadow: 0 0 6px rgba(60,253,224,0.5);
@@ -212,6 +212,14 @@
     letter-spacing: 0.03em; background: none; border: 1px solid rgba(60,253,224,0.25);
     color: rgba(60,253,224,0.5); border-radius: 2px; padding: 0.2rem 0.4rem; cursor: pointer;
   }
+  a.screen-link {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.52rem; font-weight: 700;
+    letter-spacing: 0.03em; background: none; border: 1px solid rgba(60,253,224,0.25);
+    color: rgba(60,253,224,0.5); border-radius: 2px; padding: 0.2rem 0.4rem; cursor: pointer;
+    text-decoration: none; text-shadow: none;
+  }
+  a.screen-link:hover { color: var(--sci-glow); border-color: var(--sci-glow); }
+  @media (max-width: 700px) { a.screen-link { padding: 0.4rem 0.5rem; font-size: 0.55rem; } }
   .screen-tab.active { background: rgba(60,253,224,0.15); color: var(--sci-glow); border-color: var(--sci-glow); }
   .save-hint-tip {
     position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
@@ -1545,6 +1553,8 @@
               <button type="button" class="screen-tab active" data-view="waves">WAVES</button>
               <button type="button" class="screen-tab" data-view="stems" id="screenStemsTab">MY STEMS <span id="screenCount">(0)</span></button>
               <button type="button" class="screen-tab" data-view="samples" id="screenSamplesTab">SAMPLES</button>
+              <a class="screen-link" id="samplerLink" href="/sampler">SAMPLER</a>
+              <a class="screen-link" id="sheetMusicLink" href="/notation-viewer">SHEET MUSIC</a>
             </span>
           </div>
           <div class="transport" role="group" aria-label="Playback transport">
@@ -1869,7 +1879,6 @@
       
 
       <div class="wood-trim"></div>
-      <div class="sample-help-wrap"><a class="sample-help-pill" id="samplerLink" href="/sampler" style="text-decoration:none;">SAMPLER</a><a class="sample-help-pill" id="sheetMusicLink" href="/notation-viewer" style="text-decoration:none;margin-left:0.5rem;">SHEET MUSIC</a></div>
     </div>
   </div>
 </section>
