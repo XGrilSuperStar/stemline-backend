@@ -333,8 +333,9 @@
       showInfo(lastXml);
       if (isPreview) {
         setStatus('Free preview: first 8 measures only. ' + usesLeft + ' free preview(s) left this month. Upgrade to Premium for the full chart and downloads.');
-        xmlBtn.disabled = true; midiBtn.disabled = false;
-        midiBtn.onclick = function () { setStatus('MIDI download is a Premium feature. Upgrade to unlock MIDI and MusicXML downloads.'); };
+        var premiumMsg = 'MIDI and MusicXML downloads are a Premium feature. Upgrade to Premium to unlock them (log in with your Premium account if you already have one).';
+        xmlBtn.disabled = false; midiBtn.disabled = false;
+        xmlBtn.onclick = midiBtn.onclick = function () { setStatus(premiumMsg); alert(premiumMsg); };
         goBtn.disabled = false;
         return;
       }
