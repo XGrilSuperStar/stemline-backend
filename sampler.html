@@ -54,16 +54,6 @@
   .logo-mark { width: 38px; height: 38px; flex-shrink: 0; }
   .logo-mark svg { display: block; width: 100%; height: 100%; }
   .logo-text { font-family: 'Big Shoulders Stencil', sans-serif; font-weight: 800; font-size: 1.35rem; letter-spacing: 0.05em; text-transform: uppercase; }
-  .help-pill { margin-left: auto; padding: 0.35rem 0.9rem; border-radius: 999px; border: 1px solid var(--teal); background: rgba(60,253,224,0.12); color: var(--teal); font: 700 0.65rem 'JetBrains Mono', monospace; letter-spacing: 0.04em; cursor: pointer; box-shadow: 0 0 10px rgba(60,253,224,0.3); text-transform: uppercase; }
-  .help-pill:hover:not(:disabled) { background: rgba(60,253,224,0.22); filter: none; }
-  #helpPop { position: fixed; inset: 0; z-index: 10000; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.65); padding: 1rem; }
-  #helpPop.open { display: flex; }
-  #helpPop .box { position: relative; max-width: 520px; width: 100%; max-height: 90vh; overflow: auto; padding: 1.2rem 1.4rem; border-radius: 8px; background: repeating-linear-gradient(90deg, rgba(255,255,255,0.02) 0 1px, transparent 1px 3px), linear-gradient(180deg, #232327, #141416); border: 1px solid var(--concrete-line); box-shadow: 0 14px 40px rgba(0,0,0,0.7); }
-  #helpPop h3 { margin: 0 0 0.6rem; font-family: 'Big Shoulders Stencil', sans-serif; font-weight: 800; font-size: 1.2rem; letter-spacing: 0.06em; color: var(--vu-amber); }
-  #helpPop ol { margin: 0; padding-left: 1.2rem; color: var(--chrome); font-size: 0.86rem; }
-  #helpPop li { margin: 0.35rem 0; }
-  #helpPop .tip { margin-top: 0.7rem; font: 600 0.72rem 'JetBrains Mono', monospace; color: var(--teal); }
-  #helpPop .x { position: absolute; top: 8px; right: 10px; padding: 0.15rem 0.5rem; font-size: 0.8rem; background: none; border: 0; box-shadow: none; color: var(--chrome-dim); }
   nav.back { max-width: 1500px; margin: 0.8rem auto 0; padding: 0 1.5rem; font: 500 0.75rem 'JetBrains Mono', monospace; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
   nav.back a { color: var(--chrome-dim); text-decoration: none; }
   nav.back a:hover { color: var(--vu-amber); }
@@ -365,44 +355,39 @@
   .lib-item:hover { background: linear-gradient(180deg, #36363c, #212125); }
   .lib-dot { box-shadow: 0 0 8px var(--pc), inset 0 1px 1px rgba(255,255,255,0.6); }
   .browser .lib { padding-right: 4px; }
+
+  /* ===== site header/footer: same as the landing page ===== */
+  nav.site-nav { display: flex; justify-content: space-between; align-items: center; padding: 1.4rem 2.5rem; background: var(--void, #0E1013); border-bottom: 1px solid var(--concrete-line); position: relative; flex-wrap: wrap; row-gap: 0.9rem; }
+  nav.site-nav::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--ember); }
+  nav.site-nav .logo { display: flex; align-items: center; gap: 10px; margin-left: 0; text-decoration: none; }
+  nav.site-nav .logo-mark { width: 30px; height: 30px; border-radius: 50%; display: block; flex-shrink: 0; }
+  nav.site-nav .logo-text { font-family: 'Big Shoulders Stencil', sans-serif; font-weight: 800; font-size: 1.25rem; letter-spacing: 0.03em; color: var(--chrome); text-transform: uppercase; }
+  nav.site-nav .links { display: flex; gap: 1.8rem; font-size: 0.85rem; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.02em; }
+  nav.site-nav .links a { color: var(--chrome-dim); text-decoration: none; }
+  nav.site-nav .links a:hover, nav.site-nav .links a.here { color: var(--chrome); }
+  .page-head { margin: 0 0 1rem; }
+  footer.site-footer { padding: 3rem 2.5rem; text-align: center; color: rgba(237,227,206,0.4); font-size: 0.82rem; border-top: 1px solid rgba(237,227,206,0.08); font-family: 'JetBrains Mono', monospace; margin-top: 2rem; }
+  @media (max-width: 700px) { nav.site-nav { padding: 0.8rem 1rem; row-gap: 0.6rem; } nav.site-nav .logo-text { font-size: 1.05rem; } nav.site-nav .links { gap: 1rem; } footer.site-footer { padding: 2rem 1rem; } }
 </style>
 </head>
 <body>
-<header>
-  <div>
-    <div class="tag">Chop &amp; play</div>
-    <h1>Sampler</h1>
-  </div>
-  <a class="back" href="/">&larr; Mixing board</a>
+<nav class="site-nav">
   <a class="logo" href="/" aria-label="Stemline101 home">
     <span class="logo-mark">
-      <svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <defs>
-          <linearGradient id="waveGrad" gradientUnits="userSpaceOnUse" x1="30" y1="110" x2="190" y2="110">
-            <stop offset="0%" stop-color="#FFB020"/>
-            <stop offset="100%" stop-color="#3CFDE0"/>
-          </linearGradient>
-        </defs>
+      <svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="display:block;width:100%;height:100%;">
+        <defs><linearGradient id="waveGrad" gradientUnits="userSpaceOnUse" x1="30" y1="110" x2="190" y2="110"><stop offset="0%" stop-color="#FFB020"/><stop offset="100%" stop-color="#3CFDE0"/></linearGradient></defs>
         <circle cx="110" cy="110" r="98" fill="#0E1013"/>
         <circle cx="110" cy="110" r="98" fill="none" stroke="#3ab6ff" stroke-width="4" opacity="0.6"/>
-        <g stroke="url(#waveGrad)" stroke-width="10" stroke-linecap="round" fill="none">
-          <line x1="40" y1="110" x2="40" y2="110"/>
-          <line x1="60" y1="90" x2="60" y2="130"/>
-          <line x1="80" y1="65" x2="80" y2="155"/>
-          <line x1="100" y1="100" x2="100" y2="120"/>
-          <line x1="120" y1="45" x2="120" y2="175"/>
-          <line x1="140" y1="80" x2="140" y2="140"/>
-          <line x1="160" y1="95" x2="160" y2="125"/>
-          <line x1="180" y1="105" x2="180" y2="115"/>
-        </g>
+        <g stroke="url(#waveGrad)" stroke-width="10" stroke-linecap="round" fill="none"><line x1="40" y1="110" x2="40" y2="110"/><line x1="60" y1="90" x2="60" y2="130"/><line x1="80" y1="65" x2="80" y2="155"/><line x1="100" y1="100" x2="100" y2="120"/><line x1="120" y1="45" x2="120" y2="175"/><line x1="140" y1="80" x2="140" y2="140"/><line x1="160" y1="95" x2="160" y2="125"/><line x1="180" y1="105" x2="180" y2="115"/></g>
       </svg>
     </span>
-    <span class="logo-text">Stemline</span>
+    <span class="logo-text">STEMLINE 101</span>
   </a>
-</header>
-<nav class="back"><a href="/">&larr; Back to the mixer</a> &nbsp;&middot;&nbsp; <a href="/notation-viewer">Sheet music</a><button type="button" class="help-pill" id="helpBtn">How to sample</button></nav>
+  <div class="links"><a href="/">Mixer</a><a href="/sampler" class="here">Sampler</a><a href="/notation-viewer">Sheet music</a></div>
+</nav>
 
 <main class="studio">
+<div class="page-head"><div class="tag">Chop &amp; play</div><h1>Sampler</h1></div>
 <p class="note">Load any stem from your saved songs, drag across the waveform to grab a piece, and save it to a pad. Trim it, tune it, loop it, and play it live from the pad grid or your keyboard. Free accounts can save 2 samples a month; Premium unlocks unlimited samples and downloads.</p>
 
 <div class="studio-grid">
@@ -500,23 +485,17 @@
 </div>
 
 </main>
-<div id="helpPop" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
-  <div class="box">
-    <button type="button" class="x" id="helpClose" aria-label="Close">&#10005;</button>
-    <h3 id="helpTitle">HOW TO SAMPLE</h3>
-    <ol>
-      <li><b>Load a stem:</b> pick a saved song and stem, press Load stem.</li>
-      <li><b>Preview:</b> press Preview to listen. Press again to stop.</li>
-      <li><b>Grab a piece:</b> drag across the waveform, pull the orange edges to fine-tune. Wheel = zoom. Drag the top ruler (or Shift + wheel) to move left/right.</li>
-      <li><b>Pick a pad</b>, type a name, press <b>Save to selected pad</b>.</li>
-      <li><b>Play it:</b> click the pad or press its key.</li>
-      <li><b>Edit it:</b> click a saved pad. Re-trim, Loop, and drag the Volume and Pitch knobs up/down.</li>
-      <li><b>On the main mixer:</b> the stem's colored pad plays it, the channel volume/mute controls it, Stop or spacebar silences it.</li>
-      <li><b>Headphones</b> plays a pad privately.</li>
-    </ol>
-    <div class="tip">Great for ringtones: chop your favorite hook and save it.</div>
+<footer class="site-footer">
+  <div style="display: flex; gap: 1.2rem; justify-content: center; flex-wrap: wrap;">
+    <a href="/privacy" style="color: inherit; text-decoration: underline;">Privacy Policy</a>
+    <a href="/terms" style="color: inherit; text-decoration: underline;">Terms of Service</a>
+    <a href="/about" style="color: inherit; text-decoration: underline;">About</a>
+    <a href="/faq" style="color: inherit; text-decoration: underline;">FAQ</a>
+    <a href="/guides" style="color: inherit; text-decoration: underline;">Guides</a>
   </div>
-</div>
+  <div style="margin-top: 0.8rem;">&copy; 2026 stemline101.com. All rights reserved.</div>
+</footer>
+
 <div id="toast"></div>
 
 <script>
@@ -1092,17 +1071,6 @@
     } catch (e) { toast('Could not make the MP3'); }
     btn.disabled = false; btn.textContent = label;
   }
-
-  /* ---------- how to sample popup ---------- */
-  (function () {
-    var pop = $('helpPop');
-    function open() { pop.classList.add('open'); }
-    function close() { pop.classList.remove('open'); }
-    $('helpBtn').addEventListener('click', open);
-    $('helpClose').addEventListener('click', close);
-    pop.addEventListener('pointerdown', function (e) { if (e.target === pop) close(); });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
-  })();
 
   /* ---------- init ---------- */
   (async function init() {
