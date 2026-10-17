@@ -193,7 +193,10 @@
   .wavecard .bezel { padding: 6px; }
   #wave { height: 440px; }
   .readout .muted { margin-left: auto; opacity: 0.7; }
-  .browser { position: sticky; top: 0.8rem; max-height: calc(100vh - 1.6rem); display: flex; flex-direction: column; }
+  .side { position: sticky; top: 0.8rem; max-height: calc(100vh - 1.6rem); overflow-y: auto; display: flex; flex-direction: column; }
+  .browser { position: static; max-height: 360px; display: flex; flex-direction: column; }
+  .side-how { max-width: none; font-size: 0.8rem; }
+  .side-how ol { padding-left: 1.1rem; }
   .browser .lib { grid-template-columns: 1fr; overflow-y: auto; align-content: start; }
   .pads { grid-template-columns: repeat(8, 1fr); gap: 8px; }
   .pad { min-height: 62px; aspect-ratio: 1 / 0.8; }
@@ -224,7 +227,8 @@
   .knob .kv { font: 700 0.8rem 'JetBrains Mono', monospace; color: var(--vu-amber); }
   @media (max-width: 1100px) {
     .studio-grid { grid-template-columns: 1fr; }
-    .browser { position: static; max-height: none; }
+    .side { position: static; max-height: none; overflow: visible; }
+    .browser { max-height: none; }
     .browser .lib { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); max-height: 360px; }
     .pads { grid-template-columns: repeat(4, 1fr); }
   }
@@ -472,27 +476,29 @@
     </div>
   </div>
 
+  <div class="side">
   <aside class="panel browser">
     <div class="dev-head"><h2>Your samples</h2></div>
     <div class="lib" id="lib"></div>
   </aside>
+  <div class="panel how side-how">
+    <h2>How it works</h2>
+    <ol>
+      <li><b>Load a stem.</b> Pick one of your saved songs, pick a stem (vocals, drums...), press Load stem.</li>
+      <li><b>Listen.</b> Press Preview. With nothing selected it plays the whole stem from wherever you last clicked. Press it again to stop.</li>
+      <li><b>Grab a piece.</b> Drag across the waveform. Pull the two orange edges to fine-tune. Scroll wheel zooms; to move left/right, drag the time ruler along the top (or hold Shift and scroll).</li>
+      <li><b>Pick a pad.</b> Click any pad in the Pads grid.</li>
+      <li><b>Save.</b> Type a name and press Save to selected pad. The pad lights up. Repeat steps 3-5 for more pads.</li>
+      <li><b>Play it.</b> Click the pad, or press its key (1 2 3 4 / Q W E R / A S D F / Z X C V).</li>
+      <li><b>Edit it.</b> Click a saved pad and the Sample editor opens: re-trim, rename, Loop, and turn the Volume and Pitch knobs by dragging them up or down (double-click to reset).</li>
+      <li><b>Use it on the main mixer.</b> Saved samples are already there: the stem's colored pad plays it, and the mixer's SAMPLES list has play, headphones and delete. The channel's volume and mute control it, and Stop or the spacebar silences it.</li>
+      <li><b>Headphones.</b> Use the Headphones button to hear a pad privately before the room does.</li>
+      <li>Samples live in this browser. Premium can download a sample as an MP3 (great for ringtones).</li>
+    </ol>
+  </div>
+  </div>
 </div>
 
-<div class="panel how">
-  <h2>How it works</h2>
-  <ol>
-    <li><b>Load a stem.</b> Pick one of your saved songs, pick a stem (vocals, drums...), press Load stem.</li>
-    <li><b>Listen.</b> Press Preview. With nothing selected it plays the whole stem from wherever you last clicked. Press it again to stop.</li>
-    <li><b>Grab a piece.</b> Drag across the waveform. Pull the two orange edges to fine-tune. Scroll wheel zooms; to move left/right, drag the time ruler along the top (or hold Shift and scroll).</li>
-    <li><b>Pick a pad.</b> Click any pad in the Pads grid.</li>
-    <li><b>Save.</b> Type a name and press Save to selected pad. The pad lights up. Repeat steps 3-5 for more pads.</li>
-    <li><b>Play it.</b> Click the pad, or press its key (1 2 3 4 / Q W E R / A S D F / Z X C V).</li>
-    <li><b>Edit it.</b> Click a saved pad and the Sample editor opens: re-trim, rename, Loop, and turn the Volume and Pitch knobs by dragging them up or down (double-click to reset).</li>
-    <li><b>Use it on the main mixer.</b> Saved samples are already there: the stem's colored pad plays it, and the mixer's SAMPLES list has play, headphones and delete. The channel's volume and mute control it, and Stop or the spacebar silences it.</li>
-    <li><b>Headphones.</b> Use the Headphones button to hear a pad privately before the room does.</li>
-    <li>Samples live in this browser. Premium can download a sample as an MP3 (great for ringtones).</li>
-  </ol>
-</div>
 </main>
 <div id="helpPop" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
   <div class="box">
