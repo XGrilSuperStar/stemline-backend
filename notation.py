@@ -131,6 +131,29 @@ def _make_monophonic(midi):
         inst.notes = kept
 
 
+def _force_chord_line(midi, max_notes=6):
+    """Polyphonic instruments (guitar, keys): after quantizing, notes starting
+    together form one chord that ends where the next chord begins. No partial
+    overlaps means a single voice, so the tab staff can be added."""
+    for inst in midi.instruments:
+        groups = {}
+        for n in inst.notes:
+            groups.setdefault(round(n.start, 3), []).append(n)
+        starts = sorted(groups)
+        kept = []
+        for i, s in enumerate(starts):
+            g = sorted(groups[s], key=lambda n: -n.velocity)[:max_notes]
+            end = max(n.end for n in g)
+            if i + 1 < len(starts):
+                end = min(end, starts[i + 1])
+            for n in g:
+                n.start = s
+                n.end = end
+                if n.end - n.start > 1e-4:
+                    kept.append(n)
+        inst.notes = kept
+
+
 def _force_single_line(midi):
     """After quantizing, make a one-note-at-a-time instrument truly one line:
     notes that land on the same grid step keep only the strongest, and every
@@ -613,6 +636,8 @@ def transcribe(audio_bytes, ext, instrument):
     midi = _quantize_midi(midi, bpm, beats, downbeat)
     if settings["mono"]:
         _force_single_line(midi)
+    else:
+        _force_chord_line(midi)
 
     note_count = sum(len(i.notes) for i in midi.instruments)
     if note_count == 0:
