@@ -131,6 +131,24 @@ def _make_monophonic(midi):
         inst.notes = kept
 
 
+def _force_single_line(midi):
+    """After quantizing, make a one-note-at-a-time instrument truly one line:
+    notes that land on the same grid step keep only the strongest, and every
+    note ends where the next begins. Overlaps would make the score writer
+    split the part into several voices, and the tab staff can't be added then."""
+    for inst in midi.instruments:
+        notes = sorted(inst.notes, key=lambda n: (round(n.start, 4), -(n.end - n.start) * n.velocity))
+        kept = []
+        for n in notes:
+            if kept and abs(n.start - kept[-1].start) < 1e-4:
+                continue
+            kept.append(n)
+        for a, b in zip(kept, kept[1:]):
+            if a.end > b.start:
+                a.end = b.start
+        inst.notes = [n for n in kept if n.end - n.start > 1e-4]
+
+
 def _refine_bpm(onsets, prior):
     """Pick the tempo (70-160) whose 8th-note grid the note onsets sit on best.
     Beat trackers often land on 2/3 or 3/2 of the real tempo; the notes
@@ -593,6 +611,8 @@ def transcribe(audio_bytes, ext, instrument):
     bpm = _refine_bpm(onsets, prior)
     beats, downbeat = _detect_meter(midi, bpm)
     midi = _quantize_midi(midi, bpm, beats, downbeat)
+    if settings["mono"]:
+        _force_single_line(midi)
 
     note_count = sum(len(i.notes) for i in midi.instruments)
     if note_count == 0:
