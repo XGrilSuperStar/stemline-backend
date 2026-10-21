@@ -1794,15 +1794,20 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
         with concurrent.futures.ThreadPoolExecutor(max_workers=_polish_workers) as _pool:
             list(_pool.map(_polish_stem, _polish_files))
 
-        # Bass cleaner loop (BASS_CLEANER=on): measure, clean, re-measure,
-        # capped at BASS_CLEANER_MAX_TRIES. Never fails a split.
+        # Bass cleaner (BASS_CLEANER=on) runs in the background AFTER the
+        # split is saved, so it adds no wait. Copy the bass stem out of the
+        # work dir now (the work dir is deleted below).
+        _bass_job = None
         try:
             import bass_cleaner
             if bass_cleaner.enabled():
                 for _bf in os.listdir(stem_dir):
                     if "bass" in _bf.lower():
-                        _summary = bass_cleaner.run_loop(os.path.join(stem_dir, _bf))
-                        logger.info(f"[job {request_id}] Bass cleaner: {_summary}")
+                        _bass_tmp_dir = os.path.join("/tmp", f"stemline_bass_{request_id}")
+                        os.makedirs(_bass_tmp_dir, exist_ok=True)
+                        _bass_tmp = os.path.join(_bass_tmp_dir, _bf)
+                        shutil.copy2(os.path.join(stem_dir, _bf), _bass_tmp)
+                        _bass_job = (_bass_tmp, _bf)
                         break
         except Exception as bc_err:
             logger.warning(f"[job {request_id}] Bass cleaner skipped: {bc_err}")
@@ -1850,6 +1855,13 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
             db.commit()
         logger.info(f"[job {request_id}] Stem split successful, saved as ID {stem_id}")
 
+        if _bass_job:
+            threading.Thread(
+                target=_bass_cleanup_job,
+                args=(request_id, zip_path, _bass_job[0], _bass_job[1]),
+                daemon=True,
+            ).start()
+
     except Exception as e:
         logger.error(f"[job {request_id}] Split error: {str(e)}", exc_info=True)
         try:
@@ -1863,6 +1875,30 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
             db.commit()
     finally:
         db.close()
+
+
+def _bass_cleanup_job(request_id: str, zip_path: str, bass_path: str, arcname: str):
+    """Background bass cleaner: run the capped loop on the copied bass stem,
+    and if it improved, swap it into the saved zip in R2. Never raises."""
+    try:
+        import bass_cleaner
+        summary = bass_cleaner.run_loop(bass_path)
+        logger.info(f"[job {request_id}] Bass cleaner (background): {summary}")
+        if summary.get("improved"):
+            src = zipfile.ZipFile(io.BytesIO(r2_download_bytes(zip_path)))
+            out = io.BytesIO()
+            with zipfile.ZipFile(out, "w") as zf:
+                for item in src.infolist():
+                    if item.filename == arcname:
+                        zf.write(bass_path, arcname)
+                    else:
+                        zf.writestr(item, src.read(item.filename))
+            r2_upload_bytes(zip_path, out.getvalue())
+            logger.info(f"[job {request_id}] Cleaned bass swapped into {zip_path}")
+    except Exception as e:
+        logger.warning(f"[job {request_id}] Background bass cleaner failed: {e}")
+    finally:
+        shutil.rmtree(os.path.dirname(bass_path), ignore_errors=True)
 
 
 @app.post("/api/v1/split")
