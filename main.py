@@ -1794,6 +1794,19 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
         with concurrent.futures.ThreadPoolExecutor(max_workers=_polish_workers) as _pool:
             list(_pool.map(_polish_stem, _polish_files))
 
+        # Bass cleaner loop (BASS_CLEANER=on): measure, clean, re-measure,
+        # capped at BASS_CLEANER_MAX_TRIES. Never fails a split.
+        try:
+            import bass_cleaner
+            if bass_cleaner.enabled():
+                for _bf in os.listdir(stem_dir):
+                    if "bass" in _bf.lower():
+                        _summary = bass_cleaner.run_loop(os.path.join(stem_dir, _bf))
+                        logger.info(f"[job {request_id}] Bass cleaner: {_summary}")
+                        break
+        except Exception as bc_err:
+            logger.warning(f"[job {request_id}] Bass cleaner skipped: {bc_err}")
+
         # Build the zip in memory and upload straight to R2, keyed by this
         # request's uuid so it can never collide with any other split's zip
         # — past or future, same filename or not.
