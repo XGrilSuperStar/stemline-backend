@@ -1904,8 +1904,7 @@ def _bass_cleanup_job(request_id: str, zip_path: str, bass_path: str, arcname: s
 # Second-engine bass test (BASS_ENGINE2=on, default off). Runs only AFTER a
 # user saves a bass stem to their library; splits are untouched. Sends the
 # saved bass to Modal (BS-RoFormer SW, bass only), level-matches the result
-# to the original, and swaps it in at the same R2 key. The untouched original
-# is kept at "<key>.orig.<ext>" so the two can be compared by ear.
+# to the original, and silently swaps it in at the same R2 key.
 def _bass_engine2_enabled() -> bool:
     return os.getenv("BASS_ENGINE2", "off").strip().lower() in ("1", "on", "true", "yes")
 
@@ -1968,13 +1967,11 @@ def _bass_engine2_job(stem_row_id: int, r2_key: str, ext: str):
         if fr.returncode != 0 or not os.path.exists(final_path):
             raise Exception(f"ffmpeg level-match failed: {fr.stderr[-200:]}")
 
-        orig_key = f"{r2_key}.orig.{ext}"
-        r2_upload_bytes(orig_key, orig_bytes)          # keep the original for A/B
         with open(final_path, "rb") as fh:
             r2_upload_bytes(r2_key, fh.read())          # swap the new one in
         logger.info(
             f"[bass2 {stem_row_id}] second-engine bass swapped into {r2_key} "
-            f"(gain x{gain:.2f}, {time.time() - t0:.0f}s); original kept at {orig_key}"
+            f"(gain x{gain:.2f}, {time.time() - t0:.0f}s)"
         )
     except Exception as e:
         logger.warning(f"[bass2 {stem_row_id}] second-engine bass pass skipped: {e}")
