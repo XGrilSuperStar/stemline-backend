@@ -1901,6 +1901,87 @@ def _bass_cleanup_job(request_id: str, zip_path: str, bass_path: str, arcname: s
         shutil.rmtree(os.path.dirname(bass_path), ignore_errors=True)
 
 
+# Second-engine bass test (BASS_ENGINE2=on, default off). Runs only AFTER a
+# user saves a bass stem to their library; splits are untouched. Sends the
+# saved bass to Modal (BS-RoFormer SW, bass only), level-matches the result
+# to the original, and swaps it in at the same R2 key. The untouched original
+# is kept at "<key>.orig.<ext>" so the two can be compared by ear.
+def _bass_engine2_enabled() -> bool:
+    return os.getenv("BASS_ENGINE2", "off").strip().lower() in ("1", "on", "true", "yes")
+
+
+def _bass_engine2_job(stem_row_id: int, r2_key: str, ext: str):
+    """Background second-engine pass on one saved bass stem. Never raises."""
+    import tempfile
+    work = tempfile.mkdtemp(prefix="bass2_")
+    try:
+        if not MODAL_SEPARATE_URL or not MODAL_SEPARATE_SECRET:
+            raise Exception("MODAL_SEPARATE_URL / MODAL_SEPARATE_SECRET not set")
+        import bass_cleaner
+        t0 = time.time()
+        orig_bytes = r2_download_bytes(r2_key)
+        orig_path = os.path.join(work, f"orig.{ext}")
+        with open(orig_path, "wb") as fh:
+            fh.write(orig_bytes)
+
+        headers = {"X-Stemline-Secret": MODAL_SEPARATE_SECRET}
+        r = requests.post(f"{MODAL_SEPARATE_URL}/submit-bass", data=orig_bytes, headers=headers, timeout=180)
+        r.raise_for_status()
+        call_id = r.json()["call_id"]
+        logger.info(f"[bass2 {stem_row_id}] submitted to Modal: {call_id}")
+
+        deadline = time.time() + MODAL_TIMEOUT_SECONDS
+        while True:
+            if time.time() > deadline:
+                raise Exception(f"Modal bass job timed out after {MODAL_TIMEOUT_SECONDS}s")
+            res = requests.get(f"{MODAL_SEPARATE_URL}/result/{call_id}", headers=headers, timeout=120)
+            if res.status_code == 202:
+                time.sleep(4)
+                continue
+            if res.status_code != 200:
+                raise Exception(f"Modal bass job failed ({res.status_code}): {res.text[:300]}")
+            break
+
+        new_raw = os.path.join(work, "new_raw.mp3")
+        with open(new_raw, "wb") as fh:
+            fh.write(res.content)
+
+        # Sanity: new stem must be audible and about the same length.
+        orig_audio = bass_cleaner._load_mono(orig_path)
+        new_audio = bass_cleaner._load_mono(new_raw)
+        o_rms = float(((orig_audio ** 2).mean()) ** 0.5) if orig_audio.size else 0.0
+        n_rms = float(((new_audio ** 2).mean()) ** 0.5) if new_audio.size else 0.0
+        if o_rms < 1e-5 or n_rms < 1e-5:
+            raise Exception(f"silent stem (orig rms {o_rms:.5f}, new rms {n_rms:.5f}); keeping original")
+        ratio = new_audio.size / max(1, orig_audio.size)
+        if not (0.9 <= ratio <= 1.1):
+            raise Exception(f"length mismatch (ratio {ratio:.2f}); keeping original")
+
+        # SW's bass ran quiet in the September MVSep test: match the original's
+        # loudness (bounded) and limit peaks so it can't clip.
+        gain = min(4.0, max(0.5, o_rms / n_rms))
+        final_path = os.path.join(work, f"final.{ext}")
+        codec = ["-c:a", "libmp3lame", "-b:a", "192k"] if ext == "mp3" else []
+        cmd = ["ffmpeg", "-y", "-v", "error", "-i", new_raw,
+               "-af", f"volume={gain:.3f},alimiter=limit=0.95"] + codec + [final_path]
+        fr = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        if fr.returncode != 0 or not os.path.exists(final_path):
+            raise Exception(f"ffmpeg level-match failed: {fr.stderr[-200:]}")
+
+        orig_key = f"{r2_key}.orig.{ext}"
+        r2_upload_bytes(orig_key, orig_bytes)          # keep the original for A/B
+        with open(final_path, "rb") as fh:
+            r2_upload_bytes(r2_key, fh.read())          # swap the new one in
+        logger.info(
+            f"[bass2 {stem_row_id}] second-engine bass swapped into {r2_key} "
+            f"(gain x{gain:.2f}, {time.time() - t0:.0f}s); original kept at {orig_key}"
+        )
+    except Exception as e:
+        logger.warning(f"[bass2 {stem_row_id}] second-engine bass pass skipped: {e}")
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
 @app.post("/api/v1/split")
 def split_stem(file: UploadFile = File(...), token: str = None, stems: str = Form("6"), client_size: int = Form(None), client_duration: float = Form(None), db: Session = Depends(get_db)):
     logger.info(f"Split request received: {file.filename} (stems={stems})")
@@ -2174,6 +2255,15 @@ def save_stem_instrument(stem_id: int, instrument: str, token: str = None, db: S
         db.refresh(new_row)
 
         logger.info(f"Saved single instrument, new stem ID {new_row.id}")
+
+        # Test: second engine on the saved bass only, in the background.
+        if instrument == "bass" and _bass_engine2_enabled():
+            threading.Thread(
+                target=_bass_engine2_job,
+                args=(new_row.id, r2_key, ext),
+                daemon=True,
+            ).start()
+
         return {"id": new_row.id, "track_name": new_row.track_name, "instrument": new_row.instrument}
     except HTTPException:
         raise

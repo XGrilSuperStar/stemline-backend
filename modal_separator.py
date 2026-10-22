@@ -11,6 +11,7 @@ Secret:   modal secret create stemline-auth STEMLINE_SECRET=<long random string>
 
 API (all need header  X-Stemline-Secret):
   POST /submit            raw audio bytes in body  ->  {"call_id": "..."}
+  POST /submit-bass       raw audio bytes (a bass stem) -> {"call_id": "..."}; result is a bass mp3
   GET  /result/{call_id}  ->  202 while running, 200 + zip when done, 500 on failure
 """
 import os
@@ -124,6 +125,71 @@ def run_roformer(audio: bytes) -> bytes:
     return data
 
 
+# Bass-only test engine: BS-RoFormer SW (jarredou), keeping just the bass stem.
+# Only called by the backend AFTER a user saves a bass stem (BASS_ENGINE2=on).
+# Checkpoint filename varies between audio-separator versions, so try a few;
+# override with the BASS_SW_MODEL env var if needed.
+BASS_SW_CANDIDATES = ["BS-Roformer-SW.ckpt", "BS-Rofo-SW-Fixed.ckpt"]
+
+
+@app.function(
+    gpu="A10G",
+    image=image,
+    timeout=1200,
+    volumes={MODEL_DIR: models_vol},
+    scaledown_window=300,
+)
+def run_bass_roformer(audio: bytes) -> bytes:
+    """BS-RoFormer SW, bass stem only. Returns a 192k mp3."""
+    import shutil, subprocess, tempfile, time
+
+    work = tempfile.mkdtemp(prefix="bsw_")
+    src = _decode_to_wav(audio, work)
+    t = time.time()
+    from audio_separator.separator import Separator
+
+    out_dir = os.path.join(work, "bsw")
+    sep = Separator(
+        output_dir=out_dir,
+        model_file_dir=f"{MODEL_DIR}/audio-separator",
+        output_single_stem="Bass",
+        output_format="WAV",
+        use_autocast=True,
+        mdxc_params={"batch_size": 4, "overlap": 4, "segment_size": 256},
+    )
+    candidates = [c for c in [os.environ.get("BASS_SW_MODEL")] + BASS_SW_CANDIDATES if c]
+    loaded, last_err = None, None
+    for name in candidates:
+        try:
+            sep.load_model(name)
+            loaded = name
+            break
+        except Exception as e:
+            last_err = e
+            print(f"bass SW: could not load {name}: {e}")
+    if not loaded:
+        raise RuntimeError(f"No BS-RoFormer SW checkpoint could be loaded: {last_err}")
+
+    files = sep.separate(src)
+    print(f"bass SW ({loaded}) {time.time() - t:.1f}s -> {files}")
+    bass = None
+    for f in files:
+        p = f if os.path.isabs(f) else os.path.join(out_dir, f)
+        if os.path.exists(p) and "bass" in os.path.basename(p).lower():
+            bass = p
+    if bass is None:
+        raise RuntimeError(f"BS-RoFormer SW produced no bass file: {files}")
+    out_mp3 = os.path.join(work, "bass.mp3")
+    subprocess.run(
+        ["ffmpeg", "-y", "-loglevel", "error", "-i", bass, "-b:a", "192k", out_mp3],
+        check=True,
+    )
+    data = open(out_mp3, "rb").read()
+    models_vol.commit()
+    shutil.rmtree(work, ignore_errors=True)
+    return data
+
+
 @app.function(image=modal.Image.debian_slim(python_version="3.11"), timeout=1200)
 def separate(audio: bytes) -> bytes:
     """Fan out to both GPUs, then zip the six stems (same output as before)."""
@@ -171,6 +237,15 @@ def web():
         if not body:
             raise HTTPException(status_code=400, detail="empty body")
         call = separate.spawn(body)
+        return {"call_id": call.object_id}
+
+    @api.post("/submit-bass")
+    async def submit_bass(request: Request, x_stemline_secret: str = Header(None)):
+        check(x_stemline_secret)
+        body = await request.body()
+        if not body:
+            raise HTTPException(status_code=400, detail="empty body")
+        call = run_bass_roformer.spawn(body)
         return {"call_id": call.object_id}
 
     @api.get("/result/{call_id}")
