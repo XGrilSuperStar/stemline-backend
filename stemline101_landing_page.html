@@ -1212,6 +1212,13 @@
   .tp-play:hover { color: var(--vu-green); box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 0 12px rgba(111,169,126,0.6), 0 0 24px rgba(111,169,126,0.3); }
   .tp-dl:hover { color: var(--vu-teal, #3CFDE0); }
   .tp-dl.active { color: var(--vu-teal, #3CFDE0); border-color: rgba(60,253,224,0.55); box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 0 10px rgba(60,253,224,0.45), 0 0 20px rgba(60,253,224,0.2); }
+  .tp-demo {
+    margin-left: 0.6rem; padding: 0.35rem 0.8rem; font-size: 0.68rem; letter-spacing: 0.1em;
+    color: var(--vu-amber, #E7A33E); background: rgba(231,163,62,0.08);
+    border: 1px solid rgba(231,163,62,0.5); border-radius: 6px; cursor: pointer;
+  }
+  .tp-demo:hover { background: rgba(231,163,62,0.18); }
+  .tp-demo:disabled { opacity: 0.6; cursor: default; }
   .tp-source {
     font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase;
     color: rgba(216,220,226,0.5); margin-left: auto; padding-right: 0.4rem;
@@ -1573,6 +1580,7 @@
             <button type="button" class="tp-btn tp-dl" id="downloadMixBtn" title="Save all five stems to your computer as one MP3 (Premium)" aria-label="Save all five stems to your computer as one MP3 (Premium)">
               <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M5 20h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
+            <button type="button" class="tp-demo mono" id="demoBtn" title="Load a demo track into the mixer so you can try it without uploading">TRY DEMO</button>
             <span class="tp-source mono" id="previewLabel">no track loaded</span>
           </div>
           <div class="wave-hint mono" id="waveHint">click or drag waveform to seek &middot; <span style="color:#ffa022;">SAMPLE</span> + drag cuts a sample, right-click it to save &middot; <span style="color:var(--vu-teal,#3CFDE0);">+CUE</span> sets where this stem starts playing from</div>
@@ -2407,7 +2415,7 @@ function updateFaders() {
 const originalStemBuffers = {};
 const currentStemMeta = {};
 
-async function loadBackendStemToChannel(channelKey, stemId, trackName) {
+async function loadBackendStemToChannel(channelKey, stemId, trackName, urlOverride) {
   const status = document.getElementById('uploadStatus');
   const showErr = (msg) => {
     if (!status) return;
@@ -2417,13 +2425,13 @@ async function loadBackendStemToChannel(channelKey, stemId, trackName) {
   };
   try {
     await ensureEngineReady();
-    if (typeof getToken !== 'function' || !getToken()) {
+    if (!urlOverride && (typeof getToken !== 'function' || !getToken())) {
       showErr('Log in first to load a stem from your library.');
       return false;
     }
-    const url = window.API_BASE + '/api/v1/my-stems/' + encodeURIComponent(stemId)
+    const url = urlOverride || (window.API_BASE + '/api/v1/my-stems/' + encodeURIComponent(stemId)
               + '/download/' + encodeURIComponent(channelKey)
-              + '?token=' + encodeURIComponent(getToken());
+              + '?token=' + encodeURIComponent(getToken()));
     const res = await fetch(url);
     if (!res.ok) throw new Error('Server returned ' + res.status);
     const arrayBuf = await res.arrayBuffer();
@@ -2612,6 +2620,28 @@ document.querySelectorAll('.ch-save').forEach(btn => {
 });
 
 window.__loadBackendStemToChannel = loadBackendStemToChannel;
+
+(function () {
+  const demoBtn = document.getElementById('demoBtn');
+  if (!demoBtn) return;
+  demoBtn.addEventListener('click', async () => {
+    demoBtn.disabled = true;
+    const prev = demoBtn.textContent;
+    demoBtn.textContent = 'LOADING…';
+    try {
+      const chans = ['vocals', 'drums', 'bass', 'guitar', 'other'];
+      const results = await Promise.all(chans.map(c =>
+        loadBackendStemToChannel(c, 'demo', 'Demo Track', '/demo/' + c + '.mp3')));
+      const ok = results.filter(Boolean).length;
+      const label = document.getElementById('previewLabel');
+      if (label && ok > 0) label.textContent = 'Demo Track';
+      demoBtn.textContent = ok === chans.length ? 'LOADED' : ('LOADED ' + ok + '/' + chans.length);
+    } catch (e) {
+      demoBtn.textContent = 'FAILED';
+    }
+    setTimeout(() => { demoBtn.textContent = prev; demoBtn.disabled = false; }, 1500);
+  });
+})();
 window.__restoreOriginalStem = restoreOriginalStem;
 window.__saveChannelAsStem = saveChannelAsStem;
 

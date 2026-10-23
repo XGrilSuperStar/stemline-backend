@@ -1160,6 +1160,18 @@ def root():
 def reset_password_page():
     return serve_landing_page()
 
+DEMO_STEMS = {"vocals", "drums", "bass", "guitar", "other"}
+
+@app.get("/demo/{stem}.mp3")
+def demo_stem(stem: str):
+    if stem not in DEMO_STEMS:
+        raise HTTPException(status_code=404, detail="Not found")
+    return FileResponse(
+        os.path.join("demo", stem + ".mp3"),
+        media_type="audio/mpeg",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
 @app.get("/favicon.ico")
 def favicon_ico():
     return FileResponse("favicon.ico", media_type="image/x-icon")
