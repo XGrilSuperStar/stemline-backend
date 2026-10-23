@@ -172,8 +172,8 @@
   }
 
   /* ===== studio layout (DAW style) ===== */
-  main.studio { max-width: 1500px; }
-  .studio-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 1rem; align-items: start; }
+  main.studio { max-width: 1180px; padding-top: 0.6rem; }
+  .studio-grid { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 0.8rem; align-items: start; }
   .stage > .panel, .browser { margin-bottom: 1rem; }
   .pick { padding: 0.7rem 1rem; }
   .pick .hint { color: var(--chrome-dim); font-size: 0.74rem; }
@@ -181,7 +181,7 @@
   .dev-head h2 { margin: 0; }
   .wavecard { padding: 0.7rem; }
   .wavecard .bezel { padding: 6px; }
-  #wave { height: 440px; }
+  #wave { height: 280px; }
   .readout .muted { margin-left: auto; opacity: 0.7; }
   .side { position: static; max-height: none; overflow: visible; display: flex; flex-direction: column; }
   .browser { position: static; max-height: none; flex-shrink: 0; display: flex; flex-direction: column; }
@@ -189,17 +189,17 @@
   .side-how ol { padding-left: 1.1rem; }
   .browser .lib { grid-template-columns: 1fr; overflow: visible; align-content: start; }
   .side-how { flex-shrink: 0; }
-  .pads { grid-template-columns: repeat(8, 1fr); gap: 8px; }
-  .pad { min-height: 62px; aspect-ratio: 1 / 0.8; }
+  .pads { grid-template-columns: repeat(8, 1fr); gap: 6px; }
+  .pad { min-height: 46px; aspect-ratio: 1 / 0.65; padding: 4px; }
   /* device panel: zoomed sample on the left, knobs on the right */
   .dev-grid { display: grid; grid-template-columns: minmax(0, 1fr) 230px; gap: 1.2rem; align-items: center; }
   .dev-left { display: flex; flex-direction: column; gap: 0.5rem; }
   .dev-left input[type=text] { width: 100%; }
-  #trim { height: 120px; margin: 0; border: 1px solid var(--concrete-line); }
+  #trim { height: 90px; margin: 0; border: 1px solid var(--concrete-line); }
   .dev-right { display: flex; justify-content: center; gap: 1.6rem; }
   .knob { display: flex; flex-direction: column; align-items: center; gap: 0.35rem; user-select: none; }
   .knob .dial {
-    --f: 0.5; position: relative; width: 78px; height: 78px; border-radius: 50%; cursor: ns-resize; touch-action: none;
+    --f: 0.5; position: relative; width: 62px; height: 62px; border-radius: 50%; cursor: ns-resize; touch-action: none;
     background:
       radial-gradient(circle at 50% 38%, #3a3a40, #17171a 70%),
       #17171a;
@@ -210,10 +210,10 @@
   .knob .dial::before {
     content: ''; position: absolute; inset: -9px; border-radius: 50%;
     background: conic-gradient(from 225deg, var(--vu-amber) calc(var(--f) * 270deg), rgba(216,220,226,0.12) 0 270deg, transparent 0);
-    -webkit-mask: radial-gradient(circle, transparent 0 39px, #000 40px 44px, transparent 45px);
-            mask: radial-gradient(circle, transparent 0 39px, #000 40px 44px, transparent 45px);
+    -webkit-mask: radial-gradient(circle, transparent 0 31px, #000 32px 36px, transparent 37px);
+            mask: radial-gradient(circle, transparent 0 31px, #000 32px 36px, transparent 37px);
   }
-  .knob .dial i { position: absolute; left: 50%; top: 6px; width: 3px; height: 20px; margin-left: -1.5px; background: var(--vu-amber); border-radius: 2px; transform-origin: 50% 33px; box-shadow: 0 0 6px rgba(231,163,62,0.7); }
+  .knob .dial i { position: absolute; left: 50%; top: 5px; width: 3px; height: 16px; margin-left: -1.5px; background: var(--vu-amber); border-radius: 2px; transform-origin: 50% 26px; box-shadow: 0 0 6px rgba(231,163,62,0.7); }
   .knob .kl { font: 500 0.62rem 'JetBrains Mono', monospace; letter-spacing: 0.14em; text-transform: uppercase; color: var(--chrome-dim); margin-top: 0.5rem; }
   .knob .kv { font: 700 0.8rem 'JetBrains Mono', monospace; color: var(--vu-amber); }
   @media (max-width: 1100px) {
