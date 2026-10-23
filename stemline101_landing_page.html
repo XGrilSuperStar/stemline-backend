@@ -1410,7 +1410,7 @@
 </head>
 <body>
 
-<div id="adSlot" style="display:none;text-align:center;background:var(--concrete);border-bottom:1px solid var(--concrete-line);font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:var(--chrome-dim);">
+<div id="adSlot" style="display:block;visibility:hidden;text-align:center;background:var(--concrete);border-bottom:1px solid var(--concrete-line);font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:var(--chrome-dim);">
   Ad space — upgrade to Premium to remove ads
 </div>
 
@@ -3894,19 +3894,23 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshAdSlot();
   }
   const adSlot = document.getElementById('adSlot');
+  function setAdSlot(show) {
+    adSlot.style.display = show ? 'block' : 'none';
+    adSlot.style.visibility = show ? 'visible' : 'hidden';
+  }
   async function refreshAdSlot() {
     if (!getToken()) {
-      adSlot.style.display = 'block';
+      setAdSlot(true);
       navUpgradeBtn.style.display = '';
       return;
     }
     try {
       const res = await fetch(API_BASE + '/api/v1/me?token=' + encodeURIComponent(getToken()));
       const data = await res.json();
-      adSlot.style.display = data.show_ads ? 'block' : 'none';
+      setAdSlot(!!data.show_ads);
       navUpgradeBtn.style.display = data.is_premium ? 'none' : '';
     } catch (err) {
-      adSlot.style.display = 'block';
+      setAdSlot(true);
       navUpgradeBtn.style.display = '';
     }
   }
