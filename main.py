@@ -2560,6 +2560,15 @@ ABOUT_HTML = """
   <li><strong>Save and reuse</strong> — Every stem you create is saved to your library so it's ready the next time you want to use it.</li>
 </ol>
 
+<h2>What to expect from the results</h2>
+<p>Separation is an estimate, not a recovery of the original studio tracks. Clean drums and bass usually come out strongest. You may hear a little bleed, such as a faint hi-hat in the vocal stem, especially on dense or heavily reverbed songs. A good source file helps. Our guide on <a href="/guides/getting-cleaner-stems">getting cleaner stems</a> has tips.</p>
+
+<h2>Your files and your library</h2>
+<p>Stems you save are stored in your account library so you can reload them without splitting again. You can delete any saved stem from the My Stems list. Read the <a href="/privacy">Privacy Policy</a> for details on what we collect and how it is used.</p>
+
+<h2>Rights</h2>
+<p>Separating a song does not change who owns it. Upload music you own or have permission to use, and check the licensing before you perform or release anything built from someone else's recording. See the <a href="/terms">Terms of Service</a>.</p>
+
 <h2>Free to start, Premium for more</h2>
 <p>Stemline101 is free to use, with ads and up to 5 song splits per month. Premium removes ads and unlocks unlimited splits for $5.99/month or $39.99/year.</p>
 
@@ -2629,6 +2638,12 @@ FAQ_HTML = """
 
 <h2>Do my saved stems stick around?</h2>
 <p>Yes, any stem you save is stored to your account library so you can reload it anytime without re-splitting the track.</p>
+
+<h2>Can I remove the vocals from a song?</h2>
+<p>Yes. Split the song, then mute the vocals channel for an instrumental. <a href="/guides/how-to-remove-vocals-from-a-song">Here is how</a>.</p>
+
+<h2>Why does a stem have a little bleed?</h2>
+<p>The model estimates each part from the finished mix, so small traces of other instruments can remain. <a href="/guides/how-ai-stem-separation-works">How AI separation works</a> explains why.</p>
 
 <h2>I have another question.</h2>
 <p>Reach out any time: stemline101@gmail.com</p>
