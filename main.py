@@ -2660,6 +2660,53 @@ async def reviews_page():
     return FileResponse("reviews_page.html", media_type="text/html")
 
 
+CONTACT_EMAIL = "kellyschliewe@gmail.com"
+
+CONTACT_HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Contact — Stemline101</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Contact Stemline101 for support, feedback, or business questions.">
+<link rel="canonical" href="https://stemline101.com/contact">
+<style>
+  body { background:#111; color:#eee; font-family: system-ui, sans-serif;
+         max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem 6rem; line-height: 1.7; }
+  h1 { color: #f0a500; }
+  h2 { color: #f0a500; margin-top: 2rem; font-size: 1.1rem; }
+  a { color: #f0a500; }
+</style>
+</head>
+<body>
+<a href="/" style="display:inline-block;margin-bottom:1.5rem;color:#f0a500;text-decoration:none;">&larr; Back to Stemline101</a>
+<h1>Contact Stemline101</h1>
+<p>Questions, feedback, bug reports, or business inquiries are all welcome.</p>
+
+<h2>Email</h2>
+<p><a href="mailto:%%EMAIL%%">%%EMAIL%%</a></p>
+<p>We read every message and aim to reply within a few business days.</p>
+
+<h2>What to include</h2>
+<ul>
+  <li>For a problem with a split or the mixer, tell us the browser you use and what you were doing when it happened.</li>
+  <li>For account or billing questions, write from the email address you signed up with.</li>
+  <li>For a rights or takedown concern, include a link to the content and a description of the issue.</li>
+</ul>
+
+<h2>Helpful links</h2>
+<p><a href="/faq">FAQ</a> · <a href="/guides">Guides</a> · <a href="/about">About</a> · <a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Service</a></p>
+</body>
+</html>
+"""
+
+
+@app.get("/contact", response_class=HTMLResponse)
+async def contact_page():
+    return CONTACT_HTML.replace("%%EMAIL%%", CONTACT_EMAIL)
+
+
 @app.get("/robots.txt", response_class=Response)
 async def robots_txt():
     body = (
@@ -2676,14 +2723,14 @@ async def robots_txt():
 @app.get("/sitemap.xml", response_class=Response)
 async def sitemap_xml():
     pages = [
-        "", "about", "faq", "privacy", "terms",
+        "", "about", "faq", "contact", "privacy", "terms",
         "sampler",
         "guides",
         "guides/what-are-stems",
         "guides/how-ai-stem-separation-works",
         "guides/mixing-stems-bpm-and-key",
         "guides/getting-cleaner-stems",
-    ]
+    ] + [f"guides/{s}" for s in MORE_GUIDE_SLUGS]
     if NOTATION_ENABLED:
         pages.insert(6, "notation-viewer")
     urls = "".join(
@@ -2830,6 +2877,7 @@ async def notation_viewer():
 
 
 from guides import router as guides_router
+from guides_more import SLUGS as MORE_GUIDE_SLUGS
 app.include_router(guides_router)
 
 

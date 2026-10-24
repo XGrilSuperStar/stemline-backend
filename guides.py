@@ -3,6 +3,8 @@
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
+from guides_more import MORE_GUIDES
+
 router = APIRouter()
 
 BASE = """<!DOCTYPE html>
@@ -36,8 +38,8 @@ BASE = """<!DOCTYPE html>
   <a href="/guides/what-are-stems">What are stems?</a> ·
   <a href="/guides/how-ai-stem-separation-works">How AI separation works</a> ·
   <a href="/guides/mixing-stems-bpm-and-key">BPM and key basics</a> ·
-  <a href="/guides/getting-cleaner-stems">Getting cleaner stems</a></p>
-  <p><a href="/about">About</a> · <a href="/faq">FAQ</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>
+  <a href="/guides/getting-cleaner-stems">Getting cleaner stems</a>%%MOREGUIDES%%</p>
+  <p><a href="/about">About</a> · <a href="/faq">FAQ</a> · <a href="/contact">Contact</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>
 </div>
 <div id="cookie-banner" style="position:fixed; bottom:0; left:0; right:0; background:#1a1a1a; color:#eee; padding:1rem 1.5rem; border-top:1px solid #333; font-family: system-ui, sans-serif; font-size:0.9rem; z-index:9999; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:1rem;">
   <span>We use cookies for essential site function and, with your consent, for advertising. See our <a href="/privacy" style="color:#f0a500;">Privacy Policy</a>.</span>
@@ -57,9 +59,21 @@ BASE = """<!DOCTYPE html>
 """
 
 
+_MORE_LINKS = "".join(
+    ' · <a href="/guides/%s">%s</a>' % (g["slug"], g["short"]) for g in MORE_GUIDES
+)
+
+_MORE_CARDS = "".join(
+    '\n<div class="card">\n  <h2><a href="/guides/%s">%s</a></h2>\n  <p>%s</p>\n</div>'
+    % (g["slug"], g["title"], g["summary"])
+    for g in MORE_GUIDES
+)
+
+
 def render(title, desc, path, body):
     return (
-        BASE.replace("%%TITLE%%", title)
+        BASE.replace("%%MOREGUIDES%%", _MORE_LINKS)
+        .replace("%%TITLE%%", title)
         .replace("%%DESC%%", desc)
         .replace("%%PATH%%", path)
         .replace("%%BODY%%", body)
@@ -264,7 +278,7 @@ async def guides_index():
         "Guides",
         "Plain-English guides to audio stems, AI stem separation, and mixing stems from different songs.",
         "/guides",
-        INDEX_BODY,
+        INDEX_BODY + _MORE_CARDS,
     )
 
 
@@ -305,4 +319,19 @@ async def guide_cleaner_stems():
         "Practical tips on source files, dense mixes, and mixer settings that reduce bleed and artifacts in separated stems.",
         "/guides/getting-cleaner-stems",
         CLEANER_BODY,
+    )
+
+
+def _make_route(g):
+    async def handler():
+        return render(g["title"], g["desc"], "/guides/" + g["slug"], g["body"])
+    return handler
+
+
+for _g in MORE_GUIDES:
+    router.add_api_route(
+        "/guides/" + _g["slug"],
+        _make_route(_g),
+        methods=["GET"],
+        response_class=HTMLResponse,
     )
