@@ -2387,7 +2387,7 @@ TERMS_HTML = """
 
 <h2>5. DMCA / Copyright Complaints</h2>
 <p>Stemline101 will respond to valid copyright infringement notices in accordance with the Digital Millennium Copyright Act (DMCA) and will remove or disable access to infringing content upon receipt of a proper notice. Repeat infringers may have their accounts terminated.</p>
-<p><strong>Copyright agent contact:</strong> kellyschliewe@gmail.com</p>
+<p><strong>Copyright agent contact:</strong> stemline101@gmail.com</p>
 
 <h2>6. No Warranty</h2>
 <p>The Service is provided "as is" without warranties of any kind. Stemline101 does not guarantee the accuracy, quality, or legality of separated stems.</p>
@@ -2405,7 +2405,7 @@ TERMS_HTML = """
 <p>Stemline101 may update these Terms at any time. Continued use of the Service after changes constitutes acceptance of the new Terms.</p>
 
 <h2>11. Contact</h2>
-<p>Questions about these Terms can be directed to: kellyschliewe@gmail.com</p>
+<p>Questions about these Terms can be directed to: stemline101@gmail.com</p>
 
 <p style="margin-top:3rem; opacity:0.6; font-size:0.9rem;">
 This document is a general template and not a substitute for legal advice.
@@ -2489,7 +2489,7 @@ PRIVACY_HTML = """
 <p>Stemline101 may update this Privacy Policy at any time. Continued use of the Service after changes constitutes acceptance of the updated policy.</p>
 
 <h2>10. Contact</h2>
-<p>Questions about this Privacy Policy can be directed to: kellyschliewe@gmail.com</p>
+<p>Questions about this Privacy Policy can be directed to: stemline101@gmail.com</p>
 
 <p style="margin-top:3rem; opacity:0.6; font-size:0.9rem;">
 This document is a general template and not a substitute for legal advice.
@@ -2564,7 +2564,7 @@ ABOUT_HTML = """
 <p>Stemline101 is free to use, with ads and up to 5 song splits per month. Premium removes ads and unlocks unlimited splits for $5.99/month or $39.99/year.</p>
 
 <h2>Contact</h2>
-<p>Questions, feedback, or support requests: kellyschliewe@gmail.com</p>
+<p>Questions, feedback, or support requests: stemline101@gmail.com</p>
 
 <div id="cookie-banner" style="position:fixed; bottom:0; left:0; right:0; background:#1a1a1a; color:#eee; padding:1rem 1.5rem; border-top:1px solid #333; font-family: system-ui, sans-serif; font-size:0.9rem; z-index:9999; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:1rem;">
   <span>We use cookies for essential site function and, with your consent, for advertising. See our <a href="/privacy" style="color:#f0a500;">Privacy Policy</a>.</span>
@@ -2631,7 +2631,7 @@ FAQ_HTML = """
 <p>Yes, any stem you save is stored to your account library so you can reload it anytime without re-splitting the track.</p>
 
 <h2>I have another question.</h2>
-<p>Reach out any time: kellyschliewe@gmail.com</p>
+<p>Reach out any time: stemline101@gmail.com</p>
 
 <div id="cookie-banner" style="position:fixed; bottom:0; left:0; right:0; background:#1a1a1a; color:#eee; padding:1rem 1.5rem; border-top:1px solid #333; font-family: system-ui, sans-serif; font-size:0.9rem; z-index:9999; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:1rem;">
   <span>We use cookies for essential site function and, with your consent, for advertising. See our <a href="/privacy" style="color:#f0a500;">Privacy Policy</a>.</span>
@@ -2660,7 +2660,7 @@ async def reviews_page():
     return FileResponse("reviews_page.html", media_type="text/html")
 
 
-CONTACT_EMAIL = "kellyschliewe@gmail.com"
+CONTACT_EMAIL = "stemline101@gmail.com"
 
 CONTACT_HTML = """
 <!DOCTYPE html>
