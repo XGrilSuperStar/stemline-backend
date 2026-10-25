@@ -2162,8 +2162,64 @@ def download_stem_original(stem_id: int, token: str = None, db: Session = Depend
 # synth channel) can still be downloaded. New splits have five stems.
 STEM_INSTRUMENTS = {"vocals", "drums", "bass", "guitar", "piano", "other"}
 
+# ---- Tempo matching (every stem loaded into the mixer plays at one BPM) ----
+_BPM_CACHE = {}
+
+def _decode_mono(audio_bytes, sr=22050):
+    """Decode any audio bytes to a mono float32 numpy array via ffmpeg."""
+    import numpy as np
+    p = subprocess.run(
+        ["ffmpeg", "-v", "error", "-i", "pipe:0", "-f", "f32le", "-ac", "1", "-ar", str(sr), "pipe:1"],
+        input=audio_bytes, capture_output=True, timeout=120)
+    if p.returncode != 0 or not p.stdout:
+        raise RuntimeError("decode failed: " + p.stderr.decode(errors="ignore")[-200:])
+    return np.frombuffer(p.stdout, dtype=np.float32)
+
+def _detect_bpm(audio_list, sr=22050):
+    """Estimate BPM from one or more audio byte blobs (summed together)."""
+    import numpy as np, librosa
+    mix = None
+    for b in audio_list:
+        try:
+            y = _decode_mono(b, sr)
+        except Exception:
+            continue
+        if mix is None:
+            mix = y
+        else:
+            n = min(len(mix), len(y))
+            mix = mix[:n] + y[:n]
+    if mix is None or len(mix) < sr * 5:
+        return None
+    tempo, _ = librosa.beat.beat_track(y=mix, sr=sr)
+    tempo = float(np.atleast_1d(tempo)[0])
+    return tempo if tempo > 0 else None
+
+def _stretch_to_bpm(audio_bytes, ext, src_bpm, target_bpm):
+    """Pitch-preserving time-stretch so src_bpm plays at target_bpm."""
+    # Pick the half/double-time reading that needs the least stretching.
+    cands = [src_bpm, src_bpm * 2, src_bpm / 2]
+    src = min(cands, key=lambda c: abs(target_bpm / c - 1))
+    ratio = max(0.5, min(2.0, target_bpm / src))
+    if abs(ratio - 1) < 0.005:
+        return audio_bytes, ext
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        inp = os.path.join(td, "in." + ext)
+        out = os.path.join(td, "out.mp3")
+        with open(inp, "wb") as f:
+            f.write(audio_bytes)
+        r = subprocess.run(
+            ["ffmpeg", "-y", "-v", "error", "-i", inp, "-filter:a", f"atempo={ratio:.5f}",
+             "-vn", "-codec:a", "libmp3lame", "-q:a", "2", out],
+            capture_output=True, timeout=180)
+        if r.returncode != 0:
+            raise RuntimeError("stretch failed: " + r.stderr.decode(errors="ignore")[-200:])
+        with open(out, "rb") as f:
+            return f.read(), "mp3"
+
 @app.get("/api/v1/my-stems/{stem_id}/download/{instrument}")
-def download_stem_instrument(stem_id: int, instrument: str, token: str = None, db: Session = Depends(get_db)):
+def download_stem_instrument(stem_id: int, instrument: str, token: str = None, bpm: float = None, db: Session = Depends(get_db)):
     # A split saves all five instruments zipped together as one row. The mixer
     # channels each need just ONE instrument's audio, so this pulls a single
     # wav back out of that zip on demand instead of the whole bundle.
@@ -2187,6 +2243,7 @@ def download_stem_instrument(stem_id: int, instrument: str, token: str = None, d
             else:
                 with open(stem_row.zip_path, "rb") as f:
                     audio_bytes = f.read()
+            detect_blobs = [audio_bytes]
         else:
             # Newer splits store .mp3 inside the zip, older ones .wav —
             # check both so old saved splits still work. The zip itself
@@ -2206,6 +2263,18 @@ def download_stem_instrument(stem_id: int, instrument: str, token: str = None, d
                 if not match:
                     raise HTTPException(status_code=404, detail=f"No {instrument} track in this split.")
                 audio_bytes = zf.read(match)
+                # Detect the song's tempo from ALL its stems together so every
+                # stem of one song gets the identical stretch and stays in sync.
+                detect_blobs = [zf.read(n) for n in names if n.lower().endswith((".mp3", ".wav"))]
+        if bpm:
+            try:
+                if stem_id not in _BPM_CACHE:
+                    _BPM_CACHE[stem_id] = _detect_bpm(detect_blobs)
+                src_bpm = _BPM_CACHE[stem_id]
+                if src_bpm:
+                    audio_bytes, ext = _stretch_to_bpm(audio_bytes, ext, src_bpm, float(bpm))
+            except Exception as te:
+                logger.error(f"Tempo match skipped for stem {stem_id}: {te}")
         media_type = "audio/mpeg" if ext == "mp3" else "audio/wav"
         return Response(
             content=audio_bytes,

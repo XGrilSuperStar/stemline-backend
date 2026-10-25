@@ -2465,15 +2465,16 @@ async function loadBackendStemToChannel(channelKey, stemId, trackName, urlOverri
     }
     const url = urlOverride || (window.API_BASE + '/api/v1/my-stems/' + encodeURIComponent(stemId)
               + '/download/' + encodeURIComponent(channelKey)
-              + '?token=' + encodeURIComponent(getToken()));
+              + '?token=' + encodeURIComponent(getToken())
+              + '&bpm=' + BASE_BPM);
     const res = await fetch(url);
     if (!res.ok) throw new Error('Server returned ' + res.status);
     const arrayBuf = await res.arrayBuffer();
     const audioBuffer = await audioCtx.decodeAudioData(arrayBuf);
 
-    // Auto-stretch to 120 BPM disabled: it sped stems up so they ended
-    // before the playhead (loop-back bug) and forced granular pitch
-    // correction (underwater sound). Stems now play at native speed.
+    // Tempo matching now happens on the server: the stem arrives already
+    // time-stretched (pitch preserved) to BASE_BPM, with its real length
+    // changed, so no playbackRate trick is needed here.
     stemAutoStretch[channelKey] = 1;
 
     if (!originalStemBuffers[channelKey]) {
