@@ -1806,20 +1806,17 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
         with concurrent.futures.ThreadPoolExecutor(max_workers=_polish_workers) as _pool:
             list(_pool.map(_polish_stem, _polish_files))
 
-        # Bass cleaner (BASS_CLEANER=on) runs in the background AFTER the
-        # split is saved, so it adds no wait. Copy the bass stem out of the
-        # work dir now (the work dir is deleted below).
-        _bass_job = None
+        # Bass cleaner (BASS_CLEANER=on) runs right here in the split, on the
+        # bass stem as soon as it's separated, before the zip is built.
+        # (The BS-RoFormer second engine still runs hidden in the background
+        # after a stem is saved to the library.)
         try:
             import bass_cleaner
             if bass_cleaner.enabled():
                 for _bf in os.listdir(stem_dir):
                     if "bass" in _bf.lower():
-                        _bass_tmp_dir = os.path.join("/tmp", f"stemline_bass_{request_id}")
-                        os.makedirs(_bass_tmp_dir, exist_ok=True)
-                        _bass_tmp = os.path.join(_bass_tmp_dir, _bf)
-                        shutil.copy2(os.path.join(stem_dir, _bf), _bass_tmp)
-                        _bass_job = (_bass_tmp, _bf)
+                        _summary = bass_cleaner.run_loop(os.path.join(stem_dir, _bf))
+                        logger.info(f"[job {request_id}] Bass cleaner (in split): {_summary}")
                         break
         except Exception as bc_err:
             logger.warning(f"[job {request_id}] Bass cleaner skipped: {bc_err}")
@@ -1866,13 +1863,6 @@ def run_split_job(stem_id: int, request_id: str, upload_dir: str, file_path: str
             stem_record.status = "done"
             db.commit()
         logger.info(f"[job {request_id}] Stem split successful, saved as ID {stem_id}")
-
-        if _bass_job:
-            threading.Thread(
-                target=_bass_cleanup_job,
-                args=(request_id, zip_path, _bass_job[0], _bass_job[1]),
-                daemon=True,
-            ).start()
 
     except Exception as e:
         logger.error(f"[job {request_id}] Split error: {str(e)}", exc_info=True)
