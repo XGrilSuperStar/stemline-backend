@@ -2407,6 +2407,16 @@ TERMS_HTML = """
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="Stemline101 Terms of Service: the rules for using our AI stem separation and mixing tools.">
 <link rel="canonical" href="https://stemline101.com/terms">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Stemline101">
+<meta property="og:title" content="Terms of Service — Stemline101">
+<meta property="og:description" content="Stemline101 Terms of Service: the rules for using our AI stem separation and mixing tools.">
+<meta property="og:url" content="https://stemline101.com/terms">
+<meta property="og:image" content="https://stemline101.com/icon-512.png">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Terms of Service — Stemline101">
+<meta name="twitter:description" content="Stemline101 Terms of Service: the rules for using our AI stem separation and mixing tools.">
+<meta name="twitter:image" content="https://stemline101.com/icon-512.png">
 <style>
   body { background:#111; color:#eee; font-family: system-ui, sans-serif;
          max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem 4rem; line-height: 1.6; }
@@ -2501,6 +2511,16 @@ PRIVACY_HTML = """
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="Stemline101 Privacy Policy: what we collect, how we use it, and your choices.">
 <link rel="canonical" href="https://stemline101.com/privacy">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Stemline101">
+<meta property="og:title" content="Privacy Policy — Stemline101">
+<meta property="og:description" content="Stemline101 Privacy Policy: what we collect, how we use it, and your choices.">
+<meta property="og:url" content="https://stemline101.com/privacy">
+<meta property="og:image" content="https://stemline101.com/icon-512.png">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Privacy Policy — Stemline101">
+<meta name="twitter:description" content="Stemline101 Privacy Policy: what we collect, how we use it, and your choices.">
+<meta name="twitter:image" content="https://stemline101.com/icon-512.png">
 <style>
   body { background:#111; color:#eee; font-family: system-ui, sans-serif;
          max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem 4rem; line-height: 1.6; }
@@ -2585,6 +2605,16 @@ ABOUT_HTML = """
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="About Stemline101: a web app that splits songs into stems and lets you mix stems from different tracks.">
 <link rel="canonical" href="https://stemline101.com/about">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Stemline101">
+<meta property="og:title" content="About — Stemline101">
+<meta property="og:description" content="About Stemline101: a web app that splits songs into stems and lets you mix stems from different tracks.">
+<meta property="og:url" content="https://stemline101.com/about">
+<meta property="og:image" content="https://stemline101.com/icon-512.png">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="About — Stemline101">
+<meta name="twitter:description" content="About Stemline101: a web app that splits songs into stems and lets you mix stems from different tracks.">
+<meta name="twitter:image" content="https://stemline101.com/icon-512.png">
 <style>
   body { background:#111; color:#eee; font-family: system-ui, sans-serif;
          max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem 4rem; line-height: 1.6; }
@@ -2665,6 +2695,16 @@ FAQ_HTML = """
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="Answers to common questions about Stemline101: formats, pricing, stem separation, and using your stems.">
 <link rel="canonical" href="https://stemline101.com/faq">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Stemline101">
+<meta property="og:title" content="FAQ — Stemline101">
+<meta property="og:description" content="Answers to common questions about Stemline101: formats, pricing, stem separation, and using your stems.">
+<meta property="og:url" content="https://stemline101.com/faq">
+<meta property="og:image" content="https://stemline101.com/icon-512.png">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="FAQ — Stemline101">
+<meta name="twitter:description" content="Answers to common questions about Stemline101: formats, pricing, stem separation, and using your stems.">
+<meta name="twitter:image" content="https://stemline101.com/icon-512.png">
 <style>
   body { background:#111; color:#eee; font-family: system-ui, sans-serif;
          max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem 4rem; line-height: 1.6; }
@@ -2745,6 +2785,16 @@ CONTACT_HTML = """
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="Contact Stemline101 for support, feedback, or business questions.">
 <link rel="canonical" href="https://stemline101.com/contact">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Stemline101">
+<meta property="og:title" content="Contact — Stemline101">
+<meta property="og:description" content="Contact Stemline101 for support, feedback, or business questions.">
+<meta property="og:url" content="https://stemline101.com/contact">
+<meta property="og:image" content="https://stemline101.com/icon-512.png">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Contact — Stemline101">
+<meta name="twitter:description" content="Contact Stemline101 for support, feedback, or business questions.">
+<meta name="twitter:image" content="https://stemline101.com/icon-512.png">
 <style>
   body { background:#111; color:#eee; font-family: system-ui, sans-serif;
          max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem 6rem; line-height: 1.7; }

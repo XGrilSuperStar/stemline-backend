@@ -15,6 +15,16 @@ BASE = """<!DOCTYPE html>
 <title>%%TITLE%% — Stemline101</title>
 <meta name="description" content="%%DESC%%">
 <link rel="canonical" href="https://stemline101.com%%PATH%%">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Stemline101">
+<meta property="og:title" content="%%TITLE%%">
+<meta property="og:description" content="%%DESC%%">
+<meta property="og:url" content="https://stemline101.com%%PATH%%">
+<meta property="og:image" content="https://stemline101.com/icon-512.png">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="%%TITLE%%">
+<meta name="twitter:description" content="%%DESC%%">
+<meta name="twitter:image" content="https://stemline101.com/icon-512.png">
 <style>
   body { background:#111; color:#eee; font-family: system-ui, sans-serif;
          max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem 6rem; line-height: 1.7; }
