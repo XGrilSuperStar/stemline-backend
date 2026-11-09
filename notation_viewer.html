@@ -198,6 +198,15 @@
   .page-head { margin: 0 0 1rem; }
   footer.site-footer { padding: 3rem 2.5rem; text-align: center; color: rgba(237,227,206,0.4); font-size: 0.82rem; border-top: 1px solid rgba(237,227,206,0.08); font-family: 'JetBrains Mono', monospace; margin-top: 2rem; }
   @media (max-width: 700px) { nav.site-nav { padding: 0.8rem 1rem; row-gap: 0.6rem; } nav.site-nav .logo-text { font-size: 1.05rem; } nav.site-nav .links { gap: 1rem; } footer.site-footer { padding: 2rem 1rem; } }
+  /* About-this-tool text (AdSense content) */
+  .seo-text { max-width: 72ch; margin: 2.4rem 0 1rem; color: var(--chrome-dim); font-size: 0.92rem; line-height: 1.7; }
+  .seo-text h2 { font-family: 'Big Shoulders Stencil', sans-serif; font-weight: 800; font-size: 1.35rem; letter-spacing: 0.03em; text-transform: uppercase; color: var(--chrome); margin: 2rem 0 0.6rem; }
+  .seo-text h3 { font-size: 0.98rem; font-weight: 600; color: var(--chrome); margin: 1.2rem 0 0.3rem; }
+  .seo-text p { margin: 0 0 0.8rem; }
+  .seo-text ul, .seo-text ol { margin: 0 0 0.9rem; padding-left: 1.3rem; }
+  .seo-text li { margin: 0 0 0.35rem; }
+  .seo-text strong { color: var(--chrome); font-weight: 600; }
+  .seo-text a { color: var(--vu-amber); }
 </style>
 </head>
 <body>
@@ -249,6 +258,79 @@
 <div id="status"></div>
 <div id="info" class="info"></div>
 <div class="bezel"><div id="sheet"></div></div>
+<!-- seo-text -->
+<section class="seo-text" id="about-sheet-music">
+
+<h2>What the Sheet Music tool does</h2>
+<p>The Sheet Music tool in Stemline 101 listens to one stem from a song you have already split and writes out the notes it hears. Instead of guessing a bass line or a guitar part by ear, you can see it on the page and follow along while the stem plays. It is built for learning songs, checking a part, and getting a starting point you can edit in your own notation software.</p>
+<p>It works on the stems Stemline 101 creates, so you start by splitting a song on the <a href="/">main page</a>. After that, any of your split songs can be turned into notation.</p>
+
+<h2>Tempo, key and time signature</h2>
+<p>When the tool can detect them, small readouts above the sheet music show three things that help you play the part:</p>
+<ul>
+  <li><strong>Tempo (BPM)</strong> is the speed of the song in beats per minute. Use it to set a metronome and practice at the right pace. A higher number is faster, a lower number is slower.</li>
+  <li><strong>Key</strong> tells you which key the music is in, for example A minor or C major. Knowing the key helps you read the notes faster, choose scales that fit, and play along with other musicians.</li>
+  <li><strong>Time</strong> is the time signature, such as 4/4, which tells you how many beats are in each bar.</li>
+</ul>
+<p>Like the notes, these are detected automatically from the audio, so on a busy stem they can occasionally be off. If something sounds wrong, check it against the song by ear.</p>
+
+<h2>How to read bass tablature</h2>
+<p>Bass shows tablature only. Tablature is a simple map of the fretboard. Each line is one string of the bass, and each number tells you which fret to press on that string. A zero means you play the string open, with no finger on the fretboard. If you can find the string and the fret, you can play the note.</p>
+
+<h2>Which stems work best</h2>
+<p>Automatic note detection works best when there is one clear line of music to follow. That is why results vary from stem to stem.</p>
+<ul>
+  <li><strong>Bass:</strong> Usually the cleanest result. Bass parts tend to be one note at a time, which is easy to follow.</li>
+  <li><strong>Vocals:</strong> A lead vocal is a single melody, so it often turns out well. Backing vocals and harmonies layered on top can make it messier.</li>
+  <li><strong>Guitar:</strong> Single-note riffs and lead lines work better than thick strummed chords, where many notes sound at once.</li>
+  <li><strong>Other:</strong> This stem holds everything that is not drums, bass, vocals or guitar, such as keys and synths. Expect a mix, so treat it as a rough guide.</li>
+</ul>
+
+<h2>What to expect from the results</h2>
+<p>Notes are detected automatically, so expect some mistakes on busy stems. A wrong note, a missed note, or a rhythm that is slightly off can all happen, and the more instruments that bleed into a stem, the more that is likely. Think of the result as a strong first draft rather than a finished score. Listen while you read, fix anything that sounds wrong, and trust your ears over the page.</p>
+
+<h2>Tips for better results</h2>
+<ul>
+  <li>Start from the best audio file you have. A clean source gives cleaner stems, and cleaner stems give better notation.</li>
+  <li>Try the simplest part first. A bass line or a lead vocal is a good place to begin.</li>
+  <li>Play the stem while you read. Following along makes mistakes easy to spot.</li>
+  <li>Use the tempo readout to set a metronome, and start slower than the song until the part feels comfortable.</li>
+  <li>For a busy stem, use the notation as a map and check the tricky bars by ear.</li>
+</ul>
+
+<h2>What you can do with the music files</h2>
+<p>Premium members can download the result as MusicXML or MIDI. MusicXML is a standard format for sheet music. Notation programs such as MuseScore, Finale, Sibelius and Dorico can open it, so you can edit the notes, print the part, or share it with a bandmate. MIDI holds the notes as playable data. You can drop it into a music production program, choose any instrument sound, and hear the part played back.</p>
+
+<h2>Sheet music questions</h2>
+
+<h3>Does the tool show the BPM and key of the song?</h3>
+<p>Yes. When they can be detected, the tool shows the tempo in beats per minute, the key, and the time signature above the sheet music. They are detected automatically, so check them by ear on busy or unusual songs.</p>
+
+<h3>Why can't I make sheet music for drums?</h3>
+<p>Drums do not play pitched notes the way a bass or guitar does, so the tool does not write them out as notes. You can still split drums into their own stem and listen or play along.</p>
+
+<h3>Do I need to split a song first?</h3>
+<p>Yes. The tool works from your split songs. Split a song on the main page, then come here and pick it.</p>
+
+<h3>Is the sheet music always correct?</h3>
+<p>No. Notes are detected automatically, and busy stems can produce mistakes. Use it as a starting point and check it against what you hear.</p>
+
+<h3>Why does the bass show numbers instead of notes?</h3>
+<p>Bass is shown as tablature. Each line is a string, and each number is the fret to press. Zero means an open string.</p>
+
+<h3>Can I use this for free?</h3>
+<p>Yes, free accounts get 2 short previews a month. Premium unlocks the full chart and the MusicXML and MIDI downloads.</p>
+
+<h3>What can I open the downloads in?</h3>
+<p>MusicXML opens in common notation software such as MuseScore, Finale, Sibelius and Dorico. MIDI opens in music production programs and many other music tools.</p>
+
+<h3>Can I use sheet music from songs I do not own?</h3>
+<p>Splitting a song or writing out its notes does not give you rights to the music. Use it for practice and learning, and get permission before sharing or selling anything made from someone else's song.</p>
+
+<p>Ready to try it? <a href="/">Split a song on the main page</a>, then come back here to turn a stem into sheet music. You can also read our <a href="/guides/practice-along-with-stems">guide to practicing along with stems</a>.</p>
+
+</section>
+<!-- /seo-text -->
 </main>
 <footer class="site-footer">
   <div style="display: flex; gap: 1.2rem; justify-content: center; flex-wrap: wrap;">
