@@ -24,6 +24,10 @@ INSTRUMENT_SETTINGS = {
                "onset": 0.55, "frame": 0.35, "min_ms": 100, "vel": 0.3},
     "guitar": {"fmin": 80.0, "fmax": 1400.0, "mono": False, "title": "Guitar",
                "onset": 0.5, "frame": 0.3, "min_ms": 100, "vel": 0.25},
+    # a solo voice recorded on purpose (hum / sing / whistle): no band bleed,
+    # so thresholds can be gentler than for a separated vocal stem
+    "hum":    {"fmin": 65.0, "fmax": 1400.0, "mono": True,  "title": "Voice",
+               "onset": 0.45, "frame": 0.3, "min_ms": 90, "vel": 0.25},
     "piano":  {"fmin": 27.0, "fmax": 4200.0, "mono": False, "title": "Keys / Synth",
                "onset": 0.5, "frame": 0.3, "min_ms": 100, "vel": 0.25},
     "other":  {"fmin": None, "fmax": None,   "mono": False, "title": "Other",

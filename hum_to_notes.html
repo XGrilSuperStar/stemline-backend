@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Hum, sing or whistle a tune and Stemline 101 writes down the notes. Free preview, full chart and MIDI download with Premium.">
+<title>Hum to Notes — Stemline101</title>
+<link rel="canonical" href="https://stemline101.com/hum-to-notes">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Stemline101">
+<meta property="og:title" content="Hum to Notes — Stemline101">
+<meta property="og:description" content="Hum, sing or whistle a tune and Stemline 101 writes down the notes. Free preview, full chart and MIDI download with Premium.">
+<meta property="og:url" content="https://stemline101.com/hum-to-notes">
+<meta property="og:image" content="https://stemline101.com/icon-512.png">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Hum to Notes — Stemline101">
+<meta name="twitter:description" content="Hum, sing or whistle a tune and Stemline 101 writes down the notes. Free preview, full chart and MIDI download with Premium.">
+<meta name="twitter:image" content="https://stemline101.com/icon-512.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil:wght@700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.8.9/build/opensheetmusicdisplay.min.js"></script>
+<style>
+  :root {
+    --void: #0B0B0D;
+    --concrete: #17171A;
+    --concrete-line: rgba(216,220,226,0.14);
+    --chrome: #D8DCE2;
+    --chrome-dim: rgba(216,220,226,0.55);
+    --steel: #6B7078;
+    --ember: #B8562E;
+    --vu-amber: #E7A33E;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh;
+    background: var(--void); color: var(--chrome);
+    font-family: 'Inter', system-ui, sans-serif; line-height: 1.5;
+  }
+
+  /* Top bar: title left, Stemline logo right */
+  header {
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    padding: 0.9rem 1.5rem;
+    background:
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.018) 0 1px, transparent 1px 3px),
+      linear-gradient(180deg, #1d1d21, #121214);
+    border-bottom: 1px solid var(--concrete-line);
+    position: relative;
+  }
+  header::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+    background: linear-gradient(90deg, var(--vu-amber), var(--ember) 40%, transparent 85%);
+  }
+  .tag {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--vu-amber);
+  }
+  h1 {
+    margin: 0.1rem 0 0;
+    font-family: 'Big Shoulders Stencil', sans-serif; font-weight: 800;
+    font-size: 1.7rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--chrome);
+  }
+  .logo { display: flex; align-items: center; gap: 10px; margin-left: auto; text-decoration: none; }
+  .logo-mark { width: 38px; height: 38px; flex-shrink: 0; }
+  .logo-mark svg { display: block; width: 100%; height: 100%; }
+  .logo-text {
+    font-family: 'Big Shoulders Stencil', sans-serif; font-weight: 800; font-size: 1.35rem;
+    letter-spacing: 0.05em; text-transform: uppercase; color: var(--chrome);
+  }
+
+  .back {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; font-weight: 700;
+    letter-spacing: 0.06em; text-transform: uppercase; text-decoration: none;
+    color: var(--vu-amber); border: 1px solid rgba(231,163,62,0.55); border-radius: 4px;
+    padding: 0.55rem 0.9rem; margin-left: auto; white-space: nowrap;
+    background: linear-gradient(180deg, rgba(231,163,62,0.12), rgba(231,163,62,0.04));
+  }
+  .back:hover { background: rgba(231,163,62,0.2); }
+  .back + .logo { margin-left: 0; }
+
+  .intro { margin: 0 0 0.4rem; }
+  .intro h2 {
+    margin: 0 0 0.25rem; font-family: 'Big Shoulders Stencil', sans-serif; font-weight: 700;
+    font-size: 1.25rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--chrome);
+  }
+  .intro p { margin: 0 0 0.7rem; color: var(--chrome-dim); font-size: 0.92rem; max-width: 62ch; }
+  .howto { margin: 0 0 0.8rem; padding-left: 1.3rem; max-width: 62ch; color: var(--chrome-dim); font-size: 0.88rem; line-height: 1.5; }
+  .howto li { margin: 0 0 0.2rem; padding-left: 0.2rem; }
+  .howto b { color: var(--chrome); font-weight: 600; }
+  .facts { display: flex; flex-wrap: wrap; gap: 0.5rem; list-style: none; margin: 0; padding: 0; }
+  .facts li {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; letter-spacing: 0.03em;
+    color: var(--chrome-dim); background: #0e0e10; border: 1px solid var(--concrete-line);
+    border-radius: 999px; padding: 0.3rem 0.75rem;
+  }
+  .facts li::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 0.5rem;
+    border-radius: 50%; background: var(--vu-amber); vertical-align: middle; }
+  .field { display: flex; flex-direction: column; gap: 0.3rem; }
+  .field > span {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--vu-amber);
+  }
+  .row { align-items: flex-end; }
+  #sheet:empty::before {
+    content: 'Your sheet music will appear here.'; display: block; padding: 2.2rem 0;
+    text-align: center; color: #8a8f98; font-size: 0.9rem;
+  }
+
+  main { max-width: 1100px; margin: 0 auto; padding: 1.25rem 1.5rem 3rem; }
+  .note { color: var(--chrome-dim); font-size: 0.88rem; max-width: 70ch; margin: 0 0 1rem; }
+
+  /* Control panel: brushed-metal plate */
+  .row {
+    display: flex; flex-wrap: wrap; gap: 0.7rem; align-items: center;
+    padding: 0.9rem 1rem; margin: 1rem 0;
+    background:
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.02) 0 1px, transparent 1px 3px),
+      linear-gradient(180deg, #1f1f23, #141416);
+    border: 1px solid var(--concrete-line); border-radius: 6px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 6px 18px rgba(0,0,0,0.45);
+  }
+  select, button {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; letter-spacing: 0.03em;
+    border-radius: 4px; padding: 0.6rem 0.9rem;
+  }
+  select {
+    background: #0e0e10; color: var(--chrome);
+    border: 1px solid var(--concrete-line);
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.6);
+    min-width: 180px;
+  }
+  select:focus, button:focus-visible { outline: 2px solid var(--vu-amber); outline-offset: 1px; }
+  button {
+    cursor: pointer; font-weight: 700; text-transform: uppercase;
+    background: linear-gradient(180deg, #f0b250, var(--vu-amber) 55%, #c98a2c);
+    color: #1a1204; border: 1px solid #8a5d17;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 2px 6px rgba(0,0,0,0.5);
+  }
+  button:hover:not(:disabled) { filter: brightness(1.08); }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button.secondary {
+    background:
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.03) 0 1px, transparent 1px 3px),
+      linear-gradient(180deg, #2a2a2f, #1a1a1d);
+    color: var(--chrome); border: 1px solid var(--concrete-line); font-weight: 500;
+  }
+  button:disabled, select:disabled { opacity: 0.4; cursor: default; }
+
+  /* Status readout */
+  #status {
+    min-height: 1.6em; padding: 0.35rem 0.7rem; margin-bottom: 0.9rem;
+    font-family: 'JetBrains Mono', monospace; font-size: 0.78rem;
+    color: var(--vu-amber); background: #0e0e10;
+    border-left: 3px solid var(--ember); border-radius: 2px;
+  }
+  #status:empty { opacity: 0; }
+
+  /* Tempo / key / time readout */
+  .info { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 0 0 0.9rem; }
+  .info:empty { display: none; }
+  .chip {
+    display: flex; flex-direction: column; gap: 0.1rem; min-width: 110px;
+    padding: 0.5rem 0.9rem; background: #0e0e10; border: 1px solid var(--concrete-line);
+    border-left: 3px solid var(--vu-amber); border-radius: 3px;
+  }
+  .chip span { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--chrome-dim); }
+  .chip b { font-family: 'Big Shoulders Stencil', sans-serif; font-size: 1.5rem; letter-spacing: 0.04em; color: var(--vu-amber); font-weight: 800; line-height: 1.1; }
+
+  /* Sheet: white paper in a metal bezel */
+  .bezel {
+    padding: 10px; border-radius: 8px;
+    background:
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.03) 0 1px, transparent 1px 3px),
+      linear-gradient(180deg, #2a2a2f, #131315);
+    border: 1px solid var(--concrete-line);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06);
+  }
+  #sheet { background: #fff; color: #111; border-radius: 3px; padding: 1rem; min-height: 140px; }
+
+  @media (max-width: 640px) {
+    header { padding: 0.8rem 1rem; flex-wrap: wrap; }
+    .back { order: 3; margin-left: 0; }
+    h1 { font-size: 1.25rem; }
+    .logo-text { font-size: 1.05rem; }
+    main { padding: 1rem; }
+    select { min-width: 0; flex: 1 1 100%; }
+  }
+
+  /* ===== site header/footer: same as the landing page ===== */
+  nav.site-nav { display: flex; justify-content: space-between; align-items: center; padding: 1.4rem 2.5rem; background: var(--void, #0E1013); border-bottom: 1px solid var(--concrete-line); position: relative; flex-wrap: wrap; row-gap: 0.9rem; }
+  nav.site-nav::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--ember); }
+  nav.site-nav .logo { display: flex; align-items: center; gap: 10px; margin-left: 0; text-decoration: none; }
+  nav.site-nav .logo-mark { width: 30px; height: 30px; border-radius: 50%; display: block; flex-shrink: 0; }
+  nav.site-nav .logo-text { font-family: 'Big Shoulders Stencil', sans-serif; font-weight: 800; font-size: 1.25rem; letter-spacing: 0.03em; color: var(--chrome); text-transform: uppercase; }
+  nav.site-nav .links { display: flex; gap: 1.8rem; font-size: 0.85rem; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.02em; }
+  nav.site-nav .links a { color: var(--chrome-dim); text-decoration: none; }
+  nav.site-nav .links a:hover, nav.site-nav .links a.here { color: var(--chrome); }
+  .page-head { margin: 0 0 1rem; }
+  footer.site-footer { padding: 3rem 2.5rem; text-align: center; color: rgba(237,227,206,0.4); font-size: 0.82rem; border-top: 1px solid rgba(237,227,206,0.08); font-family: 'JetBrains Mono', monospace; margin-top: 2rem; }
+  @media (max-width: 700px) { nav.site-nav { padding: 0.8rem 1rem; row-gap: 0.6rem; } nav.site-nav .logo-text { font-size: 1.05rem; } nav.site-nav .links { gap: 1rem; } footer.site-footer { padding: 2rem 1rem; } }
+  /* About-this-tool text (AdSense content) */
+  .seo-text { max-width: 72ch; margin: 2.4rem 0 1rem; color: var(--chrome-dim); font-size: 0.92rem; line-height: 1.7; }
+  .seo-text h2 { font-family: 'Big Shoulders Stencil', sans-serif; font-weight: 800; font-size: 1.35rem; letter-spacing: 0.03em; text-transform: uppercase; color: var(--chrome); margin: 2rem 0 0.6rem; }
+  .seo-text h3 { font-size: 0.98rem; font-weight: 600; color: var(--chrome); margin: 1.2rem 0 0.3rem; }
+  .seo-text p { margin: 0 0 0.8rem; }
+  .seo-text ul, .seo-text ol { margin: 0 0 0.9rem; padding-left: 1.3rem; }
+  .seo-text li { margin: 0 0 0.35rem; }
+  .seo-text strong { color: var(--chrome); font-weight: 600; }
+  .seo-text a { color: var(--vu-amber); }
+
+  .recbtn { background: linear-gradient(180deg, #e0603a, var(--ember) 55%, #8f3f20); color: #fff; border-color: #6a2e17; }
+  .recbtn.live { animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { filter: brightness(1.35); } }
+  #meter { width: 140px; height: 10px; background: #0e0e10; border: 1px solid var(--concrete-line); border-radius: 5px; overflow: hidden; }
+  #meter i { display: block; height: 100%; width: 0; background: var(--vu-amber); transition: width .06s; }
+  audio { height: 36px; }
+</style>
+</head>
+<body>
+<nav class="site-nav">
+  <a class="logo" href="/" aria-label="Stemline101 home">
+    <span class="logo-mark">
+      <svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="display:block;width:100%;height:100%;">
+        <defs><linearGradient id="waveGrad" gradientUnits="userSpaceOnUse" x1="30" y1="110" x2="190" y2="110"><stop offset="0%" stop-color="#FFB020"/><stop offset="100%" stop-color="#3CFDE0"/></linearGradient></defs>
+        <circle cx="110" cy="110" r="98" fill="#0E1013"/>
+        <circle cx="110" cy="110" r="98" fill="none" stroke="#3ab6ff" stroke-width="4" opacity="0.6"/>
+        <g stroke="url(#waveGrad)" stroke-width="10" stroke-linecap="round" fill="none"><line x1="40" y1="110" x2="40" y2="110"/><line x1="60" y1="90" x2="60" y2="130"/><line x1="80" y1="65" x2="80" y2="155"/><line x1="100" y1="100" x2="100" y2="120"/><line x1="120" y1="45" x2="120" y2="175"/><line x1="140" y1="80" x2="140" y2="140"/><line x1="160" y1="95" x2="160" y2="125"/><line x1="180" y1="105" x2="180" y2="115"/></g>
+      </svg>
+    </span>
+    <span class="logo-text">STEMLINE 101</span>
+  </a>
+  <div class="links"><a href="/">Mixer</a><a href="/sampler">Sampler</a><a href="/notation-viewer">Sheet music</a><a href="/hum-to-notes" class="here">Hum to notes</a></div>
+</nav>
+
+
+<main>
+<div class="page-head"><div class="tag">Voice to notation</div><h1>Hum to notes</h1></div>
+<section class="intro">
+  <h2>Hum, sing or whistle a tune and see the notes</h2>
+  <ol class="howto">
+    <li><b>Log in</b> on the main page first.</li>
+    <li><b>Record.</b> Press Record, then hum, sing or whistle one note at a time. Stay close to the mic and keep it under a minute.</li>
+    <li><b>Or upload</b> a recording of your voice instead.</li>
+    <li><b>Press Show notes.</b> It listens and writes out the melody with tempo and key.</li>
+    <li><b>Download (Premium).</b> Save the melody as MIDI or MusicXML to drop into FL Studio or any notation software.</li>
+  </ol>
+  <ul class="facts">
+    <li>Works best on one voice, one note at a time, in a quiet room</li>
+    <li>Free: on-screen preview</li>
+    <li>Premium: full chart + MIDI &amp; MusicXML downloads</li>
+  </ul>
+</section>
+
+<div class="row">
+  <button id="rec" class="recbtn">&#9679; Record</button>
+  <div id="meter"><i></i></div>
+  <label class="field"><span>Or upload a recording</span><input type="file" id="file" accept="audio/*"></label>
+  <audio id="player" controls hidden></audio>
+</div>
+<div class="row">
+  <button id="go" disabled>Show notes</button>
+  <button id="dlxml" class="secondary" disabled>Download MusicXML</button>
+  <button id="dlmidi" class="secondary" disabled>Download MIDI</button>
+</div>
+<div id="status"></div>
+<div id="info" class="info"></div>
+<div class="bezel"><div id="sheet"></div></div>
+
+<section class="seo-text" id="about-hum-to-notes">
+<h2>What Hum to Notes does</h2>
+<p>Hum to Notes listens to a short recording of your voice and writes down the melody you sang. It is a quick way to capture a tune that is stuck in your head, sketch a hook before you forget it, or turn a vocal idea into a MIDI part for your music program. Hum, sing, or whistle, and you get sheet music with the tempo and key, plus a MIDI file you can open in a DAW such as FL Studio.</p>
+
+<h2>Tips for better results</h2>
+<ul>
+  <li>Record in a quiet room with no music playing behind you.</li>
+  <li>Sing or hum one clear note at a time. Slide between notes as little as you can.</li>
+  <li>Use "doo" or "la" instead of a long hum, so each note has a clear start.</li>
+  <li>Keep a steady pace. A short pause before you start helps.</li>
+  <li>Stay under a minute. Short phrases give the cleanest result.</li>
+</ul>
+
+<h2>Hum to Notes questions</h2>
+<h3>Does it work with more than one voice?</h3>
+<p>No. It follows a single melody line. Chords, harmonies and backing music will confuse it.</p>
+<h3>Why are some notes wrong?</h3>
+<p>Notes are detected automatically from the sound of your voice, so a wobbly pitch or a noisy room can cause mistakes. Treat the result as a first draft and fix anything that sounds off.</p>
+<h3>Can I use this for free?</h3>
+<p>Yes. Free accounts see the first few measures on screen. Premium unlocks the full chart and the MIDI and MusicXML downloads.</p>
+<h3>What can I open the downloads in?</h3>
+<p>MIDI opens in music production programs. MusicXML opens in notation software such as MuseScore, Finale, Sibelius and Dorico.</p>
+<p>Want to write out the parts of a full song instead? <a href="/">Split a song on the main page</a> and use <a href="/notation-viewer">Sheet music</a>.</p>
+</section>
+</main>
+<footer class="site-footer">
+  <div style="display: flex; gap: 1.2rem; justify-content: center; flex-wrap: wrap;">
+    <a href="/privacy" style="color: inherit; text-decoration: underline;">Privacy Policy</a>
+    <a href="/terms" style="color: inherit; text-decoration: underline;">Terms of Service</a>
+    <a href="/about" style="color: inherit; text-decoration: underline;">About</a>
+    <a href="/faq" style="color: inherit; text-decoration: underline;">FAQ</a>
+    <a href="/guides" style="color: inherit; text-decoration: underline;">Guides</a>
+    <a href="/contact" style="color: inherit; text-decoration: underline;">Contact</a>
+  </div>
+  <div style="margin-top: 0.8rem;">&copy; 2026 stemline101.com. All rights reserved.</div>
+</footer>
+
+
+
+
+<script>
+(function () {
+  var token = null;
+  try { token = localStorage.getItem('soundlounge101_token'); } catch (e) {}
+  var $ = function (id) { return document.getElementById(id); };
+  var statusEl = $('status'), infoEl = $('info'), recBtn = $('rec'), goBtn = $('go'),
+      xmlBtn = $('dlxml'), midiBtn = $('dlmidi'), player = $('player'), meter = $('meter').firstChild;
+  var osmd = null, wavBlob = null, ctx = null, stream = null, proc = null, chunks = [], recRate = 44100, recording = false, timer = null;
+
+  function setStatus(t) { statusEl.textContent = t || ''; }
+  function save(blob, name) {
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+  function showInfo(xml, bpm) {
+    var key = (xml.match(/Key:\s*([A-G][b#]?\s+(?:major|minor))/) || [])[1];
+    var beats = (xml.match(/<beats>(\d+)<\/beats>/) || [])[1], bt = (xml.match(/<beat-type>(\d+)<\/beat-type>/) || [])[1];
+    var h = '';
+    if (bpm) h += '<div class="chip"><span>Tempo</span><b>' + Math.round(bpm) + ' BPM</b></div>';
+    if (key) h += '<div class="chip"><span>Key</span><b>' + key + '</b></div>';
+    if (beats && bt) h += '<div class="chip"><span>Time</span><b>' + beats + '/' + bt + '</b></div>';
+    infoEl.innerHTML = h;
+  }
+
+  // ---- WAV encoding (mono, 22.05 kHz, 16-bit) so the server never needs to decode browser formats
+  function toWav(samples, rate) {
+    var target = 22050, ratio = rate / target, n = Math.floor(samples.length / ratio), out = new Int16Array(n);
+    for (var i = 0; i < n; i++) {
+      var a = Math.floor(i * ratio), b = Math.min(samples.length, Math.floor((i + 1) * ratio)), sum = 0, c = 0;
+      for (var j = a; j < b; j++) { sum += samples[j]; c++; }
+      var v = c ? sum / c : 0; v = Math.max(-1, Math.min(1, v));
+      out[i] = v < 0 ? v * 0x8000 : v * 0x7fff;
+    }
+    var buf = new ArrayBuffer(44 + out.length * 2), dv = new DataView(buf);
+    function str(o, s) { for (var k = 0; k < s.length; k++) dv.setUint8(o + k, s.charCodeAt(k)); }
+    str(0, 'RIFF'); dv.setUint32(4, 36 + out.length * 2, true); str(8, 'WAVE'); str(12, 'fmt ');
+    dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+    dv.setUint32(24, target, true); dv.setUint32(28, target * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+    str(36, 'data'); dv.setUint32(40, out.length * 2, true);
+    for (var m = 0; m < out.length; m++) dv.setInt16(44 + m * 2, out[m], true);
+    return new Blob([buf], { type: 'audio/wav' });
+  }
+  function ready(blob) {
+    wavBlob = blob; player.src = URL.createObjectURL(blob); player.hidden = false;
+    goBtn.disabled = !token; setStatus(token ? 'Ready. Press Show notes.' : 'Log in on the main page first.');
+  }
+
+  async function startRec() {
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }); }
+    catch (e) { setStatus('Could not use the microphone. Allow mic access in your browser, or upload a recording instead.'); return; }
+    ctx = new (window.AudioContext || window.webkitAudioContext)(); recRate = ctx.sampleRate; chunks = [];
+    var src = ctx.createMediaStreamSource(stream);
+    proc = ctx.createScriptProcessor(4096, 1, 1);
+    proc.onaudioprocess = function (e) {
+      var d = e.inputBuffer.getChannelData(0); chunks.push(new Float32Array(d));
+      var peak = 0; for (var i = 0; i < d.length; i += 8) peak = Math.max(peak, Math.abs(d[i]));
+      meter.style.width = Math.min(100, peak * 140) + '%';
+    };
+    src.connect(proc); proc.connect(ctx.destination);
+    recording = true; recBtn.classList.add('live'); recBtn.innerHTML = '&#9632; Stop';
+    var t0 = Date.now(); setStatus('Recording… hum, sing or whistle.');
+    timer = setInterval(function () {
+      var s = Math.round((Date.now() - t0) / 1000); setStatus('Recording… ' + s + 's');
+      if (s >= 60) stopRec();
+    }, 250);
+  }
+  function stopRec() {
+    if (!recording) return; recording = false; clearInterval(timer);
+    proc.disconnect(); stream.getTracks().forEach(function (t) { t.stop(); }); ctx.close();
+    recBtn.classList.remove('live'); recBtn.innerHTML = '&#9679; Record'; meter.style.width = '0';
+    var len = chunks.reduce(function (a, c) { return a + c.length; }, 0), all = new Float32Array(len), o = 0;
+    chunks.forEach(function (c) { all.set(c, o); o += c.length; });
+    if (len < recRate * 0.5) { setStatus('That was too short. Try again.'); return; }
+    ready(toWav(all, recRate));
+  }
+  recBtn.addEventListener('click', function () { recording ? stopRec() : startRec(); });
+
+  $('file').addEventListener('change', async function (e) {
+    var f = e.target.files[0]; if (!f) return;
+    setStatus('Reading your file…');
+    try {
+      var ac = new (window.AudioContext || window.webkitAudioContext)();
+      var buf = await ac.decodeAudioData(await f.arrayBuffer());
+      var ch = buf.getChannelData(0), n = Math.min(ch.length, Math.floor(buf.sampleRate * 60));
+      ready(toWav(ch.subarray(0, n), buf.sampleRate)); ac.close();
+    } catch (err) { setStatus('Could not read that file. Try a WAV or MP3.'); }
+  });
+
+  goBtn.addEventListener('click', async function () {
+    if (!wavBlob) return;
+    goBtn.disabled = true; xmlBtn.disabled = true; midiBtn.disabled = true; infoEl.innerHTML = '';
+    setStatus('Listening and writing out the notes… this can take a minute.');
+    try {
+      var fd = new FormData(); fd.append('file', wavBlob, 'voice.wav');
+      var r = await fetch('/api/v1/hum-to-notes?token=' + encodeURIComponent(token), { method: 'POST', body: fd });
+      if (!r.ok) { var msg = 'Something went wrong.'; try { msg = (await r.json()).detail || msg; } catch (e) {} throw new Error(msg); }
+      var d = await r.json();
+      if (!osmd) osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay('sheet', { autoResize: true, drawTitle: true });
+      await osmd.load(d.musicxml); osmd.render(); showInfo(d.musicxml, d.bpm);
+      xmlBtn.disabled = false; midiBtn.disabled = false;
+      if (d.preview) {
+        setStatus('Free preview: first 8 measures only. Upgrade to Premium for the full chart and downloads.');
+        var msg2 = 'MIDI and MusicXML downloads are a Premium feature.';
+        xmlBtn.onclick = midiBtn.onclick = function () { setStatus(msg2); alert(msg2); };
+      } else {
+        setStatus('Done. ' + d.note_count + ' notes found.');
+        xmlBtn.onclick = function () { save(new Blob([d.musicxml], { type: 'application/xml' }), 'hum.musicxml'); };
+        midiBtn.onclick = function () {
+          var b = atob(d.midi_b64), u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i);
+          save(new Blob([u], { type: 'audio/midi' }), 'hum.mid');
+        };
+      }
+    } catch (e) { setStatus(e.message); }
+    goBtn.disabled = false;
+  });
+
+  if (!token) setStatus('Log in on the main page first.');
+})();
+</script>
+</body>
+</html>

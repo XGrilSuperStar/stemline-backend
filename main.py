@@ -12,6 +12,8 @@ import uuid
 import json
 import concurrent.futures
 import threading
+import base64
+from starlette.concurrency import run_in_threadpool
 import time
 from datetime import datetime, timedelta
 import jwt
@@ -2857,6 +2859,7 @@ async def sitemap_xml():
     ] + [f"guides/{s}" for s in MORE_GUIDE_SLUGS]
     if NOTATION_ENABLED:
         pages.insert(6, "notation-viewer")
+        pages.insert(7, "hum-to-notes")
     urls = "".join(
         f"  <url><loc>https://stemline101.com/{p}</loc></url>\n" for p in pages
     )
@@ -2986,6 +2989,50 @@ def stem_notation(stem_id: int, instrument: str, fmt: str = "musicxml", token: s
                         headers={"Content-Disposition": f'attachment; filename="{base}.mid"'})
     return Response(content=result["musicxml"], media_type="application/vnd.recordare.musicxml+xml",
                     headers={"Content-Disposition": f'inline; filename="{base}.musicxml"'})
+
+
+@app.post("/api/v1/hum-to-notes")
+async def hum_to_notes(file: UploadFile = File(...), token: str = None, db: Session = Depends(get_db)):
+    """Turn a short voice recording (hum / sing / whistle) into notes.
+    The browser sends a WAV. Free users get an on-screen preview; the MIDI
+    and full chart are Premium, same as stem sheet music."""
+    if not NOTATION_ENABLED:
+        raise HTTPException(status_code=404, detail="Not Found")
+    user_id = get_current_user(token)
+    user = db.query(User).filter(User.id == user_id).first()
+    premium = effective_is_premium(db, user)
+    audio = await file.read()
+    if not audio:
+        raise HTTPException(status_code=400, detail="That recording is empty.")
+    if len(audio) > 15 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="That recording is too long. Keep it under about a minute.")
+    try:
+        import notation
+        result = await run_in_threadpool(notation.transcribe, audio, "wav", "hum")
+    except ImportError:
+        raise HTTPException(status_code=503, detail="The notes engine isn't installed on this server.")
+    except notation.NotationError:
+        raise HTTPException(status_code=422, detail="No clear notes were found. Try humming one steady note at a time, closer to the mic.")
+    except Exception as e:
+        logger.error(f"Hum-to-notes error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Could not turn that recording into notes.")
+    xml = result["musicxml"]
+    if not premium:
+        xml = notation.preview(xml, FREE_NOTATION_MEASURES)
+    return {
+        "musicxml": xml,
+        "midi_b64": base64.b64encode(result["midi"]).decode() if premium else None,
+        "bpm": result["bpm"],
+        "note_count": result["note_count"],
+        "preview": not premium,
+    }
+
+
+@app.get("/hum-to-notes", response_class=HTMLResponse)
+async def hum_to_notes_page():
+    if not NOTATION_ENABLED:
+        raise HTTPException(status_code=404, detail="Not Found")
+    return FileResponse("hum_to_notes.html", media_type="text/html")
 
 
 @app.get("/sampler", response_class=HTMLResponse)
