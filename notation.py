@@ -630,6 +630,13 @@ def transcribe(audio_bytes, ext, instrument):
     _merge_same_pitch(midi)
     if settings["mono"]:
         _make_monophonic(midi)
+    # Download MIDI keeps the performance's real timing (no grid snapping, no
+    # leading rest); only the sheet music below is quantized.
+    for inst in midi.instruments:
+        inst.name = settings["title"]
+    raw_buf = io.BytesIO()
+    midi.write(raw_buf)
+    raw_midi_bytes = raw_buf.getvalue()
     onsets = [n.start for i in midi.instruments for n in i.notes]
     bpm = _refine_bpm(onsets, prior)
     beats, downbeat = _detect_meter(midi, bpm)
@@ -654,7 +661,7 @@ def transcribe(audio_bytes, ext, instrument):
     xml = _midi_to_musicxml(midi_bytes, settings["title"], bpm, beats)
     # notation staff with the tablature staff underneath; no note-letter labels
     xml = _add_tablature(xml, instrument)
-    return {"midi": midi_bytes, "musicxml": xml, "bpm": bpm, "note_count": note_count}
+    return {"midi": raw_midi_bytes, "musicxml": xml, "bpm": bpm, "note_count": note_count}
 
 
 def preview(xml, max_measures=8):
