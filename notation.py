@@ -639,6 +639,10 @@ def transcribe(audio_bytes, ext, instrument):
     else:
         _force_chord_line(midi)
 
+    # Name the track so DAWs (FL Studio's import dialog) list it instead of a blank row.
+    for inst in midi.instruments:
+        inst.name = settings["title"]
+
     note_count = sum(len(i.notes) for i in midi.instruments)
     if note_count == 0:
         raise NotationError("No notes were detected in this stem.")
