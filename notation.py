@@ -136,6 +136,19 @@ def _make_monophonic(midi):
         inst.notes = kept
 
 
+def _ensure_gap(midi, gap=0.04, min_len=0.06):
+    """End a note a little early when it touches the next one, so a small rest
+    always shows between notes in the downloaded MIDI."""
+    for inst in midi.instruments:
+        notes = sorted(inst.notes, key=lambda n: n.start)
+        for a, b in zip(notes, notes[1:]):
+            room = b.start - a.end
+            if room < gap:
+                new_end = b.start - gap
+                if new_end - a.start >= min_len:
+                    a.end = new_end
+
+
 def _collapse_slides(midi, max_gap=0.06, short=0.16):
     """A sung slide between two notes makes the detector write a staircase of
     short notes one or two semitones apart. Fold each such short note into its
@@ -752,8 +765,12 @@ def transcribe(audio_bytes, ext, instrument):
     # leading rest); only the sheet music below is quantized.
     for inst in midi.instruments:
         inst.name = settings["title"]
+    import copy
+    out_midi = copy.deepcopy(midi)
+    if settings["mono"]:
+        _ensure_gap(out_midi)
     raw_buf = io.BytesIO()
-    midi.write(raw_buf)
+    out_midi.write(raw_buf)
     raw_midi_bytes = raw_buf.getvalue()
     onsets = [n.start for i in midi.instruments for n in i.notes]
     bpm = _refine_bpm(onsets, prior)
