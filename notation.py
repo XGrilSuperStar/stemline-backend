@@ -27,7 +27,8 @@ INSTRUMENT_SETTINGS = {
     # a solo voice recorded on purpose (hum / sing / whistle): no band bleed,
     # so thresholds can be gentler than for a separated vocal stem
     "hum":    {"fmin": 65.0, "fmax": 1400.0, "mono": True,  "title": "Voice",
-               "onset": 0.45, "frame": 0.3, "min_ms": 90, "vel": 0.25},
+               "onset": 0.45, "frame": 0.3, "min_ms": 90, "vel": 0.25,
+               "dip_split": True},
     "piano":  {"fmin": 27.0, "fmax": 4200.0, "mono": False, "title": "Keys / Synth",
                "onset": 0.5, "frame": 0.3, "min_ms": 100, "vel": 0.25},
     "other":  {"fmin": None, "fmax": None,   "mono": False, "title": "Other",
@@ -133,6 +134,55 @@ def _make_monophonic(midi):
             if a.end > b.start:
                 a.end = b.start
         inst.notes = kept
+
+
+def _split_on_volume_dips(midi, rms, hop_s, depth=0.5, min_part=0.08):
+    """The pitch model can't tell two sung notes of the SAME pitch apart ("la la
+    la" comes out as one long note). The volume can: between repeated notes the
+    voice dips. Split a note wherever the loudness falls below `depth` x the
+    quieter of the peaks on either side. Each part must be at least `min_part`
+    seconds, so vibrato or a small wobble doesn't chop a held note."""
+    import numpy as np
+    r = np.convolve(rms, np.ones(3) / 3.0, mode="same")
+    m = max(2, int(round(min_part / hop_s)))
+    for inst in midi.instruments:
+        out = []
+        for n in inst.notes:
+            a = int(n.start / hop_s)
+            b = min(len(r), int(n.end / hop_s))
+            seg = r[a:b]
+            starts_ends = []
+            cut = 0
+            i = cut + m
+            while i < len(seg) - m:
+                lo, hi = max(0, i - 3), min(len(seg), i + 4)
+                if seg[i] <= seg[lo:hi].min():
+                    left = seg[cut:i].max()
+                    right = seg[i:min(len(seg), i + 3 * m)].max()
+                    if seg[i] < depth * min(left, right):
+                        # widen the dip to where the volume climbs back above half way
+                        lim = 0.5 * min(left, right)
+                        j0 = i
+                        while j0 > cut and seg[j0 - 1] < lim:
+                            j0 -= 1
+                        j1 = i
+                        while j1 < len(seg) - 1 and seg[j1 + 1] < lim:
+                            j1 += 1
+                        starts_ends.append((cut, max(cut + 1, j0)))
+                        cut = j1 + 1
+                        i = cut + m
+                        continue
+                i += 1
+            starts_ends.append((cut, len(seg)))
+            if len(starts_ends) == 1:
+                out.append(n)
+                continue
+            for s_i, e_i in starts_ends:
+                s = n.start if s_i == 0 else (a + s_i) * hop_s
+                e = n.end if e_i >= len(seg) else (a + e_i) * hop_s
+                if e - s >= min_part * 0.75:
+                    out.append(type(n)(velocity=n.velocity, pitch=n.pitch, start=s, end=e))
+        inst.notes = sorted(out, key=lambda x: x.start)
 
 
 def _force_chord_line(midi, max_notes=6):
@@ -626,12 +676,21 @@ def transcribe(audio_bytes, ext, instrument):
             maximum_frequency=settings["fmax"],
             midi_tempo=prior,
         )
+        rms = hop_s = None
+        if settings.get("dip_split"):
+            import librosa
+            y, sr = librosa.load(audio_path, sr=22050, mono=True, duration=120)
+            hop = 128
+            rms = librosa.feature.rms(y=y, frame_length=512, hop_length=hop)[0]
+            hop_s = hop / float(sr)
 
     _drop_quiet_notes(midi, settings["vel"])
     _drop_tiny_notes(midi, settings["min_ms"] / 1000.0)
     if settings.get("fold_above"):
         _fold_octaves(midi, settings["fold_above"])
     _merge_same_pitch(midi)
+    if rms is not None:
+        _split_on_volume_dips(midi, rms, hop_s)
     if settings["mono"]:
         _make_monophonic(midi)
     # Download MIDI keeps the performance's real timing (no grid snapping, no
