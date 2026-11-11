@@ -74,6 +74,100 @@ def _estimate_bpm(path):
     return round(bpm, 1)
 
 
+def _hum_to_midi(path, tempo, fmin=65.0, fmax=1000.0, min_ms=90):
+    """Single-voice pitch tracking (pYIN) -> notes.
+
+    Basic Pitch is polyphonic and invents extra notes from overtones when fed
+    a lone voice. pYIN follows exactly one pitch at a time, which is what a
+    hum / sung line is."""
+    import librosa
+    import numpy as np
+    import pretty_midi
+
+    y, sr = librosa.load(path, sr=22050, mono=True, duration=120)
+    hop = 256
+    if y.size < sr * 0.2:
+        return pretty_midi.PrettyMIDI(initial_tempo=tempo)
+    f0, voiced, _ = librosa.pyin(y, fmin=fmin, fmax=fmax, sr=sr,
+                                 frame_length=2048, hop_length=hop)
+    rms = librosa.feature.rms(y=y, frame_length=1024, hop_length=hop)[0]
+    n = min(len(f0), len(rms))
+    f0, voiced, rms = f0[:n], voiced[:n], rms[:n]
+    hop_s = hop / float(sr)
+
+    midi_f = np.full(n, np.nan)
+    ok = voiced & ~np.isnan(f0)
+    midi_f[ok] = 69.0 + 12.0 * np.log2(f0[ok] / 440.0)
+    if ok.sum() < 3:
+        return pretty_midi.PrettyMIDI(initial_tempo=tempo)
+
+    # Singers are rarely exactly in tune with A440: measure how far off they
+    # sit on average (circular median of the cents offset) and correct it.
+    frac = midi_f[ok] - np.round(midi_f[ok])
+    ang = np.angle(np.mean(np.exp(2j * np.pi * frac))) / (2 * np.pi)
+    midi_f = midi_f - ang
+
+    # Median-smooth the pitch track so vibrato and glitches don't make notes.
+    sm = midi_f.copy()
+    k = 2
+    for i in range(n):
+        if np.isnan(midi_f[i]):
+            continue
+        w = midi_f[max(0, i - k): i + k + 1]
+        w = w[~np.isnan(w)]
+        sm[i] = np.median(w)
+    pitch = np.where(np.isnan(sm), -1, np.round(sm)).astype(int)
+
+    # Run-length encode, then absorb runs too short to be real notes.
+    runs = []
+    for i, p in enumerate(pitch):
+        if runs and runs[-1][0] == p:
+            runs[-1][2] = i + 1
+        else:
+            runs.append([int(p), i, i + 1])
+    min_frames = max(2, int(round(min_ms / 1000.0 / hop_s)))
+    changed = True
+    while changed:
+        changed = False
+        for idx, (p, a, b) in enumerate(runs):
+            if p == -1 or (b - a) >= min_frames:
+                continue
+            left = runs[idx - 1] if idx > 0 else None
+            right = runs[idx + 1] if idx + 1 < len(runs) else None
+            if left and right and left[0] == right[0] and left[0] != -1:
+                left[2] = right[2]
+                del runs[idx:idx + 2]
+            elif left and left[0] != -1 and (not right or right[0] == -1 or (left[2] - left[1]) >= (right[2] - right[1])):
+                left[2] = b
+                del runs[idx]
+            elif right and right[0] != -1:
+                right[1] = a
+                del runs[idx]
+            else:
+                runs[idx][0] = -1
+            changed = True
+            break
+    # glue neighbours that ended up with the same pitch
+    merged = []
+    for r in runs:
+        if merged and merged[-1][0] == r[0] and r[0] != -1:
+            merged[-1][2] = r[2]
+        else:
+            merged.append(list(r))
+
+    loud = float(np.percentile(rms, 95)) or 1.0
+    pm = pretty_midi.PrettyMIDI(initial_tempo=tempo)
+    inst = pretty_midi.Instrument(program=0)
+    for p, a, b in merged:
+        if p < 0 or (b - a) < min_frames:
+            continue
+        vel = int(np.clip(40 + 80 * float(np.mean(rms[a:b])) / loud, 30, 120))
+        inst.notes.append(pretty_midi.Note(velocity=vel, pitch=int(p),
+                                           start=a * hop_s, end=b * hop_s))
+    pm.instruments.append(inst)
+    return pm
+
+
 def _drop_quiet_notes(midi, share):
     """Drop ghost detections: notes much quieter than the loud ones."""
     import numpy as np
@@ -751,25 +845,30 @@ def transcribe(audio_bytes, ext, instrument):
     if not settings:
         raise NotationError(f"Unknown instrument: {instrument}")
 
-    from basic_pitch.inference import predict
+    if instrument != "hum":
+        from basic_pitch.inference import predict
 
-    ext = (ext or "wav").lower().lstrip(".")
+    ext =(ext or "wav").lower().lstrip(".")
     with tempfile.TemporaryDirectory() as td:
         audio_path = os.path.join(td, f"stem.{ext}")
         with open(audio_path, "wb") as f:
             f.write(audio_bytes)
 
         prior = _estimate_bpm(audio_path)
-        _, midi, note_events = predict(
-            audio_path,
-            _get_model(),
-            onset_threshold=settings["onset"],
-            frame_threshold=settings["frame"],
-            minimum_note_length=settings["min_ms"],
-            minimum_frequency=settings["fmin"],
-            maximum_frequency=settings["fmax"],
-            midi_tempo=prior,
-        )
+        if instrument == "hum":
+            midi = _hum_to_midi(audio_path, prior, settings["fmin"],
+                                min(settings["fmax"], 1000.0), settings["min_ms"])
+        else:
+            _, midi, note_events = predict(
+                audio_path,
+                _get_model(),
+                onset_threshold=settings["onset"],
+                frame_threshold=settings["frame"],
+                minimum_note_length=settings["min_ms"],
+                minimum_frequency=settings["fmin"],
+                maximum_frequency=settings["fmax"],
+                midi_tempo=prior,
+            )
         rms = hop_s = None
         if settings.get("dip_split") or settings["mono"]:
             import librosa
