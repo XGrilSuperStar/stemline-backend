@@ -136,7 +136,30 @@ def _make_monophonic(midi):
         inst.notes = kept
 
 
-def _split_on_volume_dips(midi, rms, hop_s, depth=0.5, min_part=0.08):
+def _collapse_slides(midi, max_gap=0.06, short=0.16):
+    """A sung slide between two notes makes the detector write a staircase of
+    short notes one or two semitones apart. Fold each such short note into its
+    longer neighbour so a slide reads as one note, not several."""
+    for inst in midi.instruments:
+        notes = sorted(inst.notes, key=lambda n: n.start)
+        changed = True
+        while changed:
+            changed = False
+            for i in range(len(notes) - 1):
+                a, b = notes[i], notes[i + 1]
+                la, lb = a.end - a.start, b.end - b.start
+                diff = abs(a.pitch - b.pitch)
+                if (b.start - a.end) <= max_gap and 1 <= diff <= 2 and min(la, lb) < (short if diff == 1 else 0.12):
+                    keep, drop = (a, b) if la >= lb else (b, a)
+                    keep.start = min(a.start, b.start)
+                    keep.end = max(a.end, b.end)
+                    notes.remove(drop)
+                    changed = True
+                    break
+        inst.notes = notes
+
+
+def _split_on_volume_dips(midi, rms, hop_s, depth=0.3, min_part=0.10, min_dip=0.03):
     """The pitch model can't tell two sung notes of the SAME pitch apart ("la la
     la" comes out as one long note). The volume can: between repeated notes the
     voice dips. Split a note wherever the loudness falls below `depth` x the
@@ -168,10 +191,11 @@ def _split_on_volume_dips(midi, rms, hop_s, depth=0.5, min_part=0.08):
                         j1 = i
                         while j1 < len(seg) - 1 and seg[j1 + 1] < lim:
                             j1 += 1
-                        starts_ends.append((cut, max(cut + 1, j0)))
-                        cut = j1 + 1
-                        i = cut + m
-                        continue
+                        if (j1 - j0 + 1) * hop_s >= min_dip:   # a real pause, not a brief wobble
+                            starts_ends.append((cut, max(cut + 1, j0)))
+                            cut = j1 + 1
+                            i = cut + m
+                            continue
                 i += 1
             starts_ends.append((cut, len(seg)))
             if len(starts_ends) == 1:
@@ -718,6 +742,8 @@ def transcribe(audio_bytes, ext, instrument):
     if rms is not None:
         if settings.get("dip_split"):
             _split_on_volume_dips(midi, rms, hop_s)
+            _collapse_slides(midi)
+            _merge_same_pitch(midi, max_gap=0.04)   # re-join one note that got cut in two
         if settings["mono"]:
             _trim_note_ends(midi, rms, hop_s)
     if settings["mono"]:
