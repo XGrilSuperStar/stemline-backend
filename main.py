@@ -3021,10 +3021,21 @@ async def hum_to_notes(file: UploadFile = File(...), token: str = None, db: Sess
         logger.error(f"Hum-to-notes error: {str(e)}")
         raise HTTPException(status_code=500, detail="Could not turn that recording into notes.")
     xml = result["musicxml"]
+    # notes for the piano roll: [pitch, start_sec, end_sec]
+    import io as _io, re as _re, pretty_midi as _pm
+    roll = sorted(([n.pitch, round(n.start, 3), round(n.end, 3)]
+                   for i in _pm.PrettyMIDI(_io.BytesIO(result["midi"])).instruments for n in i.notes),
+                  key=lambda n: n[1])
     if not premium:
         xml = notation.preview(xml, FREE_NOTATION_MEASURES)
+        # free preview shows the same stretch as the sheet music (first measures)
+        _b = _re.search(r"<beats>(\d+)</beats>", result["musicxml"]); _t = _re.search(r"<beat-type>(\d+)</beat-type>", result["musicxml"])
+        if _b and _t and result["bpm"]:
+            cutoff = FREE_NOTATION_MEASURES * int(_b.group(1)) * (4 / int(_t.group(1))) * 60 / result["bpm"]
+            roll = [n for n in roll if n[1] < cutoff]
     return {
         "musicxml": xml,
+        "notes": roll,
         "midi_b64": base64.b64encode(result["midi"]).decode() if premium else None,
         "bpm": result["bpm"],
         "note_count": result["note_count"],
