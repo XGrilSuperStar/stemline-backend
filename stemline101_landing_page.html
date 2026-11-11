@@ -1424,9 +1424,7 @@
 </head>
 <body>
 
-<div id="adSlot" style="display:block;visibility:hidden;text-align:center;background:var(--concrete);border-bottom:1px solid var(--concrete-line);font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:var(--chrome-dim);">
-  Ad space — upgrade to Premium to remove ads
-</div>
+<div id="adSlot" aria-label="Advertisement" style="display:block;visibility:visible;text-align:center;background:var(--concrete);border-bottom:1px solid var(--concrete-line);font-family:'JetBrains Mono',monospace;font-size:0.62rem;letter-spacing:0.14em;text-transform:uppercase;color:rgba(216,220,226,0.35);">Advertisement</div>
 
 <nav>
   <div class="logo">
@@ -1458,6 +1456,7 @@
     <a href="/" class="here">Mixer</a>
     <a href="/sampler">Sampler</a>
     <a href="/notation-viewer">Sheet music</a>
+    <a href="/hum-to-notes">Hum to notes</a>
     <a href="/guides">Guides</a>
     <a href="/about">About</a>
     <a href="/faq">FAQ</a>
@@ -1584,6 +1583,7 @@
               <button type="button" class="screen-tab" data-view="samples" id="screenSamplesTab">SAMPLES</button>
               <a class="screen-link" id="samplerLink" href="/sampler">SAMPLER</a>
               <a class="screen-link" id="sheetMusicLink" href="/notation-viewer">SHEET MUSIC</a>
+              <a class="screen-link" id="voiceNotesLink" href="/hum-to-notes">VOICE TO NOTES</a>
             </span>
           </div>
           <div class="transport" role="group" aria-label="Playback transport">

@@ -208,8 +208,15 @@
   .seo-text strong { color: var(--chrome); font-weight: 600; }
   .seo-text a { color: var(--vu-amber); }
 </style>
+<style>
+  #adSlot.ad-strip { box-sizing: border-box; width: 100%; max-width: 728px; height: 90px; margin: 0 auto; display: flex; align-items: center; justify-content: center; background: #17171A; border-bottom: 1px solid rgba(216,220,226,0.14); font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(216,220,226,0.35); }
+  @media (max-width: 760px) { #adSlot.ad-strip { max-width: 320px; height: 50px; } }
+</style>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1970454477202193"
+     crossorigin="anonymous"></script>
 </head>
 <body>
+<div id="adSlot" class="ad-strip" aria-label="Advertisement">Advertisement</div>
 <nav class="site-nav">
   <a class="logo" href="/" aria-label="Stemline101 home">
     <span class="logo-mark">
@@ -445,6 +452,16 @@
   });
 
   loadSongs();
+})();
+</script>
+<script>
+(function () {
+  try {
+    var t = localStorage.getItem('soundlounge101_token'); if (!t) return;
+    fetch('/api/v1/me?token=' + encodeURIComponent(t)).then(function (r) { return r.json(); }).then(function (d) {
+      if (d && d.show_ads === false) { var a = document.getElementById('adSlot'); if (a) a.style.display = 'none'; }
+    }).catch(function () {});
+  } catch (e) {}
 })();
 </script>
 </body>
