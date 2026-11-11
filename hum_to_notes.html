@@ -214,6 +214,14 @@
   #meter { width: 140px; height: 10px; background: #0e0e10; border: 1px solid var(--concrete-line); border-radius: 5px; overflow: hidden; }
   #meter i { display: block; height: 100%; width: 0; background: var(--vu-amber); transition: width .06s; }
   audio { height: 36px; }
+  input[type="text"] {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; letter-spacing: 0.03em;
+    background: #0e0e10; color: var(--chrome); border: 1px solid var(--concrete-line);
+    border-radius: 4px; padding: 0.6rem 0.9rem; min-width: 200px;
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.6);
+  }
+  input[type="text"]:focus { outline: 2px solid var(--vu-amber); outline-offset: 1px; }
+  [hidden] { display: none !important; }
 </style>
 </head>
 <body>
@@ -241,7 +249,7 @@
     <li><b>Log in</b> on the main page first.</li>
     <li><b>Record.</b> Press Record, then hum, sing or whistle one note at a time. Stay close to the mic and keep it under a minute.</li>
     <li><b>Or upload</b> a recording of your voice instead.</li>
-    <li><b>Press Show notes.</b> It listens and writes out the melody with tempo and key.</li>
+    <li><b>Notes appear on their own.</b> When you stop recording or pick a file, it listens and writes out the melody with tempo and key.</li>
     <li><b>Download (Premium).</b> Save the melody as MIDI or MusicXML to drop into FL Studio or any notation software.</li>
   </ol>
   <ul class="facts">
@@ -252,7 +260,9 @@
 </section>
 
 <div class="row">
+  <label class="field"><span>Name your recording</span><input type="text" id="label" maxlength="60" placeholder="e.g. Chorus idea"></label>
   <button id="rec" class="recbtn">&#9679; Record</button>
+  <button id="stop" class="recbtn live" hidden>&#9632; Stop</button>
   <div id="meter"><i></i></div>
   <label class="field"><span>Or upload a recording</span><input type="file" id="file" accept="audio/*"></label>
   <audio id="player" controls hidden></audio>
@@ -312,7 +322,13 @@
   try { token = localStorage.getItem('soundlounge101_token'); } catch (e) {}
   var $ = function (id) { return document.getElementById(id); };
   var statusEl = $('status'), infoEl = $('info'), recBtn = $('rec'), goBtn = $('go'),
-      xmlBtn = $('dlxml'), midiBtn = $('dlmidi'), player = $('player'), meter = $('meter').firstChild;
+      xmlBtn = $('dlxml'), midiBtn = $('dlmidi'), player = $('player'), meter = $('meter').firstChild,
+      stopBtn = $('stop'), labelEl = $('label');
+  // File name for downloads comes from the label the person typed.
+  function fileBase() {
+    var n = (labelEl.value || '').trim().replace(/[\\\/:*?"<>|]+/g, '').replace(/\s+/g, ' ').slice(0, 60);
+    return n || 'recording';
+  }
   var osmd = null, wavBlob = null, ctx = null, stream = null, proc = null, chunks = [], recRate = 44100, recording = false, timer = null;
 
   function setStatus(t) { statusEl.textContent = t || ''; }
@@ -350,7 +366,9 @@
   }
   function ready(blob) {
     wavBlob = blob; player.src = URL.createObjectURL(blob); player.hidden = false;
-    goBtn.disabled = !token; setStatus(token ? 'Ready. Press Show notes.' : 'Log in on the main page first.');
+    goBtn.disabled = !token;
+    if (token) { goBtn.click(); }   // writes the notes automatically, no extra button press
+    else { setStatus('Log in on the main page first.'); }
   }
 
   async function startRec() {
@@ -365,7 +383,7 @@
       meter.style.width = Math.min(100, peak * 140) + '%';
     };
     src.connect(proc); proc.connect(ctx.destination);
-    recording = true; recBtn.classList.add('live'); recBtn.innerHTML = '&#9632; Stop';
+    recording = true; recBtn.hidden = true; stopBtn.hidden = false;
     var t0 = Date.now(); setStatus('Recording… hum, sing or whistle.');
     timer = setInterval(function () {
       var s = Math.round((Date.now() - t0) / 1000); setStatus('Recording… ' + s + 's');
@@ -375,13 +393,14 @@
   function stopRec() {
     if (!recording) return; recording = false; clearInterval(timer);
     proc.disconnect(); stream.getTracks().forEach(function (t) { t.stop(); }); ctx.close();
-    recBtn.classList.remove('live'); recBtn.innerHTML = '&#9679; Record'; meter.style.width = '0';
+    stopBtn.hidden = true; recBtn.hidden = false; meter.style.width = '0';
     var len = chunks.reduce(function (a, c) { return a + c.length; }, 0), all = new Float32Array(len), o = 0;
     chunks.forEach(function (c) { all.set(c, o); o += c.length; });
     if (len < recRate * 0.5) { setStatus('That was too short. Try again.'); return; }
     ready(toWav(all, recRate));
   }
-  recBtn.addEventListener('click', function () { recording ? stopRec() : startRec(); });
+  recBtn.addEventListener('click', function () { if (!recording) startRec(); });
+  stopBtn.addEventListener('click', stopRec);
 
   $('file').addEventListener('change', async function (e) {
     var f = e.target.files[0]; if (!f) return;
@@ -412,10 +431,10 @@
         xmlBtn.onclick = midiBtn.onclick = function () { setStatus(msg2); alert(msg2); };
       } else {
         setStatus('Done. ' + d.note_count + ' notes found.');
-        xmlBtn.onclick = function () { save(new Blob([d.musicxml], { type: 'application/xml' }), 'hum.musicxml'); };
+        xmlBtn.onclick = function () { save(new Blob([d.musicxml], { type: 'application/xml' }), fileBase() + '.musicxml'); };
         midiBtn.onclick = function () {
           var b = atob(d.midi_b64), u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i);
-          save(new Blob([u], { type: 'audio/midi' }), 'hum.mid');
+          save(new Blob([u], { type: 'audio/midi' }), fileBase() + '.mid');
         };
       }
     } catch (e) { setStatus(e.message); }
