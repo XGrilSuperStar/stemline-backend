@@ -37,6 +37,10 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
+# Homepage CSS/JS files (split out of the landing page)
+from fastapi.staticfiles import StaticFiles
+app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")), name="static")
+
 # CORS
 app.add_middleware(
     CORSMiddleware,
