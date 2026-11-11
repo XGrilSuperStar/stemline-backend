@@ -136,15 +136,18 @@ def _make_monophonic(midi):
         inst.notes = kept
 
 
-def _ensure_gap(midi, gap=0.04, min_len=0.06):
-    """End a note a little early when it touches the next one, so a small rest
-    always shows between notes in the downloaded MIDI."""
+def _ensure_gap(midi, gap=0.10, min_len=0.06, max_trim=0.4):
+    """End a note early when it sits too close to the next one, so a clear rest
+    shows between notes in the downloaded MIDI. A note gives up at most
+    `max_trim` of its own length, so short notes aren't squashed to nothing."""
     for inst in midi.instruments:
         notes = sorted(inst.notes, key=lambda n: n.start)
         for a, b in zip(notes, notes[1:]):
             room = b.start - a.end
             if room < gap:
-                new_end = b.start - gap
+                length = a.end - a.start
+                new_end = max(b.start - gap, a.end - max_trim * length)
+                new_end = min(new_end, a.end)
                 if new_end - a.start >= min_len:
                     a.end = new_end
 
