@@ -113,6 +113,34 @@ def _merge_same_pitch(midi, max_gap=0.03):
         inst.notes = sorted(out, key=lambda n: n.start)
 
 
+def _clean_fragments(midi, short=0.15, join_gap=0.08, drop_below=0.10):
+    """Tidy tiny stray notes: a short note next to the same pitch is glued on,
+    a short note right beside a longer note within a semitone is absorbed,
+    and a very short lone note is dropped."""
+    for inst in midi.instruments:
+        notes = sorted(inst.notes, key=lambda n: n.start)
+        changed = True
+        while changed:
+            changed = False
+            for i, n in enumerate(notes):
+                if n.end - n.start >= short:
+                    continue
+                prev = notes[i - 1] if i > 0 else None
+                nxt = notes[i + 1] if i + 1 < len(notes) else None
+                same = [x for x in (prev, nxt) if x and x.pitch == n.pitch
+                        and (n.start - x.end <= join_gap if x is prev else x.start - n.end <= join_gap)]
+                if same:
+                    x = same[0]
+                    x.start, x.end = min(x.start, n.start), max(x.end, n.end)
+                    notes.pop(i); changed = True; break
+                near = [x for x in (prev, nxt) if x and abs(x.pitch - n.pitch) <= 1
+                        and x.end - x.start > 2 * (n.end - n.start)
+                        and (n.start - x.end <= join_gap if x is prev else x.start - n.end <= join_gap)]
+                if near or n.end - n.start < drop_below:
+                    notes.pop(i); changed = True; break
+        inst.notes = notes
+
+
 def _make_monophonic(midi):
     """Keep ONE note at a time: the strongest (loudness x length) wins, notes
     that overlap a winner are dropped. Kills harmonics, octave blips and
@@ -762,6 +790,7 @@ def transcribe(audio_bytes, ext, instrument):
             _merge_same_pitch(midi, max_gap=0.04)   # re-join one note that got cut in two
         if settings["mono"]:
             _trim_note_ends(midi, rms, hop_s)
+            _clean_fragments(midi)
     if settings["mono"]:
         _make_monophonic(midi)
     # Download MIDI keeps the performance's real timing (no grid snapping, no
