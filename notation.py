@@ -185,6 +185,32 @@ def _split_on_volume_dips(midi, rms, hop_s, depth=0.5, min_part=0.08):
         inst.notes = sorted(out, key=lambda x: x.start)
 
 
+def _trim_note_ends(midi, rms, hop_s, frac=0.3, min_len=0.09):
+    """The pitch model keeps a note alive through echo / reverb / decay tails, so
+    the rests between notes shrink to almost nothing. End each note where the
+    loudness has fallen below `frac` of that note's own peak instead."""
+    import numpy as np
+    r = np.convolve(rms, np.ones(3) / 3.0, mode="same")
+    for inst in midi.instruments:
+        for n in inst.notes:
+            a = int(n.start / hop_s)
+            b = min(len(r), int(n.end / hop_s))
+            if b - a < 4:
+                continue
+            seg = r[a:b]
+            pk = int(np.argmax(seg))
+            lim = frac * seg[pk]
+            end_i = None
+            for i in range(pk, len(seg) - 2):
+                if seg[i] < lim and seg[i + 1] < lim and seg[i + 2] < lim:
+                    end_i = i
+                    break
+            if end_i is not None:
+                new_end = (a + end_i) * hop_s
+                if new_end - n.start >= min_len and new_end < n.end:
+                    n.end = new_end
+
+
 def _force_chord_line(midi, max_notes=6):
     """Polyphonic instruments (guitar, keys): after quantizing, notes starting
     together form one chord that ends where the next chord begins. No partial
@@ -677,7 +703,7 @@ def transcribe(audio_bytes, ext, instrument):
             midi_tempo=prior,
         )
         rms = hop_s = None
-        if settings.get("dip_split"):
+        if settings.get("dip_split") or settings["mono"]:
             import librosa
             y, sr = librosa.load(audio_path, sr=22050, mono=True, duration=120)
             hop = 128
@@ -690,7 +716,10 @@ def transcribe(audio_bytes, ext, instrument):
         _fold_octaves(midi, settings["fold_above"])
     _merge_same_pitch(midi)
     if rms is not None:
-        _split_on_volume_dips(midi, rms, hop_s)
+        if settings.get("dip_split"):
+            _split_on_volume_dips(midi, rms, hop_s)
+        if settings["mono"]:
+            _trim_note_ends(midi, rms, hop_s)
     if settings["mono"]:
         _make_monophonic(midi)
     # Download MIDI keeps the performance's real timing (no grid snapping, no
