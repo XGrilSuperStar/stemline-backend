@@ -53,22 +53,28 @@
   .lede { margin: 0 auto; max-width: 54ch; font-size: 1.1rem; color: var(--chrome-dim); }
 
   /* ===== drop zone ===== */
-  /* 1920s studio mic frame: silver double border, deco corners */
-  .drop { position: relative; margin: 2.6rem auto 0; max-width: 760px; padding: 2.4rem 1.6rem 2rem; text-align: center;
+  /* The drop box is the front of a 1920s studio mic: chrome bezel, faint mesh grille, screws, side pivots */
+  .drop { position: relative; margin: 2.8rem auto 0; max-width: 760px; padding: 2.6rem 2rem 2.2rem; text-align: center;
     background:
-      radial-gradient(120% 70% at 50% 0%, rgba(216,220,226,0.07), transparent 60%),
-      linear-gradient(180deg, #17171a, #111113) padding-box,
-      linear-gradient(135deg, #f4f6f9, #8d939c 30%, #d9dde3 50%, #7b818a 75%, #eef0f3) border-box;
-    border: 3px solid transparent; border-radius: 22px;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(0,0,0,0.6); transition: box-shadow .15s; }
-  .drop::before { content: ''; position: absolute; inset: 9px; border: 1px solid rgba(216,220,226,0.32); border-radius: 15px; pointer-events: none; }
-  .drop i.c { position: absolute; width: 14px; height: 14px; border: 2px solid #c9ced6; pointer-events: none; }
-  .drop i.c1 { top: 15px; left: 15px; border-right: 0; border-bottom: 0; border-top-left-radius: 8px; }
-  .drop i.c2 { top: 15px; right: 15px; border-left: 0; border-bottom: 0; border-top-right-radius: 8px; }
-  .drop i.c3 { bottom: 15px; left: 15px; border-right: 0; border-top: 0; border-bottom-left-radius: 8px; }
-  .drop i.c4 { bottom: 15px; right: 15px; border-left: 0; border-top: 0; border-bottom-right-radius: 8px; }
-  .drop.over { box-shadow: 0 0 0 2px var(--amber), 0 20px 50px rgba(0,0,0,0.55); }
-  .mic { display: block; width: 84px; height: 124px; margin: 0 auto 0.9rem; filter: drop-shadow(0 6px 10px rgba(0,0,0,0.6)); }
+      radial-gradient(circle at 50% 50%, rgba(216,220,226,0.10) 0.9px, transparent 1.3px) 0 0 / 9px 9px,
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 9px),
+      linear-gradient(180deg, #19191c, #101012) padding-box,
+      linear-gradient(145deg, #fbfcfd, #8d939c 22%, #dfe3e8 45%, #70767f 70%, #f0f2f5) border-box;
+    border: 9px solid transparent; border-radius: 14px;
+    box-shadow: 0 22px 50px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(0,0,0,0.7), inset 0 0 40px rgba(0,0,0,0.65); transition: box-shadow .15s; }
+  .drop::before { content: ''; position: absolute; inset: -9px; border-radius: 14px; pointer-events: none;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.55), inset 0 0 0 8px rgba(0,0,0,0.0); }
+  .drop i.s { position: absolute; width: 9px; height: 9px; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(circle at 35% 30%, #fff, #9aa0a9 55%, #5d636c); box-shadow: 0 1px 2px rgba(0,0,0,0.6); }
+  .drop i.s::after { content: ''; position: absolute; left: 1.5px; right: 1.5px; top: 4px; height: 1px; background: rgba(0,0,0,0.55); transform: rotate(-35deg); }
+  .drop i.s1 { top: -6px; left: -6px; } .drop i.s2 { top: -6px; right: -6px; }
+  .drop i.s3 { bottom: -6px; left: -6px; } .drop i.s4 { bottom: -6px; right: -6px; }
+  .drop i.k { position: absolute; top: 50%; width: 22px; height: 46px; margin-top: -23px; pointer-events: none;
+    background: linear-gradient(90deg, #6d737c, #e9ecf0 45%, #8d939c); box-shadow: 0 2px 6px rgba(0,0,0,0.6); }
+  .drop i.k1 { left: -29px; border-radius: 8px 0 0 8px; } .drop i.k2 { right: -29px; border-radius: 0 8px 8px 0; transform: scaleX(-1); }
+  .drop-plate { display: inline-block; margin: 0 auto 1.3rem; padding: 0.25rem 1rem; font-family: 'JetBrains Mono', monospace; font-size: 0.66rem; letter-spacing: 0.22em; text-transform: uppercase;
+    color: #20242a; border-radius: 3px; background: linear-gradient(180deg, #f4f6f9, #aeb4bc); box-shadow: inset 0 1px 0 #fff, 0 1px 3px rgba(0,0,0,0.6); }
+  .drop.over { box-shadow: 0 0 0 2px var(--amber), 0 22px 50px rgba(0,0,0,0.6), inset 0 0 40px rgba(0,0,0,0.65); }
   .drop-actions { display: flex; flex-wrap: wrap; gap: 0.8rem; justify-content: center; align-items: center; }
   .drop-or { color: var(--steel); font-size: 0.85rem; }
   .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; cursor: pointer; font-family: 'Inter', sans-serif; font-weight: 600; font-size: 1rem;
@@ -82,7 +88,7 @@
   .btn-ghost { background: transparent; color: var(--chrome); border-color: rgba(216,220,226,0.28); font-size: 0.92rem; padding: 0.65rem 1.1rem; }
   .btn-solid { background: var(--amber); color: #1a1204; font-size: 0.92rem; padding: 0.65rem 1.1rem; }
   @keyframes pulse { 50% { filter: brightness(1.35); } }
-  .drop-hint { margin: 1.1rem 0 0; font-size: 0.86rem; color: var(--steel); }
+  .drop-hint { margin: 1.1rem 0 0; text-shadow: 0 1px 2px #000; font-size: 0.86rem; color: var(--steel); }
   #meter { width: 160px; height: 6px; background: #0e0e10; border-radius: 3px; overflow: hidden; margin: 1.1rem auto 0; }
   #meter i { display: block; height: 100%; width: 0; background: var(--amber); transition: width .06s; }
   .namebox { display: block; margin: 1.5rem auto 0.3rem; max-width: 340px; text-align: left; }
@@ -137,7 +143,7 @@
     main { padding: 0 1rem; }
     .hero { padding: 2.4rem 0 1.4rem; }
     .grid3 { grid-template-columns: 1fr; }
-    .drop { padding: 1.6rem 1rem; }
+    .drop { padding: 1.8rem 1rem 1.5rem; } .drop i.k { display: none; }
     .results { padding: 1rem; }
     #roll { height: 200px; }
   }
@@ -174,30 +180,8 @@
   <p class="lede">Sing or whistle a melody. Stemline 101 writes down the notes and gives you a MIDI file for your music program.</p>
 
   <div class="drop" id="drop">
-    <i class="c c1"></i><i class="c c2"></i><i class="c c3"></i><i class="c c4"></i>
-    <svg class="mic" viewBox="0 0 84 124" aria-hidden="true">
-      <defs>
-        <linearGradient id="chrome" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f7f8fa"/><stop offset=".35" stop-color="#9aa0a9"/><stop offset=".6" stop-color="#e3e6ea"/><stop offset="1" stop-color="#6d737c"/></linearGradient>
-        <linearGradient id="grille" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a2b2f"/><stop offset="1" stop-color="#0d0d0f"/></linearGradient>
-        <clipPath id="head"><circle cx="42" cy="38" r="26"/></clipPath>
-      </defs>
-      <!-- stand -->
-      <rect x="38" y="84" width="8" height="26" rx="2" fill="url(#chrome)"/>
-      <ellipse cx="42" cy="114" rx="26" ry="6" fill="url(#chrome)"/>
-      <ellipse cx="42" cy="112.5" rx="20" ry="3.5" fill="#bfc4cb" opacity=".55"/>
-      <!-- yoke -->
-      <path d="M10 38 C10 78 74 78 74 38" fill="none" stroke="url(#chrome)" stroke-width="5" stroke-linecap="round"/>
-      <circle cx="10" cy="38" r="4.5" fill="url(#chrome)"/><circle cx="74" cy="38" r="4.5" fill="url(#chrome)"/>
-      <!-- head: outer ring, mesh grille -->
-      <circle cx="42" cy="38" r="30" fill="url(#chrome)"/>
-      <circle cx="42" cy="38" r="26" fill="url(#grille)"/>
-      <g clip-path="url(#head)" stroke="#aeb3bb" stroke-width="1.4" opacity=".85">
-        <line x1="14" y1="22" x2="70" y2="22"/><line x1="14" y1="28" x2="70" y2="28"/><line x1="14" y1="34" x2="70" y2="34"/>
-        <line x1="14" y1="40" x2="70" y2="40"/><line x1="14" y1="46" x2="70" y2="46"/><line x1="14" y1="52" x2="70" y2="52"/><line x1="14" y1="58" x2="70" y2="58"/>
-      </g>
-      <circle cx="42" cy="38" r="26" fill="none" stroke="#e9ecf0" stroke-width="1.2" opacity=".7"/>
-      <path d="M26 24 A20 20 0 0 1 48 14" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".35"/>
-    </svg>
+    <i class="s s1"></i><i class="s s2"></i><i class="s s3"></i><i class="s s4"></i><i class="k k1"></i><i class="k k2"></i>
+    <div class="drop-plate">Stemline 101 &middot; Voice</div>
     <div class="drop-actions">
       <button id="rec" class="btn btn-rec">&#9679;&nbsp; Record</button>
       <button id="stop" class="btn btn-rec live" hidden>&#9632;&nbsp; Stop</button>
