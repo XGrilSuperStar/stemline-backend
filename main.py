@@ -2859,7 +2859,7 @@ async def sitemap_xml():
     ] + [f"guides/{s}" for s in MORE_GUIDE_SLUGS]
     if NOTATION_ENABLED:
         pages.insert(6, "notation-viewer")
-        pages.insert(7, "hum-to-notes")
+        pages.insert(7, "audio-to-midi")
     urls = "".join(
         f"  <url><loc>https://stemline101.com/{p}</loc></url>\n" for p in pages
     )
@@ -3012,7 +3012,7 @@ async def hum_to_notes(file: UploadFile = File(...), token: str = None, db: Sess
     except ImportError:
         raise HTTPException(status_code=503, detail="The notes engine isn't installed on this server.")
     except notation.NotationError:
-        raise HTTPException(status_code=422, detail="No clear notes were found. Try humming one steady note at a time, closer to the mic.")
+        raise HTTPException(status_code=422, detail="No clear notes were found. Try singing one steady note at a time, closer to the mic.")
     except Exception as e:
         logger.error(f"Hum-to-notes error: {str(e)}")
         raise HTTPException(status_code=500, detail="Could not turn that recording into notes.")
@@ -3028,11 +3028,18 @@ async def hum_to_notes(file: UploadFile = File(...), token: str = None, db: Sess
     }
 
 
-@app.get("/hum-to-notes", response_class=HTMLResponse)
-async def hum_to_notes_page():
+@app.get("/audio-to-midi", response_class=HTMLResponse)
+async def audio_to_midi_page():
     if not NOTATION_ENABLED:
         raise HTTPException(status_code=404, detail="Not Found")
     return FileResponse("hum_to_notes.html", media_type="text/html")
+
+
+@app.get("/hum-to-notes")
+async def hum_to_notes_old_address():
+    # old address from before the rename: send people to the new one
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse("/audio-to-midi", status_code=301)
 
 
 @app.get("/sampler", response_class=HTMLResponse)

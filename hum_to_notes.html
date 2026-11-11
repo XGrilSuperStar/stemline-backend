@@ -3,18 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Hum, sing or whistle a tune and Stemline 101 writes down the notes. Free preview, full chart and MIDI download with Premium.">
-<title>Hum to Notes — Stemline101</title>
-<link rel="canonical" href="https://stemline101.com/hum-to-notes">
+<meta name="description" content="Record or upload a voice clip and Stemline 101 turns it into notes and a MIDI file. Free preview, full chart and MIDI download with Premium.">
+<title>Audio to MIDI — Stemline101</title>
+<link rel="canonical" href="https://stemline101.com/audio-to-midi">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Stemline101">
-<meta property="og:title" content="Hum to Notes — Stemline101">
-<meta property="og:description" content="Hum, sing or whistle a tune and Stemline 101 writes down the notes. Free preview, full chart and MIDI download with Premium.">
-<meta property="og:url" content="https://stemline101.com/hum-to-notes">
+<meta property="og:title" content="Audio to MIDI — Stemline101">
+<meta property="og:description" content="Record or upload a voice clip and Stemline 101 turns it into notes and a MIDI file. Free preview, full chart and MIDI download with Premium.">
+<meta property="og:url" content="https://stemline101.com/audio-to-midi">
 <meta property="og:image" content="https://stemline101.com/icon-512.png">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Hum to Notes — Stemline101">
-<meta name="twitter:description" content="Hum, sing or whistle a tune and Stemline 101 writes down the notes. Free preview, full chart and MIDI download with Premium.">
+<meta name="twitter:title" content="Audio to MIDI — Stemline101">
+<meta name="twitter:description" content="Record or upload a voice clip and Stemline 101 turns it into notes and a MIDI file. Free preview, full chart and MIDI download with Premium.">
 <meta name="twitter:image" content="https://stemline101.com/icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil:wght@700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -244,17 +244,17 @@
     </span>
     <span class="logo-text">STEMLINE 101</span>
   </a>
-  <div class="links"><a href="/">Mixer</a><a href="/sampler">Sampler</a><a href="/notation-viewer">Sheet music</a><a href="/hum-to-notes" class="here">Audio to MIDI</a></div>
+  <div class="links"><a href="/">Mixer</a><a href="/sampler">Sampler</a><a href="/notation-viewer">Sheet music</a><a href="/audio-to-midi" class="here">Audio to MIDI</a></div>
 </nav>
 
 
 <main>
-<div class="page-head"><div class="tag">Voice to notation</div><h1>Hum to notes</h1></div>
+<div class="page-head"><div class="tag">Voice to notation</div><h1>Audio to MIDI</h1></div>
 <section class="intro">
-  <h2>Hum, sing or whistle a tune and see the notes</h2>
+  <h2>Sing or whistle a tune and get the notes and MIDI</h2>
   <ol class="howto">
     <li><b>Log in</b> on the main page first.</li>
-    <li><b>Record.</b> Press Record, then hum, sing or whistle one note at a time. Stay close to the mic and keep it under a minute.</li>
+    <li><b>Record.</b> Press Record, then sing or whistle one note at a time. Stay close to the mic and keep it under a minute.</li>
     <li><b>Or upload</b> a recording of your voice instead.</li>
     <li><b>Notes appear on their own.</b> When you stop recording or pick a file, it listens and writes out the melody with tempo and key.</li>
     <li><b>Download (Premium).</b> Save the melody as MIDI or MusicXML to drop into FL Studio or any notation software.</li>
@@ -283,20 +283,20 @@
 <div id="info" class="info"></div>
 <div class="bezel"><div id="sheet"></div></div>
 
-<section class="seo-text" id="about-hum-to-notes">
-<h2>What Hum to Notes does</h2>
-<p>Hum to Notes listens to a short recording of your voice and writes down the melody you sang. It is a quick way to capture a tune that is stuck in your head, sketch a hook before you forget it, or turn a vocal idea into a MIDI part for your music program. Hum, sing, or whistle, and you get sheet music with the tempo and key, plus a MIDI file you can open in a DAW such as FL Studio.</p>
+<section class="seo-text" id="about-audio-to-midi">
+<h2>What Audio to MIDI does</h2>
+<p>Audio to MIDI listens to a short recording of your voice and writes down the melody you sang. It is a quick way to capture a tune that is stuck in your head, sketch a hook before you forget it, or turn a vocal idea into a MIDI part for your music program. Sing or whistle, and you get sheet music with the tempo and key, plus a MIDI file you can open in a DAW such as FL Studio.</p>
 
 <h2>Tips for better results</h2>
 <ul>
   <li>Record in a quiet room with no music playing behind you.</li>
-  <li>Sing or hum one clear note at a time. Slide between notes as little as you can.</li>
-  <li>Use "doo" or "la" instead of a long hum, so each note has a clear start.</li>
+  <li>Sing one clear note at a time. Slide between notes as little as you can.</li>
+  <li>Use "doo" or "la" instead of a long drawn-out note, so each note has a clear start.</li>
   <li>Keep a steady pace. A short pause before you start helps.</li>
   <li>Stay under a minute. Short phrases give the cleanest result.</li>
 </ul>
 
-<h2>Hum to Notes questions</h2>
+<h2>Audio to MIDI questions</h2>
 <h3>Does it work with more than one voice?</h3>
 <p>No. It follows a single melody line. Chords, harmonies and backing music will confuse it.</p>
 <h3>Why are some notes wrong?</h3>
@@ -391,7 +391,7 @@
     };
     src.connect(proc); proc.connect(ctx.destination);
     recording = true; recBtn.hidden = true; stopBtn.hidden = false;
-    var t0 = Date.now(); setStatus('Recording… hum, sing or whistle.');
+    var t0 = Date.now(); setStatus('Recording… sing or whistle.');
     timer = setInterval(function () {
       var s = Math.round((Date.now() - t0) / 1000); setStatus('Recording… ' + s + 's');
       if (s >= 60) stopRec();
