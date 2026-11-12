@@ -97,7 +97,12 @@ def _hum_to_midi(path, tempo, fmin=65.0, fmax=1000.0, min_ms=90):
 
     midi_f = np.full(n, np.nan)
     ok = voiced & ~np.isnan(f0)
-    midi_f[ok] = 69.0 + 12.0 * np.log2(f0[ok] / 440.0)
+    # Open a gap wherever the voice dips well below its nearby peak ("doo-doo",
+    # consonants, breaths): pYIN alone bridges those and runs notes together.
+    w = int(0.15 / (hop / float(sr)))
+    local_max = np.array([rms[max(0, i - w): i + w + 1].max() for i in range(n)])
+    ok &= rms >= 0.3 * local_max
+    midi_f[ok] =69.0 + 12.0 * np.log2(f0[ok] / 440.0)
     if ok.sum() < 3:
         return pretty_midi.PrettyMIDI(initial_tempo=tempo)
 
