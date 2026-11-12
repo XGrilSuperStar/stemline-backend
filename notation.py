@@ -905,6 +905,17 @@ def transcribe(audio_bytes, ext, instrument):
     raw_midi_bytes = raw_buf.getvalue()
     onsets = [n.start for i in midi.instruments for n in i.notes]
     bpm = _refine_bpm(onsets, prior)
+    # Stamp the downloaded MIDI with the same tempo shown on the page (not the
+    # first rough guess), keeping every note at the same real-time position.
+    import pretty_midi
+    fixed = pretty_midi.PrettyMIDI(initial_tempo=bpm)
+    for inst in out_midi.instruments:
+        ni = pretty_midi.Instrument(program=inst.program, name=inst.name)
+        ni.notes = list(inst.notes)
+        fixed.instruments.append(ni)
+    raw_buf = io.BytesIO()
+    fixed.write(raw_buf)
+    raw_midi_bytes = raw_buf.getvalue()
     beats, downbeat = _detect_meter(midi, bpm)
     midi = _quantize_midi(midi, bpm, beats, downbeat)
     if settings["mono"]:
