@@ -27,7 +27,7 @@ INSTRUMENT_SETTINGS = {
     # a solo voice recorded on purpose (hum / sing / whistle): no band bleed,
     # so thresholds can be gentler than for a separated vocal stem
     "hum":    {"fmin": 65.0, "fmax": 1400.0, "mono": True,  "title": "Voice",
-               "onset": 0.45, "frame": 0.3, "min_ms": 90, "vel": 0.25,
+               "onset": 0.45, "frame": 0.3, "min_ms": 150, "vel": 0.25,
                "dip_split": True},
     "piano":  {"fmin": 27.0, "fmax": 4200.0, "mono": False, "title": "Keys / Synth",
                "onset": 0.5, "frame": 0.3, "min_ms": 100, "vel": 0.25},
@@ -945,6 +945,18 @@ def transcribe(audio_bytes, ext, instrument):
         _force_single_line(midi)
     else:
         _force_chord_line(midi)
+
+    if instrument == "hum":
+        # Hummed lines: the downloaded MIDI is the grid-snapped version too, so
+        # notes start on the beat and are separate (a short rest after each),
+        # instead of the raw wobbly timing that sounds like fumbling.
+        grid = copy.deepcopy(midi)
+        _ensure_gap(grid, gap=7.5 / bpm, min_len=0.05, max_trim=0.5)
+        for inst in grid.instruments:
+            inst.name = settings["title"]
+        gbuf = io.BytesIO()
+        grid.write(gbuf)
+        raw_midi_bytes = gbuf.getvalue()
 
     # Name the track so DAWs (FL Studio's import dialog) list it instead of a blank row.
     for inst in midi.instruments:
