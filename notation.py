@@ -27,7 +27,7 @@ INSTRUMENT_SETTINGS = {
     # a solo voice recorded on purpose (hum / sing / whistle): no band bleed,
     # so thresholds can be gentler than for a separated vocal stem
     "hum":    {"fmin": 65.0, "fmax": 1400.0, "mono": True,  "title": "Voice",
-               "onset": 0.45, "frame": 0.3, "min_ms": 150, "vel": 0.25,
+               "onset": 0.45, "frame": 0.3, "min_ms": 110, "vel": 0.25,
                "dip_split": True},
     "piano":  {"fmin": 27.0, "fmax": 4200.0, "mono": False, "title": "Keys / Synth",
                "onset": 0.5, "frame": 0.3, "min_ms": 100, "vel": 0.25},
@@ -951,12 +951,18 @@ def transcribe(audio_bytes, ext, instrument):
     _merge_same_pitch(midi)
     if instrument == "hum":
         _fix_octave_outliers(midi)
-        _drop_weak_short_notes(midi)
     if rms is not None:
         if settings.get("dip_split"):
-            _split_on_volume_dips(midi, rms, hop_s)
+            if instrument == "hum":
+                # sung syllables dip less than "la la la": split on shallower dips
+                _split_on_volume_dips(midi, rms, hop_s, depth=0.6, min_part=0.08, min_dip=0.02)
+            else:
+                _split_on_volume_dips(midi, rms, hop_s)
             _collapse_slides(midi)
-            _merge_same_pitch(midi, max_gap=0.04)   # re-join one note that got cut in two
+            if instrument != "hum":   # hum: keep repeated syllables on one pitch separate
+                _merge_same_pitch(midi, max_gap=0.04)   # re-join one note that got cut in two
+        if instrument == "hum":
+            _drop_weak_short_notes(midi, short=0.12, keep_share=0.5)
         if settings["mono"]:
             _trim_note_ends(midi, rms, hop_s)
             _clean_fragments(midi)
