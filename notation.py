@@ -228,6 +228,23 @@ def _fix_octave_outliers(midi, span=3, jump=10):
                     n.pitch -= 12
 
 
+def _drop_weak_short_notes(midi, short=0.2, keep_share=0.7, tail_share=0.5):
+    """Sung line cleanup: a note under `short` seconds only counts if it is
+    clearly loud (breaths, consonants and slides are short AND quiet), and
+    quiet notes trailing off the end of the take are cut."""
+    import numpy as np
+    for inst in midi.instruments:
+        if len(inst.notes) < 6:
+            continue
+        loud = float(np.percentile([n.velocity for n in inst.notes], 90))
+        inst.notes = [n for n in inst.notes
+                      if (n.end - n.start) >= short or n.velocity >= keep_share * loud]
+        notes = sorted(inst.notes, key=lambda n: n.start)
+        while len(notes) > 4 and notes[-1].velocity < tail_share * loud:
+            notes.pop()
+        inst.notes = notes
+
+
 def _drop_tiny_notes(midi, min_seconds):
     for inst in midi.instruments:
         inst.notes = [n for n in inst.notes if (n.end - n.start) >= min_seconds]
@@ -934,6 +951,7 @@ def transcribe(audio_bytes, ext, instrument):
     _merge_same_pitch(midi)
     if instrument == "hum":
         _fix_octave_outliers(midi)
+        _drop_weak_short_notes(midi)
     if rms is not None:
         if settings.get("dip_split"):
             _split_on_volume_dips(midi, rms, hop_s)
