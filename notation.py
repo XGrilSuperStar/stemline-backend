@@ -217,6 +217,15 @@ def _fix_octave_outliers(midi, span=3, jump=10):
                 n.pitch -= 12
             while ref - n.pitch >= jump:
                 n.pitch += 12
+        # Also compare with the whole line: a run of low notes (the end of a
+        # take) can drag the local median down with it and hide the error.
+        if len(notes) >= 6:
+            top = float(np.median([n.pitch for n in notes]))
+            for n in notes:
+                while top - n.pitch >= jump:
+                    n.pitch += 12
+                while n.pitch - top >= jump + 2:
+                    n.pitch -= 12
 
 
 def _drop_tiny_notes(midi, min_seconds):
