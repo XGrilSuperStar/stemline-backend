@@ -106,6 +106,24 @@ def _hum_to_midi(path, tempo, fmin=65.0, fmax=1000.0, min_ms=90):
     if ok.sum() < 3:
         return pretty_midi.PrettyMIDI(initial_tempo=tempo)
 
+    # pYIN sometimes locks onto half or double the real frequency (a note an
+    # octave off, or a stray low "extra" note). Pull any frame that sits far
+    # from the voice's nearby median back by octaves.
+    idx = np.where(ok)[0]
+    if idx.size > 5:
+        w2 = int(0.8 / (hop / float(sr)))
+        vals = midi_f[idx]
+        for j, i in enumerate(idx):
+            lo = np.searchsorted(idx, i - w2)
+            hi = np.searchsorted(idx, i + w2, side="right")
+            ref = np.median(vals[lo:hi])
+            v = midi_f[i]
+            while v - ref > 9.5:
+                v -= 12
+            while ref - v > 9.5:
+                v += 12
+            midi_f[i] = v
+
     # Singers are rarely exactly in tune with A440: measure how far off they
     # sit on average (circular median of the cents offset) and correct it.
     frac = midi_f[ok] - np.round(midi_f[ok])
