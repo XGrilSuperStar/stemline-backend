@@ -201,6 +201,24 @@ def _drop_quiet_notes(midi, share):
         inst.notes = [n for n in inst.notes if n.velocity >= share * loud]
 
 
+def _fix_octave_outliers(midi, span=3, jump=10):
+    """A sung note an octave away from the notes around it is almost always a
+    tracking error (the end of a recording is where it happens most). Move it
+    by octaves toward the neighbouring notes."""
+    import numpy as np
+    for inst in midi.instruments:
+        notes = sorted(inst.notes, key=lambda n: n.start)
+        for i, n in enumerate(notes):
+            near = [m.pitch for m in notes[max(0, i - span): i] + notes[i + 1: i + 1 + span]]
+            if len(near) < 2:
+                continue
+            ref = float(np.median(near))
+            while n.pitch - ref >= jump:
+                n.pitch -= 12
+            while ref - n.pitch >= jump:
+                n.pitch += 12
+
+
 def _drop_tiny_notes(midi, min_seconds):
     for inst in midi.instruments:
         inst.notes = [n for n in inst.notes if (n.end - n.start) >= min_seconds]
@@ -905,6 +923,8 @@ def transcribe(audio_bytes, ext, instrument):
     if settings.get("fold_above"):
         _fold_octaves(midi, settings["fold_above"])
     _merge_same_pitch(midi)
+    if instrument == "hum":
+        _fix_octave_outliers(midi)
     if rms is not None:
         if settings.get("dip_split"):
             _split_on_volume_dips(midi, rms, hop_s)
@@ -951,7 +971,7 @@ def transcribe(audio_bytes, ext, instrument):
         # notes start on the beat and are separate (a short rest after each),
         # instead of the raw wobbly timing that sounds like fumbling.
         grid = copy.deepcopy(midi)
-        _ensure_gap(grid, gap=7.5 / bpm, min_len=0.05, max_trim=0.5)
+        _ensure_gap(grid, gap=0.10, min_len=0.08, max_trim=0.5)
         for inst in grid.instruments:
             inst.name = settings["title"]
         gbuf = io.BytesIO()
