@@ -103,7 +103,13 @@
   .chip b { font-size: 1.15rem; font-weight: 700; color: #fff; }
   .res-btns { display: flex; flex-wrap: wrap; gap: 0.6rem; }
   .roll-wrap { background: #0c0c0e; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
-  #roll { display: block; width: 100%; height: 260px; }
+  .roll-wrap { position: relative; touch-action: none; user-select: none; }
+  #wave { display: block; width: 100%; height: 72px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  #roll { display: block; width: 100%; height: 340px; cursor: default; }
+  .editor-bar { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin-bottom: 0.8rem; }
+  .editor-bar .chk { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; color: var(--chrome-dim); cursor: pointer; }
+  .editor-bar .hint { flex-basis: 100%; font-size: 0.8rem; color: var(--steel); }
+  #edited { display: none; margin: 0.6rem 0 0; font-size: 0.82rem; color: var(--amber); }
   .res-label { margin: 1.4rem 0 0.6rem; font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--chrome-dim); }
   #sheet { background: #fff; color: #111; border-radius: 12px; padding: 1rem; min-height: 120px; }
 
@@ -139,7 +145,7 @@
     .grid3 { grid-template-columns: 1fr; }
     .drop { padding: 1.6rem 0.9rem; border-width: 8px; border-radius: 42px; margin-bottom: 3.4rem; } .drop::before { inset: -8px; border-radius: 42px; } .drop .plate { padding: 1.2rem 0.9rem; }
     .results { padding: 1rem; }
-    #roll { height: 200px; }
+    #roll { height: 260px; } #wave { height: 56px; }
   }
 </style>
 <style>
@@ -208,7 +214,16 @@
       <button id="dlmidi" class="btn btn-solid" disabled>Download MIDI</button>
     </div>
   </div>
-  <div class="roll-wrap"><canvas id="roll"></canvas></div>
+  <div class="editor-bar">
+    <button id="play" class="btn btn-solid" type="button">&#9654;&nbsp; Play</button>
+    <label class="chk"><input type="checkbox" id="hearVoice" checked> My voice</label>
+    <label class="chk"><input type="checkbox" id="hearNotes" checked> Notes</label>
+    <button id="delNote" class="btn btn-ghost" type="button" disabled>Delete note</button>
+    <button id="undo" class="btn btn-ghost" type="button" disabled>Undo</button>
+    <span class="hint">Click a note to hear it. Drag it up or down to change its pitch, or sideways to move it. Double-click empty space to add a note. Click the waveform to jump to that spot.</span>
+  </div>
+  <div class="roll-wrap" id="rollWrap"><canvas id="wave"></canvas><canvas id="roll"></canvas></div>
+  <p id="edited">You changed the notes. The MIDI download has your changes; the sheet music below still shows the original.</p>
   <div class="res-label">Sheet music</div>
   <div id="sheet"></div>
 </section>
@@ -285,7 +300,7 @@
   var $ = function (id) { return document.getElementById(id); };
   var statusEl = $('status'), infoEl = $('info'), recBtn = $('rec'), goBtn = $('go'),
       xmlBtn = $('dlxml'), midiBtn = $('dlmidi'), player = $('player'), meter = $('meter').firstChild,
-      stopBtn = $('stop'), labelEl = $('label'), resultsEl = $('results'), rollEl = $('roll'), dropEl = $('drop'), rollNotes = null;
+      stopBtn = $('stop'), labelEl = $('label'), resultsEl = $('results'), rollEl = $('roll'), dropEl = $('drop');
   // File name for downloads comes from the label the person typed.
   function fileBase() {
     var n = (labelEl.value || '').trim().replace(/[\\\/:*?"<>|]+/g, '').replace(/\s+/g, ' ').slice(0, 60);
@@ -379,38 +394,231 @@
   ['dragleave', 'drop'].forEach(function (ev) { dropEl.addEventListener(ev, function (e) { e.preventDefault(); dropEl.classList.remove('over'); }); });
   dropEl.addEventListener('drop', function (e) { handleFile(e.dataTransfer && e.dataTransfer.files[0]); });
 
-  // ---- piano roll: draws the notes as bars on a keyboard
+  // ---- editor: waveform on top, piano roll with a real keyboard under it, click / drag / delete notes
+  var waveEl = $('wave'), playBtn = $('play'), delBtn = $('delNote'), undoBtn = $('undo'), editedEl = $('edited');
+  var notesArr = [], sel = -1, voiceBuf = null, peaks = null, undoStack = [], edited = false, lastBpm = 120;
+  var lo = 48, hi = 72, endT = 1, keysW = 58, pad = 8, playPos = 0, playing = false, pctx = null, voiceSrc = null, tones = [], raf = 0, playT0 = 0, playFrom = 0;
+  var BLACK = [1, 3, 6, 8, 10];
+  function geo() {
+    var W = rollEl.clientWidth, H = rollEl.clientHeight, rows = hi - lo + 1;
+    return { W: W, H: H, rows: rows, rh: (H - pad * 2) / rows, pw: W - keysW - pad };
+  }
+  function tx(t, g) { return keysW + (t / endT) * g.pw; }
+  function xt(x, g) { return Math.max(0, Math.min(endT, (x - keysW) / g.pw * endT)); }
+  function py(p, g) { return pad + (hi - p) * g.rh; }
+  function yp(y, g) { return Math.max(lo, Math.min(hi, hi - Math.floor((y - pad) / g.rh))); }
+  function pitchName(p) { return ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][p % 12] + (Math.floor(p / 12) - 1); }
+
+  function setupRoll(raw, bpm) {
+    notesArr = (raw || []).map(function (n) { return { p: n[0], s: n[1], e: n[2] }; });
+    lastBpm = bpm || 120; sel = -1; undoStack = []; edited = false; editedEl.style.display = 'none';
+    var l = Infinity, h = -Infinity, e = 0;
+    notesArr.forEach(function (n) { l = Math.min(l, n.p); h = Math.max(h, n.p); e = Math.max(e, n.e); });
+    if (!isFinite(l)) { l = 55; h = 66; }
+    lo = Math.max(21, l - 4); hi = Math.min(108, h + 4); if (hi - lo < 14) { hi = Math.min(108, lo + 14); }
+    endT = Math.max(1, e, voiceBuf ? voiceBuf.duration : 0); playPos = 0;
+    updateBtns(); drawRoll();
+  }
+  function updateBtns() { delBtn.disabled = sel < 0; undoBtn.disabled = !undoStack.length; }
+  function snapshot() { undoStack.push(JSON.stringify(notesArr)); if (undoStack.length > 60) undoStack.shift(); updateBtns(); }
+  function markEdited() { edited = true; editedEl.style.display = 'block'; }
+  function sortNotes() { var cur = sel >= 0 ? notesArr[sel] : null; notesArr.sort(function (a, b) { return a.s - b.s; }); sel = cur ? notesArr.indexOf(cur) : -1; }
+
   function drawRoll() {
-    var notes = rollNotes; if (!notes || !notes.length) return;
-    var dpr = window.devicePixelRatio || 1, W = rollEl.clientWidth, H = rollEl.clientHeight;
-    rollEl.width = W * dpr; rollEl.height = H * dpr;
-    var c = rollEl.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H);
-    var lo = Infinity, hi = -Infinity, end = 0;
-    notes.forEach(function (n) { lo = Math.min(lo, n[0]); hi = Math.max(hi, n[0]); end = Math.max(end, n[2]); });
-    lo = Math.max(0, lo - 2); hi = hi + 2; if (hi - lo < 11) hi = lo + 11;
-    var keysW = 44, pad = 10, rows = hi - lo + 1, rh = (H - pad * 2) / rows, pw = W - keysW - pad, black = [1, 3, 6, 8, 10];
-    var names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-    for (var p = lo; p <= hi; p++) {
-      var y = pad + (hi - p) * rh, isB = black.indexOf(p % 12) >= 0;
-      c.fillStyle = isB ? '#0f0f12' : '#141418'; c.fillRect(keysW, y, pw, rh);
-      c.fillStyle = isB ? '#1c1c20' : '#e8eaee'; c.fillRect(0, y + 0.5, keysW - 2, rh - 1);
-      if (p % 12 === 0) { c.fillStyle = '#555'; c.font = '10px Inter, sans-serif'; c.textBaseline = 'middle'; c.fillText('C' + (Math.floor(p / 12) - 1), 6, y + rh / 2); }
-      c.strokeStyle = 'rgba(216,220,226,0.06)'; c.beginPath(); c.moveTo(keysW, y + rh); c.lineTo(W - pad, y + rh); c.stroke();
+    var g = geo(), dpr = window.devicePixelRatio || 1;
+    // --- waveform
+    var WH = waveEl.clientHeight;
+    waveEl.width = g.W * dpr; waveEl.height = WH * dpr;
+    var wc = waveEl.getContext('2d'); wc.setTransform(dpr, 0, 0, dpr, 0, 0); wc.clearRect(0, 0, g.W, WH);
+    wc.fillStyle = '#0c0c0e'; wc.fillRect(0, 0, g.W, WH);
+    wc.fillStyle = '#6B7078'; wc.font = '10px Inter, sans-serif'; wc.textBaseline = 'middle'; wc.fillText('Audio', 8, WH / 2);
+    if (peaks) {
+      wc.fillStyle = '#E7A33E';
+      var per = 100;  // peaks per second
+      for (var x = 0; x < g.pw; x++) {
+        var t0 = x / g.pw * endT, t1 = (x + 1) / g.pw * endT, i0 = Math.floor(t0 * per), i1 = Math.max(i0 + 1, Math.ceil(t1 * per)), m = 0;
+        for (var i = i0; i < i1 && i < peaks.length; i++) if (peaks[i] > m) m = peaks[i];
+        var hgt = Math.max(1, m * (WH - 8));
+        wc.fillRect(keysW + x, (WH - hgt) / 2, 1, hgt);
+      }
     }
-    var secs = Math.max(1, Math.ceil(end));
-    for (var s = 0; s <= secs; s++) {
-      var x = keysW + (s / end) * pw; if (x > W - pad + 1) break;
-      c.strokeStyle = 'rgba(216,220,226,0.07)'; c.beginPath(); c.moveTo(x, pad); c.lineTo(x, H - pad); c.stroke();
+    var px = tx(playPos, g); wc.fillStyle = '#ff6a3d'; wc.fillRect(px, 0, 1.5, WH);
+    // --- roll
+    rollEl.width = g.W * dpr; rollEl.height = g.H * dpr;
+    var c = rollEl.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, g.W, g.H);
+    c.fillStyle = '#0c0c0e'; c.fillRect(0, 0, g.W, g.H);
+    var p;
+    for (p = lo; p <= hi; p++) {
+      var y = py(p, g), isB = BLACK.indexOf(p % 12) >= 0;
+      c.fillStyle = isB ? '#101013' : '#16161a'; c.fillRect(keysW, y, g.pw, g.rh);
+      c.strokeStyle = 'rgba(216,220,226,' + (p % 12 === 0 ? '0.16' : '0.05') + ')'; c.beginPath(); c.moveTo(keysW, y + g.rh); c.lineTo(g.W - pad, y + g.rh); c.stroke();
     }
-    notes.forEach(function (n) {
-      var x = keysW + (n[1] / end) * pw, w = Math.max(3, ((n[2] - n[1]) / end) * pw - 1), y = pad + (hi - n[0]) * rh;
-      var g = c.createLinearGradient(0, y, 0, y + rh); g.addColorStop(0, '#f2b453'); g.addColorStop(1, '#d98f26');
-      c.fillStyle = g; c.beginPath();
-      if (c.roundRect) c.roundRect(x, y + 1, w, Math.max(3, rh - 2), 3); else c.rect(x, y + 1, w, Math.max(3, rh - 2));
+    // time grid (every second)
+    for (var s2 = 0; s2 <= Math.ceil(endT); s2++) {
+      var gx = tx(s2, g); if (gx > g.W - pad + 1) break;
+      c.strokeStyle = 'rgba(216,220,226,0.07)'; c.beginPath(); c.moveTo(gx, pad); c.lineTo(gx, g.H - pad); c.stroke();
+    }
+    // keyboard: white keys first, then the shorter black keys on top
+    for (p = lo; p <= hi; p++) {
+      if (BLACK.indexOf(p % 12) >= 0) continue;
+      var ky = py(p, g);
+      var gr = c.createLinearGradient(0, 0, keysW, 0); gr.addColorStop(0, '#d9dce1'); gr.addColorStop(1, '#fbfcfd');
+      c.fillStyle = gr; c.fillRect(0, ky, keysW - 1, g.rh);
+      c.strokeStyle = '#8b919a'; c.beginPath(); c.moveTo(0, ky + g.rh - 0.5); c.lineTo(keysW - 1, ky + g.rh - 0.5); c.stroke();
+      if (p % 12 === 0) { c.fillStyle = '#444'; c.font = '10px Inter, sans-serif'; c.textBaseline = 'middle'; c.fillText('C' + (Math.floor(p / 12) - 1), keysW - 22, ky + g.rh / 2); }
+    }
+    for (p = lo; p <= hi; p++) {
+      if (BLACK.indexOf(p % 12) < 0) continue;
+      var by = py(p, g), gb = c.createLinearGradient(0, 0, keysW * 0.62, 0); gb.addColorStop(0, '#000'); gb.addColorStop(1, '#3a3d44');
+      c.fillStyle = gb; c.fillRect(0, by, keysW * 0.62, g.rh);
+    }
+    // notes
+    notesArr.forEach(function (n, i) {
+      var x = tx(n.s, g), w = Math.max(4, tx(n.e, g) - x - 1), y = py(n.p, g), h = Math.max(4, g.rh - 2);
+      var gn = c.createLinearGradient(0, y, 0, y + h);
+      if (i === sel) { gn.addColorStop(0, '#ffd27a'); gn.addColorStop(1, '#f0a02e'); } else { gn.addColorStop(0, '#f2b453'); gn.addColorStop(1, '#d98f26'); }
+      c.fillStyle = gn; c.beginPath();
+      if (c.roundRect) c.roundRect(x, y + 1, w, h, 3); else c.rect(x, y + 1, w, h);
       c.fill();
+      if (i === sel) { c.strokeStyle = '#fff'; c.lineWidth = 1.5; c.stroke(); c.lineWidth = 1; }
     });
+    // playhead
+    c.fillStyle = '#ff6a3d'; c.fillRect(px, 0, 1.5, g.H);
   }
   window.addEventListener('resize', drawRoll);
+
+  // ---- sound: short piano-ish tones for clicking / playing notes
+  function audioCtx() {
+    if (!pctx) pctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (pctx.state === 'suspended') pctx.resume();
+    return pctx;
+  }
+  function tone(p, when, dur, vol) {
+    var ac = audioCtx(), t = when == null ? ac.currentTime : when, f = 440 * Math.pow(2, (p - 69) / 12);
+    var o = ac.createOscillator(), o2 = ac.createOscillator(), gn = ac.createGain();
+    o.type = 'triangle'; o2.type = 'sine'; o.frequency.value = f; o2.frequency.value = f * 2;
+    var g2 = ac.createGain(); g2.gain.value = 0.25; o2.connect(g2); g2.connect(gn); o.connect(gn); gn.connect(ac.destination);
+    var v = vol || 0.3; gn.gain.setValueAtTime(0.0001, t); gn.gain.exponentialRampToValueAtTime(v, t + 0.012);
+    gn.gain.exponentialRampToValueAtTime(0.0001, t + Math.max(0.1, dur));
+    o.start(t); o2.start(t); o.stop(t + dur + 0.05); o2.stop(t + dur + 0.05);
+    tones.push(o, o2);
+  }
+  function stopPlay() {
+    playing = false; cancelAnimationFrame(raf); playBtn.innerHTML = '&#9654;&nbsp; Play';
+    if (voiceSrc) { try { voiceSrc.stop(); } catch (e) {} voiceSrc = null; }
+    tones.forEach(function (o) { try { o.stop(); } catch (e) {} }); tones = [];
+  }
+  function startPlay() {
+    var ac = audioCtx(), from = playPos >= endT - 0.05 ? 0 : playPos, t0 = ac.currentTime + 0.06;
+    playFrom = from; playT0 = t0; playing = true; playBtn.innerHTML = '&#9632;&nbsp; Stop';
+    if ($('hearVoice').checked && voiceBuf) {
+      voiceSrc = ac.createBufferSource(); voiceSrc.buffer = voiceBuf; voiceSrc.connect(ac.destination); voiceSrc.start(t0, from);
+    }
+    if ($('hearNotes').checked) {
+      notesArr.forEach(function (n) { if (n.e > from) tone(n.p, t0 + Math.max(0, n.s - from), Math.max(0.12, n.e - Math.max(n.s, from)), 0.22); });
+    }
+    (function tick() {
+      if (!playing) return;
+      playPos = playFrom + (ac.currentTime - playT0);
+      if (playPos >= endT) { playPos = endT; stopPlay(); drawRoll(); return; }
+      if (playPos < 0) playPos = 0;
+      drawRoll(); raf = requestAnimationFrame(tick);
+    })();
+  }
+  playBtn.addEventListener('click', function () { if (playing) stopPlay(); else startPlay(); });
+
+  // ---- mouse / touch editing
+  var drag = null;
+  function hit(x, y) {
+    var g = geo();
+    for (var i = notesArr.length - 1; i >= 0; i--) {
+      var n = notesArr[i], nx = tx(n.s, g), nw = Math.max(6, tx(n.e, g) - nx), ny = py(n.p, g);
+      if (x >= nx - 2 && x <= nx + nw + 2 && y >= ny && y <= ny + g.rh) return i;
+    }
+    return -1;
+  }
+  function pos(e) { var r = rollEl.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+  rollEl.addEventListener('pointerdown', function (e) {
+    var q = pos(e), g = geo();
+    if (q.x < keysW) { tone(yp(q.y, g), null, 0.5, 0.3); return; }       // click a piano key
+    var i = hit(q.x, q.y);
+    if (i < 0) { sel = -1; updateBtns(); drawRoll(); return; }
+    sel = i; var n = notesArr[i]; tone(n.p, null, 0.45, 0.3); updateBtns();
+    drag = { i: i, x0: q.x, y0: q.y, p0: n.p, s0: n.s, e0: n.e, mode: null, pushed: false };
+    rollEl.setPointerCapture(e.pointerId); drawRoll();
+  });
+  rollEl.addEventListener('pointermove', function (e) {
+    if (!drag) return;
+    var q = pos(e), g = geo(), n = notesArr[drag.i], dx = q.x - drag.x0, dy = q.y - drag.y0;
+    if (!drag.mode) {
+      if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+      drag.mode = Math.abs(dx) > Math.abs(dy) ? 'time' : 'pitch';
+    }
+    if (!drag.pushed) { snapshot(); drag.pushed = true; }
+    if (drag.mode === 'pitch') {
+      var np = Math.max(lo, Math.min(hi, drag.p0 - Math.round(dy / g.rh)));
+      if (np !== n.p) { n.p = np; tone(np, null, 0.35, 0.25); markEdited(); }
+    } else {
+      var d = dx / g.pw * endT, len = drag.e0 - drag.s0, ns = Math.max(0, Math.min(endT - len, drag.s0 + d));
+      n.s = ns; n.e = ns + len; markEdited();
+    }
+    drawRoll();
+  });
+  function endDrag() { if (drag && drag.mode === 'time') sortNotes(); drag = null; drawRoll(); }
+  rollEl.addEventListener('pointerup', endDrag); rollEl.addEventListener('pointercancel', endDrag);
+  rollEl.addEventListener('dblclick', function (e) {
+    var q = pos(e), g = geo(); if (q.x < keysW || hit(q.x, q.y) >= 0) return;
+    snapshot(); var s0 = xt(q.x, g), p = yp(q.y, g);
+    notesArr.push({ p: p, s: s0, e: Math.min(endT, s0 + 0.3) }); sortNotes(); sel = notesArr.findIndex(function (n) { return n.p === p && n.s === s0; });
+    tone(p, null, 0.4, 0.3); markEdited(); updateBtns(); drawRoll();
+  });
+  waveEl.addEventListener('click', function (e) {
+    var r = waveEl.getBoundingClientRect(), g = geo(); var t = xt(e.clientX - r.left, g);
+    var was = playing; if (was) stopPlay(); playPos = t; drawRoll(); if (was) startPlay();
+  });
+  function deleteSel() {
+    if (sel < 0) return; snapshot(); notesArr.splice(sel, 1); sel = -1; markEdited(); updateBtns(); drawRoll();
+  }
+  delBtn.addEventListener('click', deleteSel);
+  undoBtn.addEventListener('click', function () {
+    if (!undoStack.length) return; notesArr = JSON.parse(undoStack.pop()); sel = -1; markEdited(); updateBtns(); drawRoll();
+  });
+  document.addEventListener('keydown', function (e) {
+    var tg = (e.target && e.target.tagName) || ''; if (tg === 'INPUT' || tg === 'TEXTAREA') return;
+    if (e.key === 'Delete' || e.key === 'Backspace') { if (sel >= 0) { e.preventDefault(); deleteSel(); } }
+    else if (e.key === ' ' && resultsEl.hidden === false) { e.preventDefault(); playBtn.click(); }
+  });
+
+  // waveform data from the recording (peaks every 10 ms)
+  async function loadVoice(blob) {
+    voiceBuf = null; peaks = null;
+    try {
+      var oc = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 1, 22050);
+      voiceBuf = await oc.decodeAudioData(await blob.arrayBuffer());
+      var ch = voiceBuf.getChannelData(0), per = voiceBuf.sampleRate / 100, n = Math.ceil(ch.length / per), mx = 0.001;
+      peaks = new Float32Array(n);
+      for (var i = 0; i < n; i++) { var m = 0, e0 = Math.min(ch.length, Math.floor((i + 1) * per)); for (var j = Math.floor(i * per); j < e0; j++) { var v = Math.abs(ch[j]); if (v > m) m = v; } peaks[i] = m; if (m > mx) mx = m; }
+      for (var k = 0; k < n; k++) peaks[k] = Math.pow(peaks[k] / mx, 0.7);
+    } catch (e) { voiceBuf = null; peaks = null; }
+  }
+
+  // MIDI file built in the browser from the edited notes
+  function buildMidi(list, bpm) {
+    var ppq = 480, tps = ppq * bpm / 60, ev = [];
+    list.forEach(function (n) { ev.push([Math.round(n.s * tps), 1, n.p], [Math.max(Math.round(n.e * tps), Math.round(n.s * tps) + 1), 0, n.p]); });
+    ev.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+    var d = [];
+    function vlq(v) { var b = [v & 0x7f]; while ((v >>= 7)) b.unshift((v & 0x7f) | 0x80); return b; }
+    var mpq = Math.round(60000000 / bpm);
+    d.push(0, 0xFF, 0x51, 3, (mpq >> 16) & 255, (mpq >> 8) & 255, mpq & 255);
+    d.push(0, 0xFF, 0x03, 5, 86, 111, 105, 99, 101);   // track name "Voice"
+    var last = 0;
+    ev.forEach(function (x) { d = d.concat(vlq(x[0] - last)); last = x[0]; d.push(x[1] ? 0x90 : 0x80, x[2] & 127, x[1] ? 90 : 0); });
+    d.push(0, 0xFF, 0x2F, 0);
+    var head = [0x4d, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 0, 0, 1, ppq >> 8, ppq & 255];
+    var len = d.length, trk = [0x4d, 0x54, 0x72, 0x6b, (len >>> 24) & 255, (len >>> 16) & 255, (len >>> 8) & 255, len & 255];
+    return new Uint8Array(head.concat(trk, d));
+  }
 
   goBtn.addEventListener('click', async function () {
     if (!wavBlob) return;
@@ -422,7 +630,7 @@
       if (!r.ok) { var msg = 'Something went wrong.'; try { msg = (await r.json()).detail || msg; } catch (e) {} throw new Error(msg); }
       var d = await r.json();
       if (!osmd) osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay('sheet', { autoResize: true, drawTitle: true });
-      resultsEl.hidden = false; rollNotes = d.notes || []; drawRoll();
+      stopPlay(); resultsEl.hidden = false; await loadVoice(wavBlob); setupRoll(d.notes || [], d.bpm);
       await osmd.load(d.musicxml); osmd.render(); showInfo(d.musicxml, d.bpm);
       resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
       xmlBtn.disabled = false; midiBtn.disabled = false;
@@ -434,7 +642,9 @@
         setStatus('Done. ' + d.note_count + ' notes found.');
         xmlBtn.onclick = function () { save(new Blob([d.musicxml], { type: 'application/xml' }), fileBase() + '.musicxml'); };
         midiBtn.onclick = function () {
-          var b = atob(d.midi_b64), u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i);
+          var u;
+          if (edited) { u = buildMidi(notesArr, lastBpm); }
+          else { var b = atob(d.midi_b64); u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); }
           save(new Blob([u], { type: 'audio/midi' }), fileBase() + '.mid');
         };
       }
