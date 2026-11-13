@@ -385,6 +385,37 @@ def _collapse_slides(midi, max_gap=0.06, short=0.16, min_run=2):
         inst.notes = notes
 
 
+def _fold_short_into_neighbour(midi, short=0.14, max_gap=0.06):
+    """A very short note right next to a longer note one or two semitones away
+    is almost always pitch wobble on the way into (or out of) the longer note.
+    Fold it into that neighbour (the neighbour grows to cover it)."""
+    for inst in midi.instruments:
+        notes = sorted(inst.notes, key=lambda n: n.start)
+        changed = True
+        while changed:
+            changed = False
+            for i, n in enumerate(notes):
+                ln = n.end - n.start
+                if ln >= short:
+                    continue
+                cands = []
+                for j in (i - 1, i + 1):
+                    if 0 <= j < len(notes):
+                        m = notes[j]
+                        gap = (n.start - m.end) if j < i else (m.start - n.end)
+                        if gap <= max_gap and 1 <= abs(m.pitch - n.pitch) <= 2 and (m.end - m.start) > ln:
+                            cands.append(m)
+                if not cands:
+                    continue
+                keep = max(cands, key=lambda m: m.end - m.start)
+                keep.start = min(keep.start, n.start)
+                keep.end = max(keep.end, n.end)
+                notes.pop(i)
+                changed = True
+                break
+        inst.notes = notes
+
+
 def _split_on_volume_dips(midi, rms, hop_s, depth=0.3, min_part=0.10, min_dip=0.03):
     """The pitch model can't tell two sung notes of the SAME pitch apart ("la la
     la" comes out as one long note). The volume can: between repeated notes the
@@ -996,6 +1027,8 @@ def transcribe(audio_bytes, ext, instrument):
             # sung line: only real slides (3+ notes stepping one way) get folded,
             # so notes a semitone or two apart in the melody survive
             _collapse_slides(midi, min_run=3 if instrument == "hum" else 2)
+            if instrument == "hum":
+                _fold_short_into_neighbour(midi)
             if instrument != "hum":   # hum: keep repeated syllables on one pitch separate
                 _merge_same_pitch(midi, max_gap=0.04)   # re-join one note that got cut in two
         if instrument == "hum":
