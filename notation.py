@@ -580,9 +580,13 @@ def _detect_meter(midi, bpm):
     return use, float(first_beat_pos + ph * b)
 
 
-def _quantize_midi(midi, bpm, beats=4, downbeat=None):
+def _quantize_midi(midi, bpm, beats=4, downbeat=None, real_lengths=False, gap=0.03, min_len=0.06):
     """Snap note starts/ends to a 16th-note grid at `bpm`, then return a new
-    PrettyMIDI. No triplets, no tiny rests: one clean grid."""
+    PrettyMIDI. No triplets, no tiny rests: one clean grid.
+
+    real_lengths=True (sung line, downloaded MIDI): only the note STARTS snap to
+    the grid; each note keeps the length it was actually sung, with a small
+    rest `gap` before the next note, so short and long notes stay short/long."""
     import numpy as np
     import pretty_midi
 
@@ -613,13 +617,23 @@ def _quantize_midi(midi, bpm, beats=4, downbeat=None):
         for n in sorted(inst.notes, key=lambda n: n.start):
             s = max(0, int(round((n.start + shift - off) / g)))
             e = max(s + 1, int(round((n.end + shift - off) / g)))
-            notes.append([s, e, n.pitch, n.velocity])
+            notes.append([s, e, n.pitch, n.velocity, n.end - n.start])
+        if real_lengths:
+            for k, (s, e, p, v, length) in enumerate(notes):
+                st = s * g
+                en = st + max(length, min_len)
+                if k + 1 < len(notes):
+                    nxt = notes[k + 1][0] * g
+                    en = min(en, nxt - gap) if nxt - gap > st + 0.03 else st + 0.03
+                new.notes.append(pretty_midi.Note(velocity=v, pitch=p, start=st, end=en))
+            out.instruments.append(new)
+            continue
         for a, b in zip(notes, notes[1:]):  # no overlaps on one line / same pitch
             if a[2] == b[2] or b[0] - a[1] < 0:
                 a[1] = max(a[0] + 1, min(a[1], b[0]))
             if 0 < b[0] - a[1] <= 1 and True:
                 a[1] = b[0]  # fill one-16th gaps instead of writing tiny rests
-        for s, e, p, v in notes:
+        for s, e, p, v, _len in notes:
             new.notes.append(pretty_midi.Note(velocity=v, pitch=p, start=s * g, end=e * g))
         out.instruments.append(new)
     return out
@@ -1016,6 +1030,7 @@ def transcribe(audio_bytes, ext, instrument):
     fixed.write(raw_buf)
     raw_midi_bytes = raw_buf.getvalue()
     beats, downbeat = _detect_meter(midi, bpm)
+    real_midi = copy.deepcopy(midi)
     midi = _quantize_midi(midi, bpm, beats, downbeat)
     if settings["mono"]:
         _force_single_line(midi)
@@ -1026,8 +1041,9 @@ def transcribe(audio_bytes, ext, instrument):
         # Hummed lines: the downloaded MIDI is the grid-snapped version too, so
         # notes start on the beat and are separate (a short rest after each),
         # instead of the raw wobbly timing that sounds like fumbling.
-        grid = copy.deepcopy(midi)
-        _ensure_gap(grid, gap=0.10, min_len=0.08, max_trim=0.5)
+        # Starts snap to the beat grid, but each note keeps its sung length.
+        grid = _quantize_midi(real_midi, bpm, beats, downbeat, real_lengths=True)
+        _force_single_line(grid)
         for inst in grid.instruments:
             inst.name = settings["title"]
         gbuf = io.BytesIO()
