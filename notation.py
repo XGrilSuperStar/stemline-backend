@@ -385,7 +385,7 @@ def _collapse_slides(midi, max_gap=0.06, short=0.16, min_run=2):
         inst.notes = notes
 
 
-def _fold_short_into_neighbour(midi, short=0.14, max_gap=0.14):
+def _fold_short_into_neighbour(midi, short=0.12, max_gap=0.10):
     """A very short note right next to a longer note one or two semitones away
     is almost always pitch wobble on the way into (or out of) the longer note.
     Fold it into that neighbour (the neighbour grows to cover it)."""
@@ -1032,7 +1032,7 @@ def transcribe(audio_bytes, ext, instrument):
             if instrument != "hum":   # hum: keep repeated syllables on one pitch separate
                 _merge_same_pitch(midi, max_gap=0.04)   # re-join one note that got cut in two
         if instrument == "hum":
-            _drop_weak_short_notes(midi, short=0.15, keep_share=0.5)
+            _drop_weak_short_notes(midi, short=0.12, keep_share=0.5)
         if settings["mono"]:
             _trim_note_ends(midi, rms, hop_s)
             _clean_fragments(midi)
