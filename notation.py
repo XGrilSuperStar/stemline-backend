@@ -228,6 +228,24 @@ def _fix_octave_outliers(midi, span=3, jump=10):
                     n.pitch -= 12
 
 
+def _drop_neighbour_blips(midi, short=0.16, max_gap=0.25, max_step=3):
+    """A very short, quieter note sandwiched between two notes of the SAME
+    pitch (a wobble up or down and back) is a blip, not a sung note: remove it
+    and let the first note hold through."""
+    for inst in midi.instruments:
+        notes = sorted(inst.notes, key=lambda n: n.start)
+        drop = set()
+        for i in range(1, len(notes) - 1):
+            a, n, b = notes[i - 1], notes[i], notes[i + 1]
+            if (n.end - n.start) < short and a.pitch == b.pitch \
+                    and 1 <= abs(n.pitch - a.pitch) <= max_step \
+                    and n.start - a.end <= max_gap and b.start - n.end <= max_gap \
+                    and n.velocity < min(a.velocity, b.velocity):
+                drop.add(i)
+                a.end = max(a.end, n.end)
+        inst.notes = [n for i, n in enumerate(notes) if i not in drop]
+
+
 def _drop_weak_short_notes(midi, short=0.2, keep_share=0.7, tail_share=0.5):
     """Sung line cleanup: a note under `short` seconds only counts if it is
     clearly loud (breaths, consonants and slides are short AND quiet), and
@@ -1033,6 +1051,7 @@ def transcribe(audio_bytes, ext, instrument):
                 _merge_same_pitch(midi, max_gap=0.04)   # re-join one note that got cut in two
         if instrument == "hum":
             _drop_weak_short_notes(midi, short=0.12, keep_share=0.5)
+            _drop_neighbour_blips(midi)
         if settings["mono"]:
             _trim_note_ends(midi, rms, hop_s)
             _clean_fragments(midi)
