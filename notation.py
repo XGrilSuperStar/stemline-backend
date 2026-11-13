@@ -1075,7 +1075,7 @@ def transcribe(audio_bytes, ext, instrument):
         # notes start on the beat and are separate (a short rest after each),
         # instead of the raw wobbly timing that sounds like fumbling.
         # Starts snap to the beat grid, but each note keeps its sung length.
-        grid = _quantize_midi(real_midi, bpm, beats, downbeat, real_lengths=True)
+        grid = _quantize_midi(real_midi, bpm, beats, None, real_lengths=True)
         _force_single_line(grid)
         for inst in grid.instruments:
             inst.name = settings["title"]
