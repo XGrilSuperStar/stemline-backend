@@ -229,18 +229,23 @@ def _fix_octave_outliers(midi, span=3, jump=10):
 
 
 def _drop_neighbour_blips(midi, short=0.16, max_gap=0.25, max_step=3):
-    """A very short, quieter note sandwiched between two notes of the SAME
-    pitch (a wobble up or down and back) is a blip, not a sung note: remove it
-    and let the first note hold through."""
+    """A very short, quieter note poking above or below BOTH of its neighbours
+    (67 -> 69 -> 66, or 63 -> 60 -> 61, or a wobble back to the same pitch) is
+    a blip, not a sung note: remove it and let the first note hold through."""
     for inst in midi.instruments:
         notes = sorted(inst.notes, key=lambda n: n.start)
         drop = set()
         for i in range(1, len(notes) - 1):
             a, n, b = notes[i - 1], notes[i], notes[i + 1]
-            if (n.end - n.start) < short and a.pitch == b.pitch \
-                    and 1 <= abs(n.pitch - a.pitch) <= max_step \
-                    and n.start - a.end <= max_gap and b.start - n.end <= max_gap \
-                    and n.velocity < min(a.velocity, b.velocity):
+            if (n.end - n.start) >= short or i - 1 in drop:
+                continue
+            if n.start - a.end > max_gap or b.start - n.end > max_gap:
+                continue
+            above = n.pitch > max(a.pitch, b.pitch)
+            below = n.pitch < min(a.pitch, b.pitch)
+            near = min(abs(n.pitch - a.pitch), abs(n.pitch - b.pitch))
+            if (above or below) and 1 <= near <= max_step \
+                    and n.velocity < max(a.velocity, b.velocity):
                 drop.add(i)
                 a.end = max(a.end, n.end)
         inst.notes = [n for i, n in enumerate(notes) if i not in drop]
