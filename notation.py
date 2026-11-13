@@ -27,7 +27,7 @@ INSTRUMENT_SETTINGS = {
     # a solo voice recorded on purpose (hum / sing / whistle): no band bleed,
     # so thresholds can be gentler than for a separated vocal stem
     "hum":    {"fmin": 65.0, "fmax": 1400.0, "mono": True,  "title": "Voice",
-               "onset": 0.45, "frame": 0.3, "min_ms": 110, "vel": 0.25,
+               "onset": 0.45, "frame": 0.3, "min_ms": 90, "vel": 0.25,
                "dip_split": True},
     "piano":  {"fmin": 27.0, "fmax": 4200.0, "mono": False, "title": "Keys / Synth",
                "onset": 0.5, "frame": 0.3, "min_ms": 100, "vel": 0.25},
@@ -341,10 +341,29 @@ def _ensure_gap(midi, gap=0.10, min_len=0.06, max_trim=0.4):
                     a.end = new_end
 
 
-def _collapse_slides(midi, max_gap=0.06, short=0.16):
+def _collapse_slides(midi, max_gap=0.06, short=0.16, min_run=2):
     """A sung slide between two notes makes the detector write a staircase of
     short notes one or two semitones apart. Fold each such short note into its
-    longer neighbour so a slide reads as one note, not several."""
+    longer neighbour so a slide reads as one note, not several.
+
+    min_run=3 (sung lines): only fold when the notes really form a staircase
+    (three or more in a row stepping the same way). Two neighbouring notes a
+    semitone or two apart are just a melody moving by step, not a slide."""
+    def _step(x, y):
+        d = y.pitch - x.pitch
+        return d if (y.start - x.end) <= max_gap and 1 <= abs(d) <= 2 else 0
+
+    def _in_staircase(notes, i):
+        # is the pair (i, i+1) part of a run of 3+ notes all stepping one way?
+        d = _step(notes[i], notes[i + 1])
+        if d == 0:
+            return False
+        if i + 2 < len(notes) and _step(notes[i + 1], notes[i + 2]) * d > 0:
+            return True
+        if i > 0 and _step(notes[i - 1], notes[i]) * d > 0:
+            return True
+        return False
+
     for inst in midi.instruments:
         notes = sorted(inst.notes, key=lambda n: n.start)
         changed = True
@@ -354,6 +373,8 @@ def _collapse_slides(midi, max_gap=0.06, short=0.16):
                 a, b = notes[i], notes[i + 1]
                 la, lb = a.end - a.start, b.end - b.start
                 diff = abs(a.pitch - b.pitch)
+                if min_run >= 3 and not _in_staircase(notes, i):
+                    continue
                 if (b.start - a.end) <= max_gap and 1 <= diff <= 2 and min(la, lb) < (short if diff == 1 else 0.12):
                     keep, drop = (a, b) if la >= lb else (b, a)
                     keep.start = min(a.start, b.start)
@@ -958,7 +979,9 @@ def transcribe(audio_bytes, ext, instrument):
                 _split_on_volume_dips(midi, rms, hop_s, depth=0.6, min_part=0.08, min_dip=0.02)
             else:
                 _split_on_volume_dips(midi, rms, hop_s)
-            _collapse_slides(midi)
+            # sung line: only real slides (3+ notes stepping one way) get folded,
+            # so notes a semitone or two apart in the melody survive
+            _collapse_slides(midi, min_run=3 if instrument == "hum" else 2)
             if instrument != "hum":   # hum: keep repeated syllables on one pitch separate
                 _merge_same_pitch(midi, max_gap=0.04)   # re-join one note that got cut in two
         if instrument == "hum":
