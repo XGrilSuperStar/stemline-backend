@@ -1283,6 +1283,7 @@ def forgot_username(body: ForgotUsernameRequest, db: Session = Depends(get_db)):
 def forgot_password(body: ForgotPasswordRequest, db: Session = Depends(get_db)):
     email = body.email.lower()
     user = db.query(User).filter(User.email == email).first()
+    logger.info(f"DEBUG forgot_password: searching email={email!r} found_user={bool(user)}")
     if user:
         raw_token = secrets.token_urlsafe(32)
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
