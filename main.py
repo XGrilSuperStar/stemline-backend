@@ -374,6 +374,7 @@ def send_email(to_email: str, subject: str, body: str):
         logger.warning(f"RESEND_API_KEY not configured. Would have emailed {to_email}: {subject}\n{body}")
         return
     try:
+        logger.info(f"DEBUG send_email: to_email={to_email} RESEND_API_KEY_set={bool(RESEND_API_KEY)} FROM_EMAIL={FROM_EMAIL}")
         response = requests.post(
             "https://api.resend.com/emails",
             headers={"Authorization": f"Bearer {RESEND_API_KEY}"},
@@ -385,6 +386,7 @@ def send_email(to_email: str, subject: str, body: str):
             },
             timeout=10,
         )
+        logger.info(f"DEBUG send_email: response status={response.status_code} body={response.text}")
         if response.status_code >= 400:
             logger.error(f"Failed to send email to {to_email}: {response.status_code} {response.text}")
     except Exception as e:
