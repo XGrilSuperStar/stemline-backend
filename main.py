@@ -32,7 +32,7 @@ from sqlalchemy.orm import sessionmaker, Session
 import logging
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
@@ -374,7 +374,6 @@ def send_email(to_email: str, subject: str, body: str):
         logger.warning(f"RESEND_API_KEY not configured. Would have emailed {to_email}: {subject}\n{body}")
         return
     try:
-        logger.info(f"DEBUG send_email: to_email={to_email} RESEND_API_KEY_set={bool(RESEND_API_KEY)} FROM_EMAIL={FROM_EMAIL}")
         response = requests.post(
             "https://api.resend.com/emails",
             headers={"Authorization": f"Bearer {RESEND_API_KEY}"},
@@ -386,7 +385,6 @@ def send_email(to_email: str, subject: str, body: str):
             },
             timeout=10,
         )
-        logger.info(f"DEBUG send_email: response status={response.status_code} body={response.text}")
         if response.status_code >= 400:
             logger.error(f"Failed to send email to {to_email}: {response.status_code} {response.text}")
     except Exception as e:
@@ -1283,7 +1281,6 @@ def forgot_username(body: ForgotUsernameRequest, db: Session = Depends(get_db)):
 def forgot_password(body: ForgotPasswordRequest, db: Session = Depends(get_db)):
     email = body.email.lower()
     user = db.query(User).filter(User.email == email).first()
-    logger.info(f"DEBUG forgot_password: searching email={email!r} found_user={bool(user)}")
     if user:
         raw_token = secrets.token_urlsafe(32)
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
