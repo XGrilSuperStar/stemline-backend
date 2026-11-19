@@ -24,6 +24,11 @@ INSTRUMENT_SETTINGS = {
                "onset": 0.55, "frame": 0.35, "min_ms": 100, "vel": 0.3},
     "guitar": {"fmin": 80.0, "fmax": 1400.0, "mono": False, "title": "Guitar",
                "onset": 0.5, "frame": 0.3, "min_ms": 100, "vel": 0.25},
+    # a solo voice recorded on purpose (hum / sing / whistle): no band bleed,
+    # so thresholds can be gentler than for a separated vocal stem
+    "hum":    {"fmin": 65.0, "fmax": 1400.0, "mono": True,  "title": "Voice",
+               "onset": 0.45, "frame": 0.3, "min_ms": 90, "vel": 0.25,
+               "dip_split": True},
     "piano":  {"fmin": 27.0, "fmax": 4200.0, "mono": False, "title": "Keys / Synth",
                "onset": 0.5, "frame": 0.3, "min_ms": 100, "vel": 0.25},
     "other":  {"fmin": None, "fmax": None,   "mono": False, "title": "Other",
@@ -69,6 +74,123 @@ def _estimate_bpm(path):
     return round(bpm, 1)
 
 
+def _hum_to_midi(path, tempo, fmin=65.0, fmax=1000.0, min_ms=90):
+    """Single-voice pitch tracking (pYIN) -> notes.
+
+    Basic Pitch is polyphonic and invents extra notes from overtones when fed
+    a lone voice. pYIN follows exactly one pitch at a time, which is what a
+    hum / sung line is."""
+    import librosa
+    import numpy as np
+    import pretty_midi
+
+    y, sr = librosa.load(path, sr=22050, mono=True, duration=120)
+    hop = 256
+    if y.size < sr * 0.2:
+        return pretty_midi.PrettyMIDI(initial_tempo=tempo)
+    f0, voiced, _ = librosa.pyin(y, fmin=fmin, fmax=fmax, sr=sr,
+                                 frame_length=2048, hop_length=hop)
+    rms = librosa.feature.rms(y=y, frame_length=1024, hop_length=hop)[0]
+    n = min(len(f0), len(rms))
+    f0, voiced, rms = f0[:n], voiced[:n], rms[:n]
+    hop_s = hop / float(sr)
+
+    midi_f = np.full(n, np.nan)
+    ok = voiced & ~np.isnan(f0)
+    # Open a gap wherever the voice dips well below its nearby peak ("doo-doo",
+    # consonants, breaths): pYIN alone bridges those and runs notes together.
+    w = int(0.15 / (hop / float(sr)))
+    local_max = np.array([rms[max(0, i - w): i + w + 1].max() for i in range(n)])
+    ok &= rms >= 0.3 * local_max
+    midi_f[ok] =69.0 + 12.0 * np.log2(f0[ok] / 440.0)
+    if ok.sum() < 3:
+        return pretty_midi.PrettyMIDI(initial_tempo=tempo)
+
+    # pYIN sometimes locks onto half or double the real frequency (a note an
+    # octave off, or a stray low "extra" note). Pull any frame that sits far
+    # from the voice's nearby median back by octaves.
+    idx = np.where(ok)[0]
+    if idx.size > 5:
+        w2 = int(0.8 / (hop / float(sr)))
+        vals = midi_f[idx]
+        for j, i in enumerate(idx):
+            lo = np.searchsorted(idx, i - w2)
+            hi = np.searchsorted(idx, i + w2, side="right")
+            ref = np.median(vals[lo:hi])
+            v = midi_f[i]
+            while v - ref > 9.5:
+                v -= 12
+            while ref - v > 9.5:
+                v += 12
+            midi_f[i] = v
+
+    # Singers are rarely exactly in tune with A440: measure how far off they
+    # sit on average (circular median of the cents offset) and correct it.
+    frac = midi_f[ok] - np.round(midi_f[ok])
+    ang = np.angle(np.mean(np.exp(2j * np.pi * frac))) / (2 * np.pi)
+    midi_f = midi_f - ang
+
+    # Median-smooth the pitch track so vibrato and glitches don't make notes.
+    sm = midi_f.copy()
+    k = 2
+    for i in range(n):
+        if np.isnan(midi_f[i]):
+            continue
+        w = midi_f[max(0, i - k): i + k + 1]
+        w = w[~np.isnan(w)]
+        sm[i] = np.median(w)
+    pitch = np.where(np.isnan(sm), -1, np.round(sm)).astype(int)
+
+    # Run-length encode, then absorb runs too short to be real notes.
+    runs = []
+    for i, p in enumerate(pitch):
+        if runs and runs[-1][0] == p:
+            runs[-1][2] = i + 1
+        else:
+            runs.append([int(p), i, i + 1])
+    min_frames = max(2, int(round(min_ms / 1000.0 / hop_s)))
+    changed = True
+    while changed:
+        changed = False
+        for idx, (p, a, b) in enumerate(runs):
+            if p == -1 or (b - a) >= min_frames:
+                continue
+            left = runs[idx - 1] if idx > 0 else None
+            right = runs[idx + 1] if idx + 1 < len(runs) else None
+            if left and right and left[0] == right[0] and left[0] != -1:
+                left[2] = right[2]
+                del runs[idx:idx + 2]
+            elif left and left[0] != -1 and (not right or right[0] == -1 or (left[2] - left[1]) >= (right[2] - right[1])):
+                left[2] = b
+                del runs[idx]
+            elif right and right[0] != -1:
+                right[1] = a
+                del runs[idx]
+            else:
+                runs[idx][0] = -1
+            changed = True
+            break
+    # glue neighbours that ended up with the same pitch
+    merged = []
+    for r in runs:
+        if merged and merged[-1][0] == r[0] and r[0] != -1:
+            merged[-1][2] = r[2]
+        else:
+            merged.append(list(r))
+
+    loud = float(np.percentile(rms, 95)) or 1.0
+    pm = pretty_midi.PrettyMIDI(initial_tempo=tempo)
+    inst = pretty_midi.Instrument(program=0)
+    for p, a, b in merged:
+        if p < 0 or (b - a) < min_frames:
+            continue
+        vel = int(np.clip(40 + 80 * float(np.mean(rms[a:b])) / loud, 30, 120))
+        inst.notes.append(pretty_midi.Note(velocity=vel, pitch=int(p),
+                                           start=a * hop_s, end=b * hop_s))
+    pm.instruments.append(inst)
+    return pm
+
+
 def _drop_quiet_notes(midi, share):
     """Drop ghost detections: notes much quieter than the loud ones."""
     import numpy as np
@@ -77,6 +199,73 @@ def _drop_quiet_notes(midi, share):
             continue
         loud = float(np.percentile([n.velocity for n in inst.notes], 90))
         inst.notes = [n for n in inst.notes if n.velocity >= share * loud]
+
+
+def _fix_octave_outliers(midi, span=3, jump=10):
+    """A sung note an octave away from the notes around it is almost always a
+    tracking error (the end of a recording is where it happens most). Move it
+    by octaves toward the neighbouring notes."""
+    import numpy as np
+    for inst in midi.instruments:
+        notes = sorted(inst.notes, key=lambda n: n.start)
+        for i, n in enumerate(notes):
+            near = [m.pitch for m in notes[max(0, i - span): i] + notes[i + 1: i + 1 + span]]
+            if len(near) < 2:
+                continue
+            ref = float(np.median(near))
+            while n.pitch - ref >= jump:
+                n.pitch -= 12
+            while ref - n.pitch >= jump:
+                n.pitch += 12
+        # Also compare with the whole line: a run of low notes (the end of a
+        # take) can drag the local median down with it and hide the error.
+        if len(notes) >= 6:
+            top = float(np.median([n.pitch for n in notes]))
+            for n in notes:
+                while top - n.pitch >= jump:
+                    n.pitch += 12
+                while n.pitch - top >= jump + 2:
+                    n.pitch -= 12
+
+
+def _drop_neighbour_blips(midi, short=0.16, max_gap=0.25, max_step=3):
+    """A very short, quieter note poking above or below BOTH of its neighbours
+    (67 -> 69 -> 66, or 63 -> 60 -> 61, or a wobble back to the same pitch) is
+    a blip, not a sung note: remove it and let the first note hold through."""
+    for inst in midi.instruments:
+        notes = sorted(inst.notes, key=lambda n: n.start)
+        drop = set()
+        for i in range(1, len(notes) - 1):
+            a, n, b = notes[i - 1], notes[i], notes[i + 1]
+            if (n.end - n.start) >= short or i - 1 in drop:
+                continue
+            if n.start - a.end > max_gap or b.start - n.end > max_gap:
+                continue
+            above = n.pitch > max(a.pitch, b.pitch)
+            below = n.pitch < min(a.pitch, b.pitch)
+            near = min(abs(n.pitch - a.pitch), abs(n.pitch - b.pitch))
+            if (above or below) and 1 <= near <= max_step \
+                    and n.velocity < max(a.velocity, b.velocity):
+                drop.add(i)
+                a.end = max(a.end, n.end)
+        inst.notes = [n for i, n in enumerate(notes) if i not in drop]
+
+
+def _drop_weak_short_notes(midi, short=0.2, keep_share=0.7, tail_share=0.5):
+    """Sung line cleanup: a note under `short` seconds only counts if it is
+    clearly loud (breaths, consonants and slides are short AND quiet), and
+    quiet notes trailing off the end of the take are cut."""
+    import numpy as np
+    for inst in midi.instruments:
+        if len(inst.notes) < 6:
+            continue
+        loud = float(np.percentile([n.velocity for n in inst.notes], 90))
+        inst.notes = [n for n in inst.notes
+                      if (n.end - n.start) >= short or n.velocity >= keep_share * loud]
+        notes = sorted(inst.notes, key=lambda n: n.start)
+        while len(notes) > 4 and notes[-1].velocity < tail_share * loud:
+            notes.pop()
+        inst.notes = notes
 
 
 def _drop_tiny_notes(midi, min_seconds):
@@ -108,6 +297,34 @@ def _merge_same_pitch(midi, max_gap=0.03):
         inst.notes = sorted(out, key=lambda n: n.start)
 
 
+def _clean_fragments(midi, short=0.15, join_gap=0.08, drop_below=0.10):
+    """Tidy tiny stray notes: a short note next to the same pitch is glued on,
+    a short note right beside a longer note within a semitone is absorbed,
+    and a very short lone note is dropped."""
+    for inst in midi.instruments:
+        notes = sorted(inst.notes, key=lambda n: n.start)
+        changed = True
+        while changed:
+            changed = False
+            for i, n in enumerate(notes):
+                if n.end - n.start >= short:
+                    continue
+                prev = notes[i - 1] if i > 0 else None
+                nxt = notes[i + 1] if i + 1 < len(notes) else None
+                same = [x for x in (prev, nxt) if x and x.pitch == n.pitch
+                        and (n.start - x.end <= join_gap if x is prev else x.start - n.end <= join_gap)]
+                if same:
+                    x = same[0]
+                    x.start, x.end = min(x.start, n.start), max(x.end, n.end)
+                    notes.pop(i); changed = True; break
+                near = [x for x in (prev, nxt) if x and abs(x.pitch - n.pitch) <= 1
+                        and x.end - x.start > 2 * (n.end - n.start)
+                        and (n.start - x.end <= join_gap if x is prev else x.start - n.end <= join_gap)]
+                if near or n.end - n.start < drop_below:
+                    notes.pop(i); changed = True; break
+        inst.notes = notes
+
+
 def _make_monophonic(midi):
     """Keep ONE note at a time: the strongest (loudness x length) wins, notes
     that overlap a winner are dropped. Kills harmonics, octave blips and
@@ -129,6 +346,173 @@ def _make_monophonic(midi):
             if a.end > b.start:
                 a.end = b.start
         inst.notes = kept
+
+
+def _ensure_gap(midi, gap=0.10, min_len=0.06, max_trim=0.4):
+    """End a note early when it sits too close to the next one, so a clear rest
+    shows between notes in the downloaded MIDI. A note gives up at most
+    `max_trim` of its own length, so short notes aren't squashed to nothing."""
+    for inst in midi.instruments:
+        notes = sorted(inst.notes, key=lambda n: n.start)
+        for a, b in zip(notes, notes[1:]):
+            room = b.start - a.end
+            if room < gap:
+                length = a.end - a.start
+                new_end = max(b.start - gap, a.end - max_trim * length)
+                new_end = min(new_end, a.end)
+                if new_end - a.start >= min_len:
+                    a.end = new_end
+
+
+def _collapse_slides(midi, max_gap=0.06, short=0.16, min_run=2):
+    """A sung slide between two notes makes the detector write a staircase of
+    short notes one or two semitones apart. Fold each such short note into its
+    longer neighbour so a slide reads as one note, not several.
+
+    min_run=3 (sung lines): only fold when the notes really form a staircase
+    (three or more in a row stepping the same way). Two neighbouring notes a
+    semitone or two apart are just a melody moving by step, not a slide."""
+    def _step(x, y):
+        d = y.pitch - x.pitch
+        return d if (y.start - x.end) <= max_gap and 1 <= abs(d) <= 2 else 0
+
+    def _in_staircase(notes, i):
+        # is the pair (i, i+1) part of a run of 3+ notes all stepping one way?
+        d = _step(notes[i], notes[i + 1])
+        if d == 0:
+            return False
+        if i + 2 < len(notes) and _step(notes[i + 1], notes[i + 2]) * d > 0:
+            return True
+        if i > 0 and _step(notes[i - 1], notes[i]) * d > 0:
+            return True
+        return False
+
+    for inst in midi.instruments:
+        notes = sorted(inst.notes, key=lambda n: n.start)
+        changed = True
+        while changed:
+            changed = False
+            for i in range(len(notes) - 1):
+                a, b = notes[i], notes[i + 1]
+                la, lb = a.end - a.start, b.end - b.start
+                diff = abs(a.pitch - b.pitch)
+                if min_run >= 3 and not _in_staircase(notes, i):
+                    continue
+                if (b.start - a.end) <= max_gap and 1 <= diff <= 2 and min(la, lb) < (short if diff == 1 else 0.12):
+                    keep, drop = (a, b) if la >= lb else (b, a)
+                    keep.start = min(a.start, b.start)
+                    keep.end = max(a.end, b.end)
+                    notes.remove(drop)
+                    changed = True
+                    break
+        inst.notes = notes
+
+
+def _fold_short_into_neighbour(midi, short=0.12, max_gap=0.10):
+    """A very short note right next to a longer note one or two semitones away
+    is almost always pitch wobble on the way into (or out of) the longer note.
+    Fold it into that neighbour (the neighbour grows to cover it)."""
+    for inst in midi.instruments:
+        notes = sorted(inst.notes, key=lambda n: n.start)
+        changed = True
+        while changed:
+            changed = False
+            for i, n in enumerate(notes):
+                ln = n.end - n.start
+                if ln >= short:
+                    continue
+                cands = []
+                for j in (i - 1, i + 1):
+                    if 0 <= j < len(notes):
+                        m = notes[j]
+                        gap = (n.start - m.end) if j < i else (m.start - n.end)
+                        if gap <= max_gap and 1 <= abs(m.pitch - n.pitch) <= 2 and (m.end - m.start) > ln:
+                            cands.append(m)
+                if not cands:
+                    continue
+                keep = max(cands, key=lambda m: m.end - m.start)
+                keep.start = min(keep.start, n.start)
+                keep.end = max(keep.end, n.end)
+                notes.pop(i)
+                changed = True
+                break
+        inst.notes = notes
+
+
+def _split_on_volume_dips(midi, rms, hop_s, depth=0.3, min_part=0.10, min_dip=0.03):
+    """The pitch model can't tell two sung notes of the SAME pitch apart ("la la
+    la" comes out as one long note). The volume can: between repeated notes the
+    voice dips. Split a note wherever the loudness falls below `depth` x the
+    quieter of the peaks on either side. Each part must be at least `min_part`
+    seconds, so vibrato or a small wobble doesn't chop a held note."""
+    import numpy as np
+    r = np.convolve(rms, np.ones(3) / 3.0, mode="same")
+    m = max(2, int(round(min_part / hop_s)))
+    for inst in midi.instruments:
+        out = []
+        for n in inst.notes:
+            a = int(n.start / hop_s)
+            b = min(len(r), int(n.end / hop_s))
+            seg = r[a:b]
+            starts_ends = []
+            cut = 0
+            i = cut + m
+            while i < len(seg) - m:
+                lo, hi = max(0, i - 3), min(len(seg), i + 4)
+                if seg[i] <= seg[lo:hi].min():
+                    left = seg[cut:i].max()
+                    right = seg[i:min(len(seg), i + 3 * m)].max()
+                    if seg[i] < depth * min(left, right):
+                        # widen the dip to where the volume climbs back above half way
+                        lim = 0.5 * min(left, right)
+                        j0 = i
+                        while j0 > cut and seg[j0 - 1] < lim:
+                            j0 -= 1
+                        j1 = i
+                        while j1 < len(seg) - 1 and seg[j1 + 1] < lim:
+                            j1 += 1
+                        if (j1 - j0 + 1) * hop_s >= min_dip:   # a real pause, not a brief wobble
+                            starts_ends.append((cut, max(cut + 1, j0)))
+                            cut = j1 + 1
+                            i = cut + m
+                            continue
+                i += 1
+            starts_ends.append((cut, len(seg)))
+            if len(starts_ends) == 1:
+                out.append(n)
+                continue
+            for s_i, e_i in starts_ends:
+                s = n.start if s_i == 0 else (a + s_i) * hop_s
+                e = n.end if e_i >= len(seg) else (a + e_i) * hop_s
+                if e - s >= min_part * 0.75:
+                    out.append(type(n)(velocity=n.velocity, pitch=n.pitch, start=s, end=e))
+        inst.notes = sorted(out, key=lambda x: x.start)
+
+
+def _trim_note_ends(midi, rms, hop_s, frac=0.3, min_len=0.09):
+    """The pitch model keeps a note alive through echo / reverb / decay tails, so
+    the rests between notes shrink to almost nothing. End each note where the
+    loudness has fallen below `frac` of that note's own peak instead."""
+    import numpy as np
+    r = np.convolve(rms, np.ones(3) / 3.0, mode="same")
+    for inst in midi.instruments:
+        for n in inst.notes:
+            a = int(n.start / hop_s)
+            b = min(len(r), int(n.end / hop_s))
+            if b - a < 4:
+                continue
+            seg = r[a:b]
+            pk = int(np.argmax(seg))
+            lim = frac * seg[pk]
+            end_i = None
+            for i in range(pk, len(seg) - 2):
+                if seg[i] < lim and seg[i + 1] < lim and seg[i + 2] < lim:
+                    end_i = i
+                    break
+            if end_i is not None:
+                new_end = (a + end_i) * hop_s
+                if new_end - n.start >= min_len and new_end < n.end:
+                    n.end = new_end
 
 
 def _force_chord_line(midi, max_notes=6):
@@ -250,9 +634,13 @@ def _detect_meter(midi, bpm):
     return use, float(first_beat_pos + ph * b)
 
 
-def _quantize_midi(midi, bpm, beats=4, downbeat=None):
+def _quantize_midi(midi, bpm, beats=4, downbeat=None, real_lengths=False, gap=0.03, min_len=0.06):
     """Snap note starts/ends to a 16th-note grid at `bpm`, then return a new
-    PrettyMIDI. No triplets, no tiny rests: one clean grid."""
+    PrettyMIDI. No triplets, no tiny rests: one clean grid.
+
+    real_lengths=True (sung line, downloaded MIDI): only the note STARTS snap to
+    the grid; each note keeps the length it was actually sung, with a small
+    rest `gap` before the next note, so short and long notes stay short/long."""
     import numpy as np
     import pretty_midi
 
@@ -283,13 +671,23 @@ def _quantize_midi(midi, bpm, beats=4, downbeat=None):
         for n in sorted(inst.notes, key=lambda n: n.start):
             s = max(0, int(round((n.start + shift - off) / g)))
             e = max(s + 1, int(round((n.end + shift - off) / g)))
-            notes.append([s, e, n.pitch, n.velocity])
+            notes.append([s, e, n.pitch, n.velocity, n.end - n.start])
+        if real_lengths:
+            for k, (s, e, p, v, length) in enumerate(notes):
+                st = s * g
+                en = st + max(length, min_len)
+                if k + 1 < len(notes):
+                    nxt = notes[k + 1][0] * g
+                    en = min(en, nxt - gap) if nxt - gap > st + 0.03 else st + 0.03
+                new.notes.append(pretty_midi.Note(velocity=v, pitch=p, start=st, end=en))
+            out.instruments.append(new)
+            continue
         for a, b in zip(notes, notes[1:]):  # no overlaps on one line / same pitch
             if a[2] == b[2] or b[0] - a[1] < 0:
                 a[1] = max(a[0] + 1, min(a[1], b[0]))
             if 0 < b[0] - a[1] <= 1 and True:
                 a[1] = b[0]  # fill one-16th gaps instead of writing tiny rests
-        for s, e, p, v in notes:
+        for s, e, p, v, _len in notes:
             new.notes.append(pretty_midi.Note(velocity=v, pitch=p, start=s * g, end=e * g))
         out.instruments.append(new)
     return out
@@ -603,48 +1001,111 @@ def transcribe(audio_bytes, ext, instrument):
     if not settings:
         raise NotationError(f"Unknown instrument: {instrument}")
 
-    from basic_pitch.inference import predict
+    if instrument != "hum":
+        from basic_pitch.inference import predict
 
-    ext = (ext or "wav").lower().lstrip(".")
+    ext =(ext or "wav").lower().lstrip(".")
     with tempfile.TemporaryDirectory() as td:
         audio_path = os.path.join(td, f"stem.{ext}")
         with open(audio_path, "wb") as f:
             f.write(audio_bytes)
 
         prior = _estimate_bpm(audio_path)
-        _, midi, note_events = predict(
-            audio_path,
-            _get_model(),
-            onset_threshold=settings["onset"],
-            frame_threshold=settings["frame"],
-            minimum_note_length=settings["min_ms"],
-            minimum_frequency=settings["fmin"],
-            maximum_frequency=settings["fmax"],
-            midi_tempo=prior,
-        )
+        if instrument == "hum":
+            midi = _hum_to_midi(audio_path, prior, settings["fmin"],
+                                min(settings["fmax"], 1000.0), settings["min_ms"])
+        else:
+            _, midi, note_events = predict(
+                audio_path,
+                _get_model(),
+                onset_threshold=settings["onset"],
+                frame_threshold=settings["frame"],
+                minimum_note_length=settings["min_ms"],
+                minimum_frequency=settings["fmin"],
+                maximum_frequency=settings["fmax"],
+                midi_tempo=prior,
+            )
+        rms = hop_s = None
+        if settings.get("dip_split") or settings["mono"]:
+            import librosa
+            y, sr = librosa.load(audio_path, sr=22050, mono=True, duration=120)
+            hop = 128
+            rms = librosa.feature.rms(y=y, frame_length=512, hop_length=hop)[0]
+            hop_s = hop / float(sr)
 
     _drop_quiet_notes(midi, settings["vel"])
     _drop_tiny_notes(midi, settings["min_ms"] / 1000.0)
     if settings.get("fold_above"):
         _fold_octaves(midi, settings["fold_above"])
     _merge_same_pitch(midi)
+    if instrument == "hum":
+        _fix_octave_outliers(midi)
+    if rms is not None:
+        if settings.get("dip_split"):
+            if instrument == "hum":
+                # sung syllables dip less than "la la la": split on shallower dips
+                _split_on_volume_dips(midi, rms, hop_s, depth=0.6, min_part=0.08, min_dip=0.02)
+            else:
+                _split_on_volume_dips(midi, rms, hop_s)
+            # sung line: only real slides (3+ notes stepping one way) get folded,
+            # so notes a semitone or two apart in the melody survive
+            _collapse_slides(midi, min_run=3 if instrument == "hum" else 2)
+            if instrument == "hum":
+                _fold_short_into_neighbour(midi)
+            if instrument != "hum":   # hum: keep repeated syllables on one pitch separate
+                _merge_same_pitch(midi, max_gap=0.04)   # re-join one note that got cut in two
+        if instrument == "hum":
+            _drop_weak_short_notes(midi, short=0.12, keep_share=0.5)
+            _drop_neighbour_blips(midi)
+        if settings["mono"]:
+            _trim_note_ends(midi, rms, hop_s)
+            _clean_fragments(midi)
     if settings["mono"]:
         _make_monophonic(midi)
     # Download MIDI keeps the performance's real timing (no grid snapping, no
     # leading rest); only the sheet music below is quantized.
     for inst in midi.instruments:
         inst.name = settings["title"]
+    import copy
+    out_midi = copy.deepcopy(midi)
+    if settings["mono"]:
+        _ensure_gap(out_midi)
     raw_buf = io.BytesIO()
-    midi.write(raw_buf)
+    out_midi.write(raw_buf)
     raw_midi_bytes = raw_buf.getvalue()
     onsets = [n.start for i in midi.instruments for n in i.notes]
     bpm = _refine_bpm(onsets, prior)
+    # Stamp the downloaded MIDI with the same tempo shown on the page (not the
+    # first rough guess), keeping every note at the same real-time position.
+    import pretty_midi
+    fixed = pretty_midi.PrettyMIDI(initial_tempo=bpm)
+    for inst in out_midi.instruments:
+        ni = pretty_midi.Instrument(program=inst.program, name=inst.name)
+        ni.notes = list(inst.notes)
+        fixed.instruments.append(ni)
+    raw_buf = io.BytesIO()
+    fixed.write(raw_buf)
+    raw_midi_bytes = raw_buf.getvalue()
     beats, downbeat = _detect_meter(midi, bpm)
+    real_midi = copy.deepcopy(midi)
     midi = _quantize_midi(midi, bpm, beats, downbeat)
     if settings["mono"]:
         _force_single_line(midi)
     else:
         _force_chord_line(midi)
+
+    if instrument == "hum":
+        # Hummed lines: the downloaded MIDI is the grid-snapped version too, so
+        # notes start on the beat and are separate (a short rest after each),
+        # instead of the raw wobbly timing that sounds like fumbling.
+        # Starts snap to the beat grid, but each note keeps its sung length.
+        grid = _quantize_midi(real_midi, bpm, beats, None, real_lengths=True)
+        _force_single_line(grid)
+        for inst in grid.instruments:
+            inst.name = settings["title"]
+        gbuf = io.BytesIO()
+        grid.write(gbuf)
+        raw_midi_bytes = gbuf.getvalue()
 
     # Name the track so DAWs (FL Studio's import dialog) list it instead of a blank row.
     for inst in midi.instruments:

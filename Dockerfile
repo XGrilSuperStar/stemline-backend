@@ -8,6 +8,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 COPY requirements.txt .
+# CPU-only torch (about 200 MB) instead of the default CUDA build (about 3 GB with
+# the NVIDIA libraries). Railway has no GPU; the GPU work runs on Modal.
+RUN pip install --no-cache-dir "torch==2.5.1" "torchaudio==2.5.1" --index-url https://download.pytorch.org/whl/cpu
 RUN pip install --no-cache-dir -r requirements.txt
 # Basic Pitch (audio -> notes) runs on the onnxruntime already in requirements.txt;
 # --no-deps keeps pip from also installing TensorFlow.

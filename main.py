@@ -12,6 +12,8 @@ import uuid
 import json
 import concurrent.futures
 import threading
+import base64
+from starlette.concurrency import run_in_threadpool
 import time
 from datetime import datetime, timedelta
 import jwt
@@ -34,6 +36,10 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
+
+# Homepage CSS/JS files (split out of the landing page)
+from fastapi.staticfiles import StaticFiles
+app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")), name="static")
 
 # CORS
 app.add_middleware(
@@ -368,6 +374,7 @@ def send_email(to_email: str, subject: str, body: str):
         logger.warning(f"RESEND_API_KEY not configured. Would have emailed {to_email}: {subject}\n{body}")
         return
     try:
+        logger.info(f"DEBUG send_email: to_email={to_email} RESEND_API_KEY_set={bool(RESEND_API_KEY)} FROM_EMAIL={FROM_EMAIL}")
         response = requests.post(
             "https://api.resend.com/emails",
             headers={"Authorization": f"Bearer {RESEND_API_KEY}"},
@@ -379,6 +386,7 @@ def send_email(to_email: str, subject: str, body: str):
             },
             timeout=10,
         )
+        logger.info(f"DEBUG send_email: response status={response.status_code} body={response.text}")
         if response.status_code >= 400:
             logger.error(f"Failed to send email to {to_email}: {response.status_code} {response.text}")
     except Exception as e:
@@ -1275,6 +1283,7 @@ def forgot_username(body: ForgotUsernameRequest, db: Session = Depends(get_db)):
 def forgot_password(body: ForgotPasswordRequest, db: Session = Depends(get_db)):
     email = body.email.lower()
     user = db.query(User).filter(User.email == email).first()
+    logger.info(f"DEBUG forgot_password: searching email={email!r} found_user={bool(user)}")
     if user:
         raw_token = secrets.token_urlsafe(32)
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
@@ -2857,6 +2866,7 @@ async def sitemap_xml():
     ] + [f"guides/{s}" for s in MORE_GUIDE_SLUGS]
     if NOTATION_ENABLED:
         pages.insert(6, "notation-viewer")
+        pages.insert(7, "audio-to-midi")
     urls = "".join(
         f"  <url><loc>https://stemline101.com/{p}</loc></url>\n" for p in pages
     )
@@ -2986,6 +2996,68 @@ def stem_notation(stem_id: int, instrument: str, fmt: str = "musicxml", token: s
                         headers={"Content-Disposition": f'attachment; filename="{base}.mid"'})
     return Response(content=result["musicxml"], media_type="application/vnd.recordare.musicxml+xml",
                     headers={"Content-Disposition": f'inline; filename="{base}.musicxml"'})
+
+
+@app.post("/api/v1/hum-to-notes")
+async def hum_to_notes(file: UploadFile = File(...), token: str = None, db: Session = Depends(get_db)):
+    """Turn a short voice recording (hum / sing / whistle) into notes.
+    The browser sends a WAV. Free users get an on-screen preview; the MIDI
+    and full chart are Premium, same as stem sheet music."""
+    if not NOTATION_ENABLED:
+        raise HTTPException(status_code=404, detail="Not Found")
+    user_id = get_current_user(token)
+    user = db.query(User).filter(User.id == user_id).first()
+    premium = effective_is_premium(db, user)
+    audio = await file.read()
+    if not audio:
+        raise HTTPException(status_code=400, detail="That recording is empty.")
+    if len(audio) > 15 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="That recording is too long. Keep it under about a minute.")
+    try:
+        import notation
+        result = await run_in_threadpool(notation.transcribe, audio, "wav", "hum")
+    except ImportError:
+        raise HTTPException(status_code=503, detail="The notes engine isn't installed on this server.")
+    except notation.NotationError:
+        raise HTTPException(status_code=422, detail="No clear notes were found. Try singing one steady note at a time, closer to the mic.")
+    except Exception as e:
+        logger.error(f"Hum-to-notes error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Could not turn that recording into notes.")
+    xml = result["musicxml"]
+    # notes for the piano roll: [pitch, start_sec, end_sec]
+    import io as _io, re as _re, pretty_midi as _pm
+    roll = sorted(([n.pitch, round(n.start, 3), round(n.end, 3)]
+                   for i in _pm.PrettyMIDI(_io.BytesIO(result["midi"])).instruments for n in i.notes),
+                  key=lambda n: n[1])
+    if not premium:
+        xml = notation.preview(xml, FREE_NOTATION_MEASURES)
+        # free preview shows the same stretch as the sheet music (first measures)
+        _b = _re.search(r"<beats>(\d+)</beats>", result["musicxml"]); _t = _re.search(r"<beat-type>(\d+)</beat-type>", result["musicxml"])
+        if _b and _t and result["bpm"]:
+            cutoff = FREE_NOTATION_MEASURES * int(_b.group(1)) * (4 / int(_t.group(1))) * 60 / result["bpm"]
+            roll = [n for n in roll if n[1] < cutoff]
+    return {
+        "musicxml": xml,
+        "notes": roll,
+        "midi_b64": base64.b64encode(result["midi"]).decode() if premium else None,
+        "bpm": result["bpm"],
+        "note_count": result["note_count"],
+        "preview": not premium,
+    }
+
+
+@app.get("/audio-to-midi", response_class=HTMLResponse)
+async def audio_to_midi_page():
+    if not NOTATION_ENABLED:
+        raise HTTPException(status_code=404, detail="Not Found")
+    return FileResponse("hum_to_notes.html", media_type="text/html")
+
+
+@app.get("/hum-to-notes")
+async def hum_to_notes_old_address():
+    # old address from before the rename: send people to the new one
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse("/audio-to-midi", status_code=301)
 
 
 @app.get("/sampler", response_class=HTMLResponse)

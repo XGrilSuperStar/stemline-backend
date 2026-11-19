@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Record or upload a voice clip and Stemline 101 turns it into notes and a MIDI file. Free preview, full chart and MIDI download with Premium.">
+<title>Audio to MIDI — Stemline101</title>
+<link rel="canonical" href="https://stemline101.com/audio-to-midi">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Stemline101">
+<meta property="og:title" content="Audio to MIDI — Stemline101">
+<meta property="og:description" content="Record or upload a voice clip and Stemline 101 turns it into notes and a MIDI file. Free preview, full chart and MIDI download with Premium.">
+<meta property="og:url" content="https://stemline101.com/audio-to-midi">
+<meta property="og:image" content="https://stemline101.com/icon-512.png">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Audio to MIDI — Stemline101">
+<meta name="twitter:description" content="Record or upload a voice clip and Stemline 101 turns it into notes and a MIDI file. Free preview, full chart and MIDI download with Premium.">
+<meta name="twitter:image" content="https://stemline101.com/icon-512.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil:wght@700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.8.9/build/opensheetmusicdisplay.min.js"></script>
+<style>
+  :root {
+    --void: #0B0B0D; --surface: #131316; --surface-2: #1a1a1e; --line: rgba(216,220,226,0.12);
+    --chrome: #E6E9EE; --chrome-dim: rgba(216,220,226,0.62); --steel: #6B7078;
+    --ember: #B8562E; --amber: #E7A33E; --amber-soft: rgba(231,163,62,0.12);
+    --concrete-line: rgba(216,220,226,0.14); --vu-amber: #E7A33E;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; background: var(--void); color: var(--chrome);
+    font-family: 'Inter', system-ui, sans-serif; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  a { color: var(--amber); }
+  [hidden] { display: none !important; }
+
+  /* ===== site nav + footer (same as the other pages) ===== */
+  nav.site-nav { display: flex; justify-content: space-between; align-items: center; padding: 1.4rem 2.5rem; background: var(--void); border-bottom: 1px solid var(--concrete-line); position: relative; flex-wrap: wrap; row-gap: 0.9rem; }
+  nav.site-nav::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--ember); }
+  nav.site-nav .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+  nav.site-nav .logo-mark { width: 30px; height: 30px; border-radius: 50%; display: block; flex-shrink: 0; }
+  nav.site-nav .logo-text { font-family: 'Big Shoulders Stencil', sans-serif; font-weight: 800; font-size: 1.25rem; letter-spacing: 0.03em; color: var(--chrome); text-transform: uppercase; }
+  nav.site-nav .links { display: flex; gap: 1.8rem; font-size: 0.85rem; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.02em; }
+  nav.site-nav .links a { color: var(--chrome-dim); text-decoration: none; }
+  nav.site-nav .links a:hover, nav.site-nav .links a.here { color: var(--chrome); }
+  footer.site-footer { padding: 3rem 2.5rem; text-align: center; color: rgba(237,227,206,0.4); font-size: 0.82rem; border-top: 1px solid rgba(237,227,206,0.08); font-family: 'JetBrains Mono', monospace; margin-top: 4rem; }
+  @media (max-width: 700px) { nav.site-nav { padding: 0.8rem 1rem; row-gap: 0.6rem; } nav.site-nav .logo-text { font-size: 1.05rem; } nav.site-nav .links { gap: 1rem; } footer.site-footer { padding: 2rem 1rem; } }
+
+  /* ===== hero ===== */
+  main { max-width: 1040px; margin: 0 auto; padding: 0 1.5rem; }
+  .hero { text-align: center; padding: 4rem 0 2.2rem; }
+  .eyebrow { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--amber); background: var(--amber-soft); border: 1px solid rgba(231,163,62,0.3); border-radius: 999px; padding: 0.3rem 0.85rem; }
+  h1 { margin: 1.1rem auto 0.9rem; max-width: 18ch; font-size: clamp(2.2rem, 5.4vw, 3.6rem); line-height: 1.08; font-weight: 700; letter-spacing: -0.02em; color: #fff; }
+  .lede { margin: 0 auto; max-width: 54ch; font-size: 1.1rem; color: var(--chrome-dim); }
+
+  /* ===== drop zone ===== */
+  /* The drop box is the front of a 1920s chrome studio mic: rounded case, horizontal slots, centre badge, pivot below */
+  .drop { position: relative; margin: 2.8rem auto 3.6rem; max-width: 760px; padding: 3.2rem 2.2rem; text-align: center;
+    border: 11px solid transparent; border-radius: 70px;
+    background:
+      linear-gradient(90deg, rgba(0,0,0,0.65), transparent 20%, transparent 80%, rgba(0,0,0,0.65)) padding-box,
+      repeating-linear-gradient(180deg, #08080a 0 20px, #b9bfc7 20px 22px, #f2f4f7 22px 25px, #8b919a 25px 28px) padding-box,
+      linear-gradient(145deg, #fbfcfd, #8d939c 22%, #e3e6ea 45%, #6d737c 70%, #f4f6f8) border-box;
+    box-shadow: 0 24px 54px rgba(0,0,0,0.65), inset 0 0 0 2px rgba(0,0,0,0.65), inset 0 0 36px rgba(0,0,0,0.6); transition: box-shadow .15s; }
+  .drop::before { content: ''; position: absolute; inset: -11px; border-radius: 70px; pointer-events: none; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.6); }
+  .drop .plate { position: relative; margin: 0 auto; max-width: 520px; padding: 1.6rem 1.4rem 1.4rem; border-radius: 22px;
+    background: linear-gradient(180deg, #1a1a1e, #101012); border: 2px solid transparent;
+    background-clip: padding-box; box-shadow: 0 0 0 2px #c9ced6, 0 0 0 4px #5d636c, 0 12px 30px rgba(0,0,0,0.7); }
+  .drop .pivot { position: absolute; left: 50%; bottom: -66px; width: 64px; height: 56px; transform: translateX(-50%); pointer-events: none; }
+  .drop-plate { display: inline-block; margin: 0 auto 1.2rem; padding: 0.22rem 0.9rem; font-family: 'JetBrains Mono', monospace; font-size: 0.64rem; letter-spacing: 0.22em; text-transform: uppercase;
+    color: #20242a; border-radius: 3px; background: linear-gradient(180deg, #f4f6f9, #aeb4bc); box-shadow: inset 0 1px 0 #fff, 0 1px 3px rgba(0,0,0,0.6); }
+  .drop.over { box-shadow: 0 0 0 3px var(--amber), 0 24px 54px rgba(0,0,0,0.65), inset 0 0 36px rgba(0,0,0,0.6); }
+  .drop-actions { display: flex; flex-wrap: wrap; gap: 0.8rem; justify-content: center; align-items: center; }
+  .drop-or { color: var(--steel); font-size: 0.85rem; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; cursor: pointer; font-family: 'Inter', sans-serif; font-weight: 600; font-size: 1rem;
+    padding: 0.85rem 1.5rem; border-radius: 10px; border: 1px solid transparent; transition: filter .15s, background .15s; text-decoration: none; }
+  .btn:hover:not(:disabled) { filter: brightness(1.1); }
+  .btn:disabled { opacity: 0.4; cursor: default; }
+  .btn:focus-visible, input:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+  .btn-rec { background: var(--ember); color: #fff; }
+  .btn-rec.live { animation: pulse 1s infinite; }
+  .btn-up { background: #fff; color: #111; }
+  .btn-ghost { background: transparent; color: var(--chrome); border-color: rgba(216,220,226,0.28); font-size: 0.92rem; padding: 0.65rem 1.1rem; }
+  .btn-solid { background: var(--amber); color: #1a1204; font-size: 0.92rem; padding: 0.65rem 1.1rem; }
+  @keyframes pulse { 50% { filter: brightness(1.35); } }
+  .drop-hint { margin: 1.1rem 0 0; text-shadow: 0 1px 2px #000; font-size: 0.86rem; color: var(--steel); }
+  #meter { width: 160px; height: 6px; background: #0e0e10; border-radius: 3px; overflow: hidden; margin: 1.1rem auto 0; }
+  #meter i { display: block; height: 100%; width: 0; background: var(--amber); transition: width .06s; }
+  .namebox { display: block; margin: 1.5rem auto 0.3rem; max-width: 340px; text-align: left; }
+  .namebox span { display: block; font-size: 0.78rem; color: var(--chrome-dim); margin-bottom: 0.3rem; }
+  input[type="text"] { width: 100%; font-family: 'Inter', sans-serif; font-size: 0.95rem; background: #0c0c0e; color: var(--chrome);
+    border: 1px solid var(--line); border-radius: 8px; padding: 0.65rem 0.85rem; }
+  #file { display: none; }
+  audio { height: 36px; margin-top: 1.1rem; max-width: 100%; }
+  #status { min-height: 1.5em; margin: 1rem auto 0; max-width: 760px; text-align: center; font-size: 0.92rem; color: var(--amber); }
+  #status:empty { opacity: 0; }
+
+  /* ===== results ===== */
+  .results { margin: 2.2rem auto 0; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 1.4rem; }
+  .res-top { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+  .info { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+  .chip { display: flex; flex-direction: column; padding: 0.4rem 0.9rem; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; min-width: 96px; }
+  .chip span { font-size: 0.66rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--chrome-dim); }
+  .chip b { font-size: 1.15rem; font-weight: 700; color: #fff; }
+  .res-btns { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+  .roll-wrap { background: #0c0c0e; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .roll-wrap { position: relative; touch-action: none; user-select: none; }
+  #wave { display: block; width: 100%; height: 72px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  #roll { display: block; width: 100%; height: 340px; cursor: default; }
+  .editor-bar { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin-bottom: 0.8rem; }
+  .editor-bar .chk { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; color: var(--chrome-dim); cursor: pointer; }
+  .editor-bar .hint { flex-basis: 100%; font-size: 0.8rem; color: var(--steel); }
+  #edited { display: none; margin: 0.6rem 0 0; font-size: 0.82rem; color: var(--amber); }
+  .res-label { margin: 1.4rem 0 0.6rem; font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--chrome-dim); }
+  #sheet { background: #fff; color: #111; border-radius: 12px; padding: 1rem; min-height: 120px; }
+
+  /* ===== sections below ===== */
+  section.block { margin: 5rem auto 0; }
+  section.block > h2 { margin: 0 0 0.5rem; text-align: center; font-size: clamp(1.6rem, 3.4vw, 2.2rem); font-weight: 700; letter-spacing: -0.01em; color: #fff; }
+  section.block > p.sub { margin: 0 auto 2rem; max-width: 56ch; text-align: center; color: var(--chrome-dim); }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 1.5rem; }
+  .card .ico { width: 40px; height: 40px; border-radius: 10px; background: var(--amber-soft); color: var(--amber); display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: 'JetBrains Mono', monospace; margin-bottom: 0.9rem; }
+  .card h3 { margin: 0 0 0.4rem; font-size: 1.05rem; color: #fff; }
+  .card p { margin: 0; font-size: 0.93rem; color: var(--chrome-dim); }
+  .tipbox { max-width: 760px; margin: 1.6rem auto 0; padding: 1rem 1.2rem; font-size: 0.93rem; color: var(--chrome); background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--amber); border-radius: 10px; }
+  .tipbox b { color: var(--amber); }
+  .steps { max-width: 760px; margin: 0 auto; padding: 0; list-style: none; counter-reset: s; }
+  .steps li { counter-increment: s; position: relative; padding: 0.2rem 0 1.1rem 3rem; color: var(--chrome-dim); }
+  .steps li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 2rem; height: 2rem; border-radius: 50%; background: var(--amber-soft); color: var(--amber); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; }
+  .steps b { color: var(--chrome); font-weight: 600; }
+  .faq { max-width: 760px; margin: 0 auto; }
+  .faq details { border-bottom: 1px solid var(--line); padding: 1rem 0; }
+  .faq summary { cursor: pointer; font-weight: 600; color: #fff; list-style: none; display: flex; justify-content: space-between; gap: 1rem; }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary::after { content: '+'; color: var(--amber); font-size: 1.3rem; line-height: 1; }
+  .faq details[open] summary::after { content: '\2212'; }
+  .faq p { margin: 0.7rem 0 0; color: var(--chrome-dim); font-size: 0.95rem; }
+  .cta { text-align: center; padding: 3rem 1.5rem; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; }
+  .cta h2 { margin: 0 0 0.5rem; font-size: 1.7rem; color: #fff; }
+  .cta p { margin: 0 auto 1.4rem; max-width: 48ch; color: var(--chrome-dim); }
+
+  @media (max-width: 760px) {
+    main { padding: 0 1rem; }
+    .hero { padding: 2.4rem 0 1.4rem; }
+    .grid3 { grid-template-columns: 1fr; }
+    .drop { padding: 1.6rem 0.9rem; border-width: 8px; border-radius: 42px; margin-bottom: 3.4rem; } .drop::before { inset: -8px; border-radius: 42px; } .drop .plate { padding: 1.2rem 0.9rem; }
+    .results { padding: 1rem; }
+    #roll { height: 260px; } #wave { height: 56px; }
+  }
+</style>
+<style>
+  #adSlot.ad-strip { box-sizing: border-box; width: 100%; max-width: 728px; height: 90px; margin: 0 auto; display: flex; align-items: center; justify-content: center; background: #17171A; border-bottom: 1px solid rgba(216,220,226,0.14); font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(216,220,226,0.35); }
+  @media (max-width: 760px) { #adSlot.ad-strip { max-width: 320px; height: 50px; } }
+</style>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1970454477202193"
+     crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="adSlot" class="ad-strip" aria-label="Advertisement">Advertisement</div>
+<nav class="site-nav">
+  <a class="logo" href="/" aria-label="Stemline101 home">
+    <span class="logo-mark">
+      <svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="display:block;width:100%;height:100%;">
+        <defs><linearGradient id="waveGrad" gradientUnits="userSpaceOnUse" x1="30" y1="110" x2="190" y2="110"><stop offset="0%" stop-color="#FFB020"/><stop offset="100%" stop-color="#3CFDE0"/></linearGradient></defs>
+        <circle cx="110" cy="110" r="98" fill="#0E1013"/>
+        <circle cx="110" cy="110" r="98" fill="none" stroke="#3ab6ff" stroke-width="4" opacity="0.6"/>
+        <g stroke="url(#waveGrad)" stroke-width="10" stroke-linecap="round" fill="none"><line x1="40" y1="110" x2="40" y2="110"/><line x1="60" y1="90" x2="60" y2="130"/><line x1="80" y1="65" x2="80" y2="155"/><line x1="100" y1="100" x2="100" y2="120"/><line x1="120" y1="45" x2="120" y2="175"/><line x1="140" y1="80" x2="140" y2="140"/><line x1="160" y1="95" x2="160" y2="125"/><line x1="180" y1="105" x2="180" y2="115"/></g>
+      </svg>
+    </span>
+    <span class="logo-text">STEMLINE 101</span>
+  </a>
+  <div class="links"><a href="/">Mixer</a><a href="/sampler">Sampler</a><a href="/notation-viewer">Sheet music</a><a href="/audio-to-midi" class="here">Audio to MIDI</a></div>
+</nav>
+
+
+<main>
+<section class="hero">
+  <span class="eyebrow">Voice to notes</span>
+  <h1>Turn your voice into MIDI</h1>
+  <p class="lede">Sing or whistle a melody. Stemline 101 writes down the notes and gives you a MIDI file for your music program.</p>
+
+  <div class="drop" id="drop">
+    <div class="plate">
+      <div class="drop-plate">Stemline 101 &middot; Voice</div>
+      <div class="drop-actions">
+        <button id="rec" class="btn btn-rec">&#9679;&nbsp; Record</button>
+        <button id="stop" class="btn btn-rec live" hidden>&#9632;&nbsp; Stop</button>
+        <span class="drop-or">or</span>
+        <label for="file" class="btn btn-up">Upload audio</label>
+        <input type="file" id="file" accept="audio/*">
+      </div>
+      <div id="meter"><i></i></div>
+      <p class="drop-hint">Drop an audio file here. Up to one minute, one note at a time.</p>
+      <label class="namebox"><span>Name your recording (optional)</span><input type="text" id="label" maxlength="60" placeholder="e.g. Chorus idea"></label>
+      <audio id="player" controls hidden></audio>
+    </div>
+    <svg class="pivot" viewBox="0 0 64 56" aria-hidden="true">
+      <defs><linearGradient id="pv" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6d737c"/><stop offset=".45" stop-color="#f4f6f9"/><stop offset="1" stop-color="#7b818a"/></linearGradient></defs>
+      <rect x="20" y="10" width="24" height="46" rx="4" fill="url(#pv)"/>
+      <rect x="14" y="0" width="36" height="16" rx="8" fill="url(#pv)"/>
+      <circle cx="32" cy="8" r="3.5" fill="#2a2d33"/>
+      <line x1="20" y1="30" x2="44" y2="30" stroke="#3b4048" stroke-width="1.5"/>
+    </svg>
+  </div>
+  <div id="status"></div>
+</section>
+
+<section class="results" id="results" hidden>
+  <div class="res-top">
+    <div id="info" class="info"></div>
+    <div class="res-btns">
+      <button id="go" class="btn btn-ghost" disabled>Run again</button>
+      <button id="dlxml" class="btn btn-ghost" disabled>Download MusicXML</button>
+      <button id="dlmidi" class="btn btn-solid" disabled>Download MIDI</button>
+    </div>
+  </div>
+  <div class="editor-bar">
+    <button id="play" class="btn btn-solid" type="button">&#9654;&nbsp; Play</button>
+    <label class="chk"><input type="checkbox" id="hearVoice" checked> My voice</label>
+    <label class="chk"><input type="checkbox" id="hearNotes" checked> Notes</label>
+    <button id="delNote" class="btn btn-ghost" type="button" disabled>Delete note</button>
+    <button id="undo" class="btn btn-ghost" type="button" disabled>Undo</button>
+    <span class="hint">Click a note to hear it. Drag it up or down to change its pitch, or sideways to move it. Double-click empty space to add a note. Click the waveform to jump to that spot.</span>
+  </div>
+  <div class="roll-wrap" id="rollWrap"><canvas id="wave"></canvas><canvas id="roll"></canvas></div>
+  <p id="edited">You changed the notes. The MIDI download has your changes; the sheet music below still shows the original.</p>
+  <div class="res-label">Sheet music</div>
+  <div id="sheet"></div>
+</section>
+
+<section class="block" id="about-audio-to-midi">
+  <h2>Sing it, get the notes</h2>
+  <p class="sub">A quick way to capture a tune before you forget it, or turn a vocal idea into a MIDI part.</p>
+  <div class="grid3">
+    <div class="card"><div class="ico">1</div><h3>Record or upload</h3><p>Use your mic right in the browser, or upload a clip of your voice or a single instrument.</p></div>
+    <div class="card"><div class="ico">2</div><h3>See your notes</h3><p>Your melody appears on a piano roll with the tempo and key, plus sheet music underneath.</p></div>
+    <div class="card"><div class="ico">3</div><h3>Open it in your DAW</h3><p>Download the MIDI file and drop it into FL Studio or any music program. MusicXML works in notation software.</p></div>
+  </div>
+  <div class="tipbox"><b>Using a full song?</b> This follows one melody line, so drums, chords and backing music add wrong notes. For a real song, <a href="/">split it on the main page</a> first, then upload just the vocal or bass stem here, or open <a href="/notation-viewer">Sheet music</a>, which works on your saved stems.</div>
+</section>
+
+<section class="block">
+  <h2>How it works</h2>
+  <p class="sub">Free accounts see an on-screen preview. Premium unlocks the full chart and the downloads.</p>
+  <ol class="steps">
+    <li><b>Log in</b> on the main page first.</li>
+    <li><b>Record or upload.</b> Press Record, then sing or whistle one note at a time and stay close to the mic. Press Stop when you're done. Or upload a recording of your voice.</li>
+    <li><b>Wait a moment.</b> The notes appear on their own, with the tempo and key. There is no extra button to press.</li>
+    <li><b>Download (Premium).</b> Press Download MIDI or Download MusicXML. The name you typed becomes the file name.</li>
+    <li><b>Open it in FL Studio.</b> Open an empty Piano roll and drag the .mid file into it. In the import window tick the track and press Accept, then pick any instrument to hear it.</li>
+  </ol>
+</section>
+
+<section class="block">
+  <h2>Tips for better results</h2>
+  <p class="sub">Clean input gives clean notes.</p>
+  <div class="grid3">
+    <div class="card"><h3>Keep it quiet</h3><p>Record in a quiet room with no music playing behind you.</p></div>
+    <div class="card"><h3>One note at a time</h3><p>Use "doo" or "la" so each note has a clear start. Slide between notes as little as you can.</p></div>
+    <div class="card"><h3>Short and steady</h3><p>Keep a steady pace and stay under a minute. Short phrases give the cleanest result.</p></div>
+  </div>
+</section>
+
+<section class="block">
+  <h2>Questions</h2>
+  <p class="sub">&nbsp;</p>
+  <div class="faq">
+    <details><summary>Does it work with more than one voice?</summary><p>No. It follows a single melody line. Chords, harmonies and backing music will confuse it.</p></details>
+    <details><summary>Can I use a full song?</summary><p>You can, but the result will be rough. It follows a single melody line, so drums, chords and backing music add wrong notes. For a real song, split it into stems on the main page first, then use just the vocal or bass stem.</p></details>
+    <details><summary>Why are some notes wrong?</summary><p>Notes are detected automatically from the sound of your voice, so a wobbly pitch or a noisy room can cause mistakes. Treat the result as a first draft and fix anything that sounds off.</p></details>
+    <details><summary>Can I use this for free?</summary><p>Yes. Free accounts see the first few measures on screen. Premium unlocks the full chart and the MIDI and MusicXML downloads.</p></details>
+    <details><summary>What can I open the downloads in?</summary><p>MIDI opens in music production programs. MusicXML opens in notation software such as MuseScore, Finale, Sibelius and Dorico.</p></details>
+  </div>
+</section>
+
+<section class="block">
+  <div class="cta">
+    <h2>Got a melody in your head?</h2>
+    <p>Record it now and see the notes in seconds.</p>
+    <a class="btn btn-solid" href="#drop" onclick="window.scrollTo({top:0,behavior:'smooth'});return false;">Record a melody</a>
+  </div>
+</section>
+</main>
+<footer class="site-footer">
+  <div style="display: flex; gap: 1.2rem; justify-content: center; flex-wrap: wrap;">
+    <a href="/privacy" style="color: inherit; text-decoration: underline;">Privacy Policy</a>
+    <a href="/terms" style="color: inherit; text-decoration: underline;">Terms of Service</a>
+    <a href="/about" style="color: inherit; text-decoration: underline;">About</a>
+    <a href="/faq" style="color: inherit; text-decoration: underline;">FAQ</a>
+    <a href="/guides" style="color: inherit; text-decoration: underline;">Guides</a>
+    <a href="/contact" style="color: inherit; text-decoration: underline;">Contact</a>
+  </div>
+  <div style="margin-top: 0.8rem;">&copy; 2026 stemline101.com. All rights reserved.</div>
+</footer>
+
+<script>
+(function () {
+  var token = null;
+  try { token = localStorage.getItem('soundlounge101_token'); } catch (e) {}
+  var $ = function (id) { return document.getElementById(id); };
+  var statusEl = $('status'), infoEl = $('info'), recBtn = $('rec'), goBtn = $('go'),
+      xmlBtn = $('dlxml'), midiBtn = $('dlmidi'), player = $('player'), meter = $('meter').firstChild,
+      stopBtn = $('stop'), labelEl = $('label'), resultsEl = $('results'), rollEl = $('roll'), dropEl = $('drop');
+  // File name for downloads comes from the label the person typed.
+  function fileBase() {
+    var n = (labelEl.value || '').trim().replace(/[\\\/:*?"<>|]+/g, '').replace(/\s+/g, ' ').slice(0, 60);
+    return n || 'recording';
+  }
+  var osmd = null, wavBlob = null, ctx = null, stream = null, proc = null, chunks = [], recRate = 44100, recording = false, timer = null;
+
+  function setStatus(t) { statusEl.textContent = t || ''; }
+  function save(blob, name) {
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+  function showInfo(xml, bpm) {
+    var key = (xml.match(/Key:\s*([A-G][b#]?\s+(?:major|minor))/) || [])[1];
+    var beats = (xml.match(/<beats>(\d+)<\/beats>/) || [])[1], bt = (xml.match(/<beat-type>(\d+)<\/beat-type>/) || [])[1];
+    var h = '';
+    if (bpm) h += '<div class="chip"><span>Tempo</span><b>' + Math.round(bpm) + ' BPM</b></div>';
+    if (key) h += '<div class="chip"><span>Key</span><b>' + key + '</b></div>';
+    if (beats && bt) h += '<div class="chip"><span>Time</span><b>' + beats + '/' + bt + '</b></div>';
+    infoEl.innerHTML = h;
+  }
+
+  // ---- WAV encoding (mono, 22.05 kHz, 16-bit) so the server never needs to decode browser formats
+  function toWav(samples, rate) {
+    var target = 22050, ratio = rate / target, n = Math.floor(samples.length / ratio), out = new Int16Array(n);
+    for (var i = 0; i < n; i++) {
+      var a = Math.floor(i * ratio), b = Math.min(samples.length, Math.floor((i + 1) * ratio)), sum = 0, c = 0;
+      for (var j = a; j < b; j++) { sum += samples[j]; c++; }
+      var v = c ? sum / c : 0; v = Math.max(-1, Math.min(1, v));
+      out[i] = v < 0 ? v * 0x8000 : v * 0x7fff;
+    }
+    var buf = new ArrayBuffer(44 + out.length * 2), dv = new DataView(buf);
+    function str(o, s) { for (var k = 0; k < s.length; k++) dv.setUint8(o + k, s.charCodeAt(k)); }
+    str(0, 'RIFF'); dv.setUint32(4, 36 + out.length * 2, true); str(8, 'WAVE'); str(12, 'fmt ');
+    dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+    dv.setUint32(24, target, true); dv.setUint32(28, target * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+    str(36, 'data'); dv.setUint32(40, out.length * 2, true);
+    for (var m = 0; m < out.length; m++) dv.setInt16(44 + m * 2, out[m], true);
+    return new Blob([buf], { type: 'audio/wav' });
+  }
+  function ready(blob) {
+    wavBlob = blob; player.src = URL.createObjectURL(blob); player.hidden = false;
+    goBtn.disabled = !token;
+    if (token) { goBtn.click(); }   // writes the notes automatically, no extra button press
+    else { setStatus('Log in on the main page first.'); }
+  }
+
+  async function startRec() {
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }); }
+    catch (e) { setStatus('Could not use the microphone. Allow mic access in your browser, or upload a recording instead.'); return; }
+    ctx = new (window.AudioContext || window.webkitAudioContext)(); recRate = ctx.sampleRate; chunks = [];
+    var src = ctx.createMediaStreamSource(stream);
+    proc = ctx.createScriptProcessor(4096, 1, 1);
+    proc.onaudioprocess = function (e) {
+      var d = e.inputBuffer.getChannelData(0); chunks.push(new Float32Array(d));
+      var peak = 0; for (var i = 0; i < d.length; i += 8) peak = Math.max(peak, Math.abs(d[i]));
+      meter.style.width = Math.min(100, peak * 140) + '%';
+    };
+    src.connect(proc); proc.connect(ctx.destination);
+    recording = true; recBtn.hidden = true; stopBtn.hidden = false;
+    var t0 = Date.now(); setStatus('Recording… sing or whistle.');
+    timer = setInterval(function () {
+      var s = Math.round((Date.now() - t0) / 1000); setStatus('Recording… ' + s + 's');
+      if (s >= 60) stopRec();
+    }, 250);
+  }
+  function stopRec() {
+    if (!recording) return; recording = false; clearInterval(timer);
+    proc.disconnect(); stream.getTracks().forEach(function (t) { t.stop(); }); ctx.close();
+    stopBtn.hidden = true; recBtn.hidden = false; meter.style.width = '0';
+    var len = chunks.reduce(function (a, c) { return a + c.length; }, 0), all = new Float32Array(len), o = 0;
+    chunks.forEach(function (c) { all.set(c, o); o += c.length; });
+    if (len < recRate * 0.5) { setStatus('That was too short. Try again.'); return; }
+    ready(toWav(all, recRate));
+  }
+  recBtn.addEventListener('click', function () { if (!recording) startRec(); });
+  stopBtn.addEventListener('click', stopRec);
+
+  async function handleFile(f) {
+    if (!f) return;
+    setStatus('Reading your file…');
+    try {
+      var ac = new (window.AudioContext || window.webkitAudioContext)();
+      var buf = await ac.decodeAudioData(await f.arrayBuffer());
+      var ch = buf.getChannelData(0), n = Math.min(ch.length, Math.floor(buf.sampleRate * 60));
+      ready(toWav(ch.subarray(0, n), buf.sampleRate)); ac.close();
+    } catch (err) { setStatus('Could not read that file. Try a WAV or MP3.'); }
+  }
+  $('file').addEventListener('change', function (e) { handleFile(e.target.files[0]); });
+  ['dragenter', 'dragover'].forEach(function (ev) { dropEl.addEventListener(ev, function (e) { e.preventDefault(); dropEl.classList.add('over'); }); });
+  ['dragleave', 'drop'].forEach(function (ev) { dropEl.addEventListener(ev, function (e) { e.preventDefault(); dropEl.classList.remove('over'); }); });
+  dropEl.addEventListener('drop', function (e) { handleFile(e.dataTransfer && e.dataTransfer.files[0]); });
+
+  // ---- editor: waveform on top, piano roll with a real keyboard under it, click / drag / delete notes
+  var waveEl = $('wave'), playBtn = $('play'), delBtn = $('delNote'), undoBtn = $('undo'), editedEl = $('edited');
+  var notesArr = [], sel = -1, voiceBuf = null, peaks = null, undoStack = [], edited = false, lastBpm = 120;
+  var lo = 48, hi = 72, endT = 1, keysW = 58, pad = 8, playPos = 0, playing = false, pctx = null, voiceSrc = null, tones = [], raf = 0, playT0 = 0, playFrom = 0;
+  var BLACK = [1, 3, 6, 8, 10];
+  function geo() {
+    var W = rollEl.clientWidth, H = rollEl.clientHeight, rows = hi - lo + 1;
+    return { W: W, H: H, rows: rows, rh: (H - pad * 2) / rows, pw: W - keysW - pad };
+  }
+  function tx(t, g) { return keysW + (t / endT) * g.pw; }
+  function xt(x, g) { return Math.max(0, Math.min(endT, (x - keysW) / g.pw * endT)); }
+  function py(p, g) { return pad + (hi - p) * g.rh; }
+  function yp(y, g) { return Math.max(lo, Math.min(hi, hi - Math.floor((y - pad) / g.rh))); }
+  function pitchName(p) { return ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][p % 12] + (Math.floor(p / 12) - 1); }
+
+  function setupRoll(raw, bpm) {
+    notesArr = (raw || []).map(function (n) { return { p: n[0], s: n[1], e: n[2] }; });
+    lastBpm = bpm || 120; sel = -1; undoStack = []; edited = false; editedEl.style.display = 'none';
+    var l = Infinity, h = -Infinity, e = 0;
+    notesArr.forEach(function (n) { l = Math.min(l, n.p); h = Math.max(h, n.p); e = Math.max(e, n.e); });
+    if (!isFinite(l)) { l = 55; h = 66; }
+    lo = Math.max(21, l - 4); hi = Math.min(108, h + 4); if (hi - lo < 14) { hi = Math.min(108, lo + 14); }
+    endT = Math.max(1, e, voiceBuf ? voiceBuf.duration : 0); playPos = 0;
+    updateBtns(); drawRoll();
+  }
+  function updateBtns() { delBtn.disabled = sel < 0; undoBtn.disabled = !undoStack.length; }
+  function snapshot() { undoStack.push(JSON.stringify(notesArr)); if (undoStack.length > 60) undoStack.shift(); updateBtns(); }
+  function markEdited() { edited = true; editedEl.style.display = 'block'; }
+  function sortNotes() { var cur = sel >= 0 ? notesArr[sel] : null; notesArr.sort(function (a, b) { return a.s - b.s; }); sel = cur ? notesArr.indexOf(cur) : -1; }
+
+  function drawRoll() {
+    var g = geo(), dpr = window.devicePixelRatio || 1;
+    // --- waveform
+    var WH = waveEl.clientHeight;
+    waveEl.width = g.W * dpr; waveEl.height = WH * dpr;
+    var wc = waveEl.getContext('2d'); wc.setTransform(dpr, 0, 0, dpr, 0, 0); wc.clearRect(0, 0, g.W, WH);
+    wc.fillStyle = '#0c0c0e'; wc.fillRect(0, 0, g.W, WH);
+    wc.fillStyle = '#6B7078'; wc.font = '10px Inter, sans-serif'; wc.textBaseline = 'middle'; wc.fillText('Audio', 8, WH / 2);
+    if (peaks) {
+      wc.fillStyle = '#E7A33E';
+      var per = 100;  // peaks per second
+      for (var x = 0; x < g.pw; x++) {
+        var t0 = x / g.pw * endT, t1 = (x + 1) / g.pw * endT, i0 = Math.floor(t0 * per), i1 = Math.max(i0 + 1, Math.ceil(t1 * per)), m = 0;
+        for (var i = i0; i < i1 && i < peaks.length; i++) if (peaks[i] > m) m = peaks[i];
+        var hgt = Math.max(1, m * (WH - 8));
+        wc.fillRect(keysW + x, (WH - hgt) / 2, 1, hgt);
+      }
+    }
+    var px = tx(playPos, g); wc.fillStyle = '#ff6a3d'; wc.fillRect(px, 0, 1.5, WH);
+    // --- roll
+    rollEl.width = g.W * dpr; rollEl.height = g.H * dpr;
+    var c = rollEl.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, g.W, g.H);
+    c.fillStyle = '#0c0c0e'; c.fillRect(0, 0, g.W, g.H);
+    var p;
+    for (p = lo; p <= hi; p++) {
+      var y = py(p, g), isB = BLACK.indexOf(p % 12) >= 0;
+      c.fillStyle = isB ? '#101013' : '#16161a'; c.fillRect(keysW, y, g.pw, g.rh);
+      c.strokeStyle = 'rgba(216,220,226,' + (p % 12 === 0 ? '0.16' : '0.05') + ')'; c.beginPath(); c.moveTo(keysW, y + g.rh); c.lineTo(g.W - pad, y + g.rh); c.stroke();
+    }
+    // time grid (every second)
+    for (var s2 = 0; s2 <= Math.ceil(endT); s2++) {
+      var gx = tx(s2, g); if (gx > g.W - pad + 1) break;
+      c.strokeStyle = 'rgba(216,220,226,0.07)'; c.beginPath(); c.moveTo(gx, pad); c.lineTo(gx, g.H - pad); c.stroke();
+    }
+    // keyboard: white keys first, then the shorter black keys on top
+    for (p = lo; p <= hi; p++) {
+      if (BLACK.indexOf(p % 12) >= 0) continue;
+      var ky = py(p, g);
+      var gr = c.createLinearGradient(0, 0, keysW, 0); gr.addColorStop(0, '#d9dce1'); gr.addColorStop(1, '#fbfcfd');
+      c.fillStyle = gr; c.fillRect(0, ky, keysW - 1, g.rh);
+      c.strokeStyle = '#8b919a'; c.beginPath(); c.moveTo(0, ky + g.rh - 0.5); c.lineTo(keysW - 1, ky + g.rh - 0.5); c.stroke();
+      if (p % 12 === 0) { c.fillStyle = '#444'; c.font = '10px Inter, sans-serif'; c.textBaseline = 'middle'; c.fillText('C' + (Math.floor(p / 12) - 1), keysW - 22, ky + g.rh / 2); }
+    }
+    for (p = lo; p <= hi; p++) {
+      if (BLACK.indexOf(p % 12) < 0) continue;
+      var by = py(p, g), gb = c.createLinearGradient(0, 0, keysW * 0.62, 0); gb.addColorStop(0, '#000'); gb.addColorStop(1, '#3a3d44');
+      c.fillStyle = gb; c.fillRect(0, by, keysW * 0.62, g.rh);
+    }
+    // notes
+    notesArr.forEach(function (n, i) {
+      var x = tx(n.s, g), w = Math.max(4, tx(n.e, g) - x - 1), y = py(n.p, g), h = Math.max(4, g.rh - 2);
+      var gn = c.createLinearGradient(0, y, 0, y + h);
+      if (i === sel) { gn.addColorStop(0, '#ffd27a'); gn.addColorStop(1, '#f0a02e'); } else { gn.addColorStop(0, '#f2b453'); gn.addColorStop(1, '#d98f26'); }
+      c.fillStyle = gn; c.beginPath();
+      if (c.roundRect) c.roundRect(x, y + 1, w, h, 3); else c.rect(x, y + 1, w, h);
+      c.fill();
+      if (i === sel) { c.strokeStyle = '#fff'; c.lineWidth = 1.5; c.stroke(); c.lineWidth = 1; }
+    });
+    // playhead
+    c.fillStyle = '#ff6a3d'; c.fillRect(px, 0, 1.5, g.H);
+  }
+  window.addEventListener('resize', drawRoll);
+
+  // ---- sound: short piano-ish tones for clicking / playing notes
+  function audioCtx() {
+    if (!pctx) pctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (pctx.state === 'suspended') pctx.resume();
+    return pctx;
+  }
+  var noiseBuf = null;
+  function tone(p, when, dur, vol) {
+    // piano-like: a few decaying overtones, two slightly detuned strings, a soft hammer tick,
+    // brighter for loud/low notes, and a quick release when the note ends
+    var ac = audioCtx(), t = when == null ? ac.currentTime : when, f = 440 * Math.pow(2, (p - 69) / 12), v = vol || 0.3;
+    dur = Math.max(0.12, dur);
+    var out = ac.createGain(), lp = ac.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = Math.min(9000, 900 + f * 7); lp.Q.value = 0.4;
+    out.connect(lp); lp.connect(ac.destination);
+    var tau = Math.max(0.25, Math.min(1.3, 1.5 - (p - 36) * 0.014));    // lower notes ring longer
+    out.gain.setValueAtTime(0.0001, t);
+    out.gain.linearRampToValueAtTime(v, t + 0.004);
+    out.gain.setTargetAtTime(v * 0.08, t + 0.004, tau);
+    out.gain.cancelScheduledValues(t + dur);
+    out.gain.setTargetAtTime(0.0001, t + dur, 0.07);
+    var amps = [1, 0.55, 0.32, 0.2, 0.12, 0.07, 0.04], end = t + dur + 0.5;
+    amps.forEach(function (a, k) {
+      var h = k + 1, hf = f * h * Math.sqrt(1 + 0.0004 * h * h); if (hf > 12000) return;
+      [-1.2, 1.2].forEach(function (cents) {
+        var o = ac.createOscillator(), g = ac.createGain();
+        o.type = 'sine'; o.frequency.value = hf; o.detune.value = cents;
+        g.gain.value = a * 0.5 * Math.pow(0.5, Math.max(0, h - 1) * Math.max(0, (p - 60)) / 40);  // high notes: fewer overtones
+        o.connect(g); g.connect(out); o.start(t); o.stop(end); tones.push(o);
+      });
+    });
+    if (!noiseBuf) {
+      noiseBuf = ac.createBuffer(1, Math.floor(ac.sampleRate * 0.03), ac.sampleRate);
+      var nd = noiseBuf.getChannelData(0); for (var i = 0; i < nd.length; i++) nd[i] = (Math.random() * 2 - 1) * (1 - i / nd.length);
+    }
+    var ns = ac.createBufferSource(), ng = ac.createGain(), hp = ac.createBiquadFilter();
+    ns.buffer = noiseBuf; hp.type = 'bandpass'; hp.frequency.value = Math.min(4000, f * 3); hp.Q.value = 0.8; ng.gain.value = v * 0.25;
+    ns.connect(hp); hp.connect(ng); ng.connect(ac.destination); ns.start(t);
+  }
+  function stopPlay() {
+    playing = false; cancelAnimationFrame(raf); playBtn.innerHTML = '&#9654;&nbsp; Play';
+    if (voiceSrc) { try { voiceSrc.stop(); } catch (e) {} voiceSrc = null; }
+    tones.forEach(function (o) { try { o.stop(); } catch (e) {} }); tones = [];
+  }
+  function startPlay() {
+    var ac = audioCtx(), from = playPos >= endT - 0.05 ? 0 : playPos, t0 = ac.currentTime + 0.06;
+    playFrom = from; playT0 = t0; playing = true; playBtn.innerHTML = '&#9632;&nbsp; Stop';
+    if ($('hearVoice').checked && voiceBuf) {
+      voiceSrc = ac.createBufferSource(); voiceSrc.buffer = voiceBuf; voiceSrc.connect(ac.destination); voiceSrc.start(t0, from);
+    }
+    if ($('hearNotes').checked) {
+      notesArr.forEach(function (n) { if (n.e > from) tone(n.p, t0 + Math.max(0, n.s - from), Math.max(0.12, n.e - Math.max(n.s, from)), 0.22); });
+    }
+    (function tick() {
+      if (!playing) return;
+      playPos = playFrom + (ac.currentTime - playT0);
+      if (playPos >= endT) { playPos = endT; stopPlay(); drawRoll(); return; }
+      if (playPos < 0) playPos = 0;
+      drawRoll(); raf = requestAnimationFrame(tick);
+    })();
+  }
+  playBtn.addEventListener('click', function () { if (playing) stopPlay(); else startPlay(); });
+
+  // ---- mouse / touch editing
+  var drag = null;
+  function hit(x, y) {
+    var g = geo();
+    for (var i = notesArr.length - 1; i >= 0; i--) {
+      var n = notesArr[i], nx = tx(n.s, g), nw = Math.max(6, tx(n.e, g) - nx), ny = py(n.p, g);
+      if (x >= nx - 2 && x <= nx + nw + 2 && y >= ny && y <= ny + g.rh) return i;
+    }
+    return -1;
+  }
+  function pos(e) { var r = rollEl.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+  rollEl.addEventListener('pointerdown', function (e) {
+    var q = pos(e), g = geo();
+    if (q.x < keysW) { tone(yp(q.y, g), null, 0.5, 0.3); return; }       // click a piano key
+    var i = hit(q.x, q.y);
+    if (i < 0) { sel = -1; updateBtns(); drawRoll(); return; }
+    sel = i; var n = notesArr[i]; tone(n.p, null, 0.45, 0.3); updateBtns();
+    drag = { i: i, x0: q.x, y0: q.y, p0: n.p, s0: n.s, e0: n.e, mode: null, pushed: false };
+    rollEl.setPointerCapture(e.pointerId); drawRoll();
+  });
+  rollEl.addEventListener('pointermove', function (e) {
+    if (!drag) return;
+    var q = pos(e), g = geo(), n = notesArr[drag.i], dx = q.x - drag.x0, dy = q.y - drag.y0;
+    if (!drag.mode) {
+      if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+      drag.mode = Math.abs(dx) > Math.abs(dy) ? 'time' : 'pitch';
+    }
+    if (!drag.pushed) { snapshot(); drag.pushed = true; }
+    if (drag.mode === 'pitch') {
+      var np = Math.max(lo, Math.min(hi, drag.p0 - Math.round(dy / g.rh)));
+      if (np !== n.p) { n.p = np; tone(np, null, 0.35, 0.25); markEdited(); }
+    } else {
+      var d = dx / g.pw * endT, len = drag.e0 - drag.s0, ns = Math.max(0, Math.min(endT - len, drag.s0 + d));
+      n.s = ns; n.e = ns + len; markEdited();
+    }
+    drawRoll();
+  });
+  function endDrag() { if (drag && drag.mode === 'time') sortNotes(); drag = null; drawRoll(); }
+  rollEl.addEventListener('pointerup', endDrag); rollEl.addEventListener('pointercancel', endDrag);
+  rollEl.addEventListener('dblclick', function (e) {
+    var q = pos(e), g = geo(); if (q.x < keysW || hit(q.x, q.y) >= 0) return;
+    snapshot(); var s0 = xt(q.x, g), p = yp(q.y, g);
+    notesArr.push({ p: p, s: s0, e: Math.min(endT, s0 + 0.3) }); sortNotes(); sel = notesArr.findIndex(function (n) { return n.p === p && n.s === s0; });
+    tone(p, null, 0.4, 0.3); markEdited(); updateBtns(); drawRoll();
+  });
+  waveEl.addEventListener('click', function (e) {
+    var r = waveEl.getBoundingClientRect(), g = geo(); var t = xt(e.clientX - r.left, g);
+    var was = playing; if (was) stopPlay(); playPos = t; drawRoll(); if (was) startPlay();
+  });
+  function deleteSel() {
+    if (sel < 0) return; snapshot(); notesArr.splice(sel, 1); sel = -1; markEdited(); updateBtns(); drawRoll();
+  }
+  delBtn.addEventListener('click', deleteSel);
+  undoBtn.addEventListener('click', function () {
+    if (!undoStack.length) return; notesArr = JSON.parse(undoStack.pop()); sel = -1; markEdited(); updateBtns(); drawRoll();
+  });
+  document.addEventListener('keydown', function (e) {
+    var tg = (e.target && e.target.tagName) || ''; if (tg === 'INPUT' || tg === 'TEXTAREA') return;
+    if (e.key === 'Delete' || e.key === 'Backspace') { if (sel >= 0) { e.preventDefault(); deleteSel(); } }
+    else if (e.key === ' ' && resultsEl.hidden === false) { e.preventDefault(); playBtn.click(); }
+  });
+
+  // waveform data from the recording (peaks every 10 ms)
+  async function loadVoice(blob) {
+    voiceBuf = null; peaks = null;
+    try {
+      var oc = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 1, 22050);
+      voiceBuf = await oc.decodeAudioData(await blob.arrayBuffer());
+      var ch = voiceBuf.getChannelData(0), per = voiceBuf.sampleRate / 100, n = Math.ceil(ch.length / per), mx = 0.001;
+      peaks = new Float32Array(n);
+      for (var i = 0; i < n; i++) { var m = 0, e0 = Math.min(ch.length, Math.floor((i + 1) * per)); for (var j = Math.floor(i * per); j < e0; j++) { var v = Math.abs(ch[j]); if (v > m) m = v; } peaks[i] = m; if (m > mx) mx = m; }
+      for (var k = 0; k < n; k++) peaks[k] = Math.pow(peaks[k] / mx, 0.7);
+    } catch (e) { voiceBuf = null; peaks = null; }
+  }
+
+  // MIDI file built in the browser from the edited notes
+  function buildMidi(list, bpm) {
+    var ppq = 480, tps = ppq * bpm / 60, ev = [];
+    list.forEach(function (n) { ev.push([Math.round(n.s * tps), 1, n.p], [Math.max(Math.round(n.e * tps), Math.round(n.s * tps) + 1), 0, n.p]); });
+    ev.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+    var d = [];
+    function vlq(v) { var b = [v & 0x7f]; while ((v >>= 7)) b.unshift((v & 0x7f) | 0x80); return b; }
+    var mpq = Math.round(60000000 / bpm);
+    d.push(0, 0xFF, 0x51, 3, (mpq >> 16) & 255, (mpq >> 8) & 255, mpq & 255);
+    d.push(0, 0xFF, 0x03, 5, 86, 111, 105, 99, 101);   // track name "Voice"
+    var last = 0;
+    ev.forEach(function (x) { d = d.concat(vlq(x[0] - last)); last = x[0]; d.push(x[1] ? 0x90 : 0x80, x[2] & 127, x[1] ? 90 : 0); });
+    d.push(0, 0xFF, 0x2F, 0);
+    var head = [0x4d, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 0, 0, 1, ppq >> 8, ppq & 255];
+    var len = d.length, trk = [0x4d, 0x54, 0x72, 0x6b, (len >>> 24) & 255, (len >>> 16) & 255, (len >>> 8) & 255, len & 255];
+    return new Uint8Array(head.concat(trk, d));
+  }
+
+  goBtn.addEventListener('click', async function () {
+    if (!wavBlob) return;
+    goBtn.disabled = true; xmlBtn.disabled = true; midiBtn.disabled = true; infoEl.innerHTML = '';
+    setStatus('Listening and writing out the notes… this can take a minute.');
+    try {
+      var fd = new FormData(); fd.append('file', wavBlob, 'voice.wav');
+      var r = await fetch('/api/v1/hum-to-notes?token=' + encodeURIComponent(token), { method: 'POST', body: fd });
+      if (!r.ok) { var msg = 'Something went wrong.'; try { msg = (await r.json()).detail || msg; } catch (e) {} throw new Error(msg); }
+      var d = await r.json();
+      if (!osmd) osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay('sheet', { autoResize: true, drawTitle: true });
+      stopPlay(); resultsEl.hidden = false; await loadVoice(wavBlob); setupRoll(d.notes || [], d.bpm);
+      await osmd.load(d.musicxml); osmd.render(); showInfo(d.musicxml, d.bpm);
+      resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      xmlBtn.disabled = false; midiBtn.disabled = false;
+      if (d.preview) {
+        setStatus('Free preview: first 8 measures only. Upgrade to Premium for the full chart and downloads.');
+        var msg2 = 'MIDI and MusicXML downloads are a Premium feature.';
+        xmlBtn.onclick = midiBtn.onclick = function () { setStatus(msg2); alert(msg2); };
+      } else {
+        setStatus('Done. ' + d.note_count + ' notes found.');
+        xmlBtn.onclick = function () { save(new Blob([d.musicxml], { type: 'application/xml' }), fileBase() + '.musicxml'); };
+        midiBtn.onclick = function () {
+          var u;
+          if (edited) { u = buildMidi(notesArr, lastBpm); }
+          else { var b = atob(d.midi_b64); u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); }
+          save(new Blob([u], { type: 'audio/midi' }), fileBase() + '.mid');
+        };
+      }
+    } catch (e) { setStatus(e.message); }
+    goBtn.disabled = false;
+  });
+
+  if (!token) setStatus('Log in on the main page first.');
+})();
+</script>
+<script>
+(function () {
+  try {
+    var t = localStorage.getItem('soundlounge101_token'); if (!t) return;
+    fetch('/api/v1/me?token=' + encodeURIComponent(t)).then(function (r) { return r.json(); }).then(function (d) {
+      if (d && d.show_ads === false) { var a = document.getElementById('adSlot'); if (a) a.style.display = 'none'; }
+    }).catch(function () {});
+  } catch (e) {}
+})();
+</script>
+</body>
+</html>
